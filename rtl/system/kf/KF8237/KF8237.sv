@@ -35,9 +35,11 @@ module KF8237 (
     output  logic           address_strobe,
     output  logic           memory_read_n,
     output  logic           memory_write_n,
-    // pc10-iii: the next clk's values of the I/O strobes (without reset)
+    // pc10-iii: the next clk's values of the strobes (without reset)
     output  logic           io_read_n_next,
-    output  logic           io_write_n_next
+    output  logic           io_write_n_next,
+    output  logic           memory_read_n_next,
+    output  logic           memory_write_n_next
 );
 
 
@@ -237,6 +239,8 @@ module KF8237 (
         .memory_write_n                     (memory_write_n),
         .io_read_n_out_next                 (io_read_n_next),
         .io_write_n_out_next                (io_write_n_next),
+        .memory_read_n_next                 (memory_read_n_next),
+        .memory_write_n_next                (memory_write_n_next),
         .io_read_n_out                      (io_read_n_out),
         .io_read_n_io                       (io_read_n_io),
         .io_write_n_out                     (io_write_n_out),

@@ -114,11 +114,14 @@ always_ff @(posedge clk) begin
     sel_dor_q <= io_sel_n && isa_addr_next[2:0] == 3'd2;
     sel_fdc_q <= io_sel_n && (isa_addr_next[2:0] == 3'd4 || isa_addr_next[2:0] == 3'd5);
 end
+logic       a0_q;
+always_ff @(posedge clk) a0_q <= isa_addr_next[0];
 wire        sel_dor = REG_DECODE ? sel_dor_q : sel_dor_c;
 wire        sel_fdc = REG_DECODE ? sel_fdc_q : sel_fdc_c;
+wire        bus_a0  = REG_DECODE ? a0_q : isa_addr[0];
 `ifndef SYNTHESIS
 always_ff @(posedge clk)
-    if (REG_DECODE && (sel_dor_q !== sel_dor_c || sel_fdc_q !== sel_fdc_c))
+    if (REG_DECODE && (sel_dor_q !== sel_dor_c || sel_fdc_q !== sel_fdc_c || a0_q !== isa_addr[0]))
         $fatal(1, "fdc_card: registered address decode differs from the bus");
 `endif
 wire        ior_fall_c = !isa_ior_n && ior_d;
@@ -215,9 +218,32 @@ assign isa_irq   = {1'b0, intr && dor[3], 4'b0000};
 assign isa_drq   = {1'b0, drq && dor[3], 1'b0};
 
 // ------------------------------------------------------------ the drives
+// pc10-iii (timing): the drive inputs (image geometry, presence, write
+// protection: the glue's, asynchronous to the PC) are registered where they
+// enter the card, and everything of the selected drive the 765 uses is a
+// register loaded from the next values (the DOR's, the cylinders' and these
+// inputs), so neither the DOR's select bits nor the geometry multiplexers
+// sit in front of the 765. The inputs take effect one clk later than before,
+// which is the same as a glue one clk slower (doc/timing.md 2.7).
+logic [1:0]      b_80trk, b_present, b_wp;
+logic [1:0][7:0] b_tracks;
+logic [1:0][1:0] b_heads;
+logic [1:0][5:0] b_spt;
+logic [7:0]      b_spc [2];             // sectors per cylinder per drive
+always_ff @(posedge clk) begin
+    b_80trk   <= drv_80trk;
+    b_present <= img_present;
+    b_wp      <= img_wp;
+    b_tracks  <= img_tracks;
+    b_heads   <= img_heads;
+    b_spt     <= img_spt;
+    b_spc[0]  <= 8'(img_heads[0]) * 8'(img_spt[0]);
+    b_spc[1]  <= 8'(img_heads[1]) * 8'(img_spt[1]);
+end
+
 // A drive is selected when the DOR selects it and its motor bit is set.
 wire [1:0] psel     = dor[1:0];
-wire       drv_sel  = int'(psel) < NDRIVES && dor[4 + psel];
+logic      drv_sel;                     // registered below: int'(psel) < NDRIVES && dor[4 + psel]
 wire       pd       = psel[0];
 logic [7:0] cyl [2];
 
@@ -241,32 +267,45 @@ always_comb begin
         cyl_next[1] = 8'd0;
     end else if (step && drv_sel) begin
         if (step_dir) begin
-            if (cyl[pd] < (drv_80trk[pd] ? 8'd83 : 8'd41)) cyl_next[pd] = cyl[pd] + 8'd1;
+            if (cyl[pd] < (b_80trk[pd] ? 8'd83 : 8'd41)) cyl_next[pd] = cyl[pd] + 8'd1;
         end else if (cyl[pd] != 8'd0)
             cyl_next[pd] = cyl[pd] - 8'd1;
     end
 end
+// the selected drive, from the next values
+wire [1:0]  psel_n  = dor_next[1:0];
+wire        pd_n    = psel_n[0];
+logic       s_present, s_wp, s_cyl_ok;
+logic [1:0] s_heads;
+logic [5:0] s_spt;
 always_ff @(posedge clk) begin
     dor       <= dor_next;
     cyl       <= cyl_next;
-    drv_cyl_q <= cyl_next[dor_next[0]];
+    drv_cyl_q <= cyl_next[pd_n];
+    drv_sel   <= int'(psel_n) < NDRIVES && dor_next[4 + psel_n];
+    s_present <= img_present[pd_n];
+    s_wp      <= img_wp[pd_n];
+    s_heads   <= img_heads[pd_n];
+    s_spt     <= img_spt[pd_n];
+    s_cyl_ok  <= cyl_next[pd_n] < img_tracks[pd_n];
 end
 `ifndef SYNTHESIS
 always_ff @(posedge clk)
-    if (drv_cyl_q !== cyl[pd])
-        $fatal(1, "fdc_card: registered drive cylinder differs from cyl[pd]");
+    if (drv_cyl_q !== cyl[pd] || drv_sel !== (int'(psel) < NDRIVES && dor[4 + psel]) ||
+        s_present !== b_present[pd] || s_wp !== b_wp[pd] || s_heads !== b_heads[pd] ||
+        s_spt !== b_spt[pd] || s_cyl_ok !== (cyl[pd] < b_tracks[pd]) ||
+        b_spc[0] !== 8'(b_heads[0]) * 8'(b_spt[0]) || b_spc[1] !== 8'(b_heads[1]) * 8'(b_spt[1]))
+        $fatal(1, "fdc_card: registered selected-drive values differ from the original expressions");
 `endif
 
 assign drv_motor  = dor[5:4];
 assign fdc_active = active;
 
 // geometry of the selected drive's medium and the image address
-// pc10-iii (timing): the head's cylinder against the medium's tracks for the
-// 765's track format check, from the registered cylinder (the same value as
-// cyl[pd] < img_tracks[pd])
-wire        g_cyl_ok = drv_cyl_q < img_tracks[pd];
-wire [1:0]  g_heads  = img_heads[pd];
-wire [5:0]  g_spt    = img_spt[pd];
+// (pc10-iii: g_cyl_ok = cyl[pd] < tracks for the 765's track format check)
+wire        g_cyl_ok = s_cyl_ok;
+wire [1:0]  g_heads  = s_heads;
+wire [5:0]  g_spt    = s_spt;
 // Timing (pc10-iii, doc/timing.md): the image address is computed for both
 // drives' geometries and the DOR's drive select picks one at the end, so the
 // DOR is one LUT before the sector port's LBA register instead of in front of
@@ -277,12 +316,10 @@ wire [5:0]  g_spt    = img_spt[pd];
 // same value for every input: nothing in either form exceeds 16 bits
 // (255 * 189 + 63 + 255 < 65536). Originally:
 //   wire [15:0] x_lba    = 16'(({8'd0, x_cyl} * 16'(g_heads) + 16'(x_head)) * 16'(g_spt) + 16'(x_sec) - 16'd1);
-wire [7:0]  g_spc_d0 = 8'(img_heads[0]) * 8'(img_spt[0]);
-wire [7:0]  g_spc_d1 = 8'(img_heads[1]) * 8'(img_spt[1]);
 (* keep = "true" *) wire [15:0] x_lba_d0 =
-    16'({8'd0, x_cyl} * {8'd0, g_spc_d0}) + (x_head ? 16'(img_spt[0]) : 16'd0) + 16'(x_sec) - 16'd1;
+    16'({8'd0, x_cyl} * {8'd0, b_spc[0]}) + (x_head ? 16'(b_spt[0]) : 16'd0) + 16'(x_sec) - 16'd1;
 (* keep = "true" *) wire [15:0] x_lba_d1 =
-    16'({8'd0, x_cyl} * {8'd0, g_spc_d1}) + (x_head ? 16'(img_spt[1]) : 16'd0) + 16'(x_sec) - 16'd1;
+    16'({8'd0, x_cyl} * {8'd0, b_spc[1]}) + (x_head ? 16'(b_spt[1]) : 16'd0) + 16'(x_sec) - 16'd1;
 wire [15:0] x_lba    = pd ? x_lba_d1 : x_lba_d0;
 `ifndef SYNTHESIS
 always_ff @(posedge clk)
@@ -301,7 +338,7 @@ upd765 #(
     .us_tick    (us_tick),
     .cpu_rd     (cpu_rd),
     .cpu_wr     (cpu_wr),
-    .cpu_a0     (cpu_rd ? isa_addr[0] : io_a0),
+    .cpu_a0     (cpu_rd ? bus_a0 : io_a0),
     .cpu_wdata  (wdat_q),
     .cpu_rdata  (cpu_rdata),
     .drq        (drq),
@@ -316,10 +353,10 @@ upd765 #(
     .step       (step),
     .step_dir   (step_dir),
     .drv_trk0   (drv_sel && drv_cyl_q == 8'd0),
-    .drv_wp     (drv_sel && img_present[pd] && img_wp[pd]),
+    .drv_wp     (drv_sel && s_present && s_wp),
     .drv_ready  (1'b1),
     .drv_ts     (1'b1),
-    .drv_spin   (drv_sel && img_present[pd]),
+    .drv_spin   (drv_sel && s_present),
     .drv_cyl    (drv_cyl_q),            // = cyl[pd]
     .geo_cyl_ok (g_cyl_ok),
     .geo_heads  (g_heads),
