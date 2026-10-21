@@ -83,6 +83,12 @@ constant C_HMAP_M2M           : std_logic_vector(15 downto 0) := x"0000";     --
 -- The BIOS ROM (pc_bios.vhd): windows 0..15 = the 64 KB image, loaded from offset 0 (the device
 -- right-aligns it to FFFFF itself); window 0x0100 = its control registers (see pc_bios.vhd).
 constant C_DEV_PC_BIOS        : std_logic_vector(15 downto 0) := x"0100";
+-- The floppy images of A: and B: (pc_fdd_sd.vhd): window 0 registers, window 1 the extent map,
+-- window 0xFFFF the CRT/ROM load CSR. Manual "ROM" loads in the menu (nothing is streamed).
+constant C_DEV_PC_FDA         : std_logic_vector(15 downto 0) := x"0101";
+constant C_DEV_PC_FDB         : std_logic_vector(15 downto 0) := x"0102";
+-- The CGA character ROM (pc_font.vhd): windows 0..1 the 8 KB image, window 0x0100 control.
+constant C_DEV_PC_FONT        : std_logic_vector(15 downto 0) := x"0103";
 
 ----------------------------------------------------------------------------------------------------------
 -- Virtual Drive Management System: not used (yet)
@@ -110,21 +116,30 @@ constant C_CRTROMTYPE_SDRAM      : std_logic_vector(15 downto 0) := x"0002";
 constant C_CRTROMTYPE_MANDATORY  : std_logic_vector(15 downto 0) := x"0003";
 constant C_CRTROMTYPE_OPTIONAL   : std_logic_vector(15 downto 0) := x"0004";
 
--- Manually loadable ROMs and cartridges: none
-constant C_CRTROMS_MAN_NUM       : natural := 0;
-constant C_CRTROMS_MAN           : crtrom_buf_array := ( x"EEEE", x"EEEE",
+-- Manually loadable ROMs: the floppy images of A: and B: (menu lines " A:%s", " B:%s"). The
+-- firmware's PREP_LOAD_IMAGE hands the file to pc_fdd_sd.vhd (extent map) and leaves the file
+-- pointer at the end, so the Shell streams nothing and only does the CSR handshake.
+constant C_CRTROMS_MAN_NUM       : natural := 2;
+constant C_CRTROMS_MAN           : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_DEV_PC_FDA,
+                                                         C_CRTROMTYPE_DEVICE, C_DEV_PC_FDB,
                                                          x"EEEE");
 
 -- Automatically loaded ROMs: the BIOS, mandatory. The Shell loads it into C_DEV_PC_BIOS before the
 -- PC leaves reset and goes fatal if the file is missing; PREP_START (m2m-rom.asm) then checks the
 -- size (8..64 KB) and releases the BIOS gate of pc_bios.vhd.
+-- The CGA character ROM is optional: without /pc10/cga.rom the free default font of
+-- pc_font.vhd stays (PREP_START copies a loaded one into the CGA card).
 constant BIOS_ROM_NAME           : string := "/pc10/bios.rom" & ENDSTR;
 constant BIOS_ROM_NAME_START     : std_logic_vector(15 downto 0) := x"0000";
+constant FONT_ROM_NAME           : string := "/pc10/cga.rom" & ENDSTR;
+constant FONT_ROM_NAME_START     : std_logic_vector(15 downto 0) := std_logic_vector(to_unsigned(BIOS_ROM_NAME'length, 16));
 
-constant C_CRTROMS_AUTO_NUM      : natural := 1;
-constant C_CRTROMS_AUTO_NAMES    : string  := BIOS_ROM_NAME;
+constant C_CRTROMS_AUTO_NUM      : natural := 2;
+constant C_CRTROMS_AUTO_NAMES    : string  := BIOS_ROM_NAME & FONT_ROM_NAME;
 constant C_CRTROMS_AUTO          : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_DEV_PC_BIOS,
                                                          C_CRTROMTYPE_MANDATORY, BIOS_ROM_NAME_START,
+                                                         C_CRTROMTYPE_DEVICE, C_DEV_PC_FONT,
+                                                         C_CRTROMTYPE_OPTIONAL, FONT_ROM_NAME_START,
                                                          x"EEEE");
 
 ----------------------------------------------------------------------------------------------------------

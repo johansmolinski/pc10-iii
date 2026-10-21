@@ -1,6 +1,7 @@
-// pc_system.sv - STAND-IN for the real PC (rtl/system/pc_system.sv), used by the MEGA65
-// shell until the real one exists. Same module name and ports as doc/architecture.md
-// section 4; it lives in CORE/stub so it never collides with rtl/.
+// pc_system.sv - STAND-IN for the real PC (rtl/system/pc_system.sv): a shell-only test
+// pattern with the same module name and ports (doc/architecture.md section 4). It lives in
+// CORE/stub so it never collides with rtl/; build it with tools/gen_xpr.py --stub. The font
+// and floppy ports are ignored / tied off.
 //
 // What it does, so that every path of the shell can be checked on the screen:
 //   * video: a CGA-like raster on the 14.31818 MHz enable (clk / 7): 912 dots x 262 lines
@@ -43,6 +44,34 @@ module pc_system #(
     output logic        vid_vsync,
     output logic        vid_hblank,
     output logic        vid_vblank,
+
+    // (ports of the real pc_system that the stand-in ignores or ties off)
+    input  logic        font_we,
+    input  logic [12:0] font_addr,
+    input  logic [7:0]  font_data,
+    input  logic        font_thin,
+    input  logic [1:0]       drv_80trk,
+    input  logic [1:0]       img_present,
+    input  logic [1:0]       img_wp,
+    input  logic [1:0][7:0]  img_tracks,
+    input  logic [1:0][1:0]  img_heads,
+    input  logic [1:0][5:0]  img_spt,
+    output logic [1:0]       drv_motor,
+    output logic             fdc_active,
+    output logic        sp_req,
+    output logic        sp_write,
+    output logic        sp_drive,
+    output logic [7:0]  sp_cyl,
+    output logic        sp_head,
+    output logic [7:0]  sp_sector,
+    output logic [15:0] sp_lba,
+    input  logic        sp_rd_valid,
+    input  logic [7:0]  sp_rd_data,
+    output logic        sp_wr_valid,
+    output logic [7:0]  sp_wr_data,
+    input  logic        sp_wr_ready,
+    input  logic        sp_done,
+    input  logic        sp_err,
 
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
@@ -130,6 +159,11 @@ module pc_system #(
             default: stub_glyph = 64'h0;
         endcase
     endfunction
+
+    assign drv_motor = 2'b00;
+    assign fdc_active = 1'b0;
+    assign {sp_req, sp_write, sp_drive, sp_head, sp_wr_valid} = '0;
+    assign {sp_cyl, sp_sector, sp_lba, sp_wr_data} = '0;
 
     function automatic logic [7:0] hexc(input logic [3:0] n);
         hexc = (n < 4'd10) ? (8'h30 + {4'h0, n}) : (8'h37 + {4'h0, n});

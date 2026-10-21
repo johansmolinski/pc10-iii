@@ -9,8 +9,12 @@
 -- * pc_bios.vhd: 64 KB BIOS ROM, QNICE device C_DEV_PC_BIOS, filled by the Shell's ROM
 --   auto-loader from /pc10/bios.rom; the PC stays in reset until the firmware has checked
 --   and released the image
--- * the OSM settings (config.vhd): memory size, HDMI mode (60 Hz only: the CGA is a
---   59.92 Hz source), analog 15 kHz / CSYNC, reset
+-- * pc_font.vhd: the CGA character ROM (free default font, or /pc10/cga.rom), QNICE device
+--   C_DEV_PC_FONT, copied into pc_system's font port
+-- * pc_fdd_sd.vhd: floppy A: and B: from image files on the SD card (QNICE devices
+--   C_DEV_PC_FDA/FDB, the SD host's engine port)
+-- * the OSM settings (config.vhd): floppy images and write protection, memory size, CGA thin
+--   font, HDMI mode (60 Hz only: the CGA is a 59.92 Hz source), analog 15 kHz / CSYNC, reset
 --
 -- The entity is the Megamiga fork's MEGA65_Core (M2M-UPSTREAM exceptions: floppy, SDRAM,
 -- PMOD, Ethernet pins and the SD engine port are routed into the core); everything the PC
@@ -328,20 +332,23 @@ architecture synthesis of MEGA65_Core is
 -- scrapes them into osm_const.asm as PC_OSM_*)
 ---------------------------------------------------------------------------------------------
 
-constant C_MENU_MEM_640       : natural := 5;
-constant C_MENU_MEM_512       : natural := 6;
-constant C_MENU_MEM_256       : natural := 7;
-constant C_MENU_MEM_128       : natural := 8;
-constant C_MENU_HDMI_720P     : natural := 14;
-constant C_MENU_HDMI_480P     : natural := 15;
-constant C_MENU_ANALOG_15KHZ  : natural := 18;
-constant C_MENU_ANALOG_CSYNC  : natural := 19;
-constant C_MENU_RESET         : natural := 22;
+constant C_MENU_WP_A          : natural := 4;
+constant C_MENU_WP_B          : natural := 5;
+constant C_MENU_MEM_640       : natural := 10;
+constant C_MENU_MEM_512       : natural := 11;
+constant C_MENU_MEM_256       : natural := 12;
+constant C_MENU_MEM_128       : natural := 13;
+constant C_MENU_CGA_THIN      : natural := 23;
+constant C_MENU_HDMI_720P     : natural := 19;
+constant C_MENU_HDMI_480P     : natural := 20;
+constant C_MENU_ANALOG_15KHZ  : natural := 24;
+constant C_MENU_ANALOG_CSYNC  : natural := 25;
+constant C_MENU_RESET         : natural := 28;
 
 -- SW1 of the 5160 as the 8255 reads it (bit = 1: switch off): bit 0 = 1 normal POST (no
 -- test loop), bit 1 = 0 no 8087, bits 3..2 = 11 all four planar banks, bits 5..4 = 10 CGA
--- 80 x 25, bits 7..6 = 00 one floppy drive. To be checked against xt_board's port map.
-constant C_DIP_SW1            : std_logic_vector(7 downto 0) := "00101101";
+-- 80 x 25, bits 7..6 = 01 two floppy drives (tb/sys uses the same 0x6D).
+constant C_DIP_SW1            : std_logic_vector(7 downto 0) := x"6D";
 
 ---------------------------------------------------------------------------------------------
 -- Clocks and resets
@@ -373,6 +380,41 @@ signal main_rom_rdata         : std_logic_vector(7 downto 0);
 signal qnice_bios_data        : std_logic_vector(15 downto 0);
 signal qnice_bios_ce          : std_logic;
 signal qnice_bios_we          : std_logic;
+signal qnice_font_data        : std_logic_vector(15 downto 0);
+signal qnice_font_ce          : std_logic;
+signal qnice_font_we          : std_logic;
+signal qnice_fdd_data         : std_logic_vector(15 downto 0);
+signal qnice_fdd_ce           : std_logic;
+signal qnice_fdd_we           : std_logic;
+signal qnice_fdd_drive        : std_logic;
+
+---------------------------------------------------------------------------------------------
+-- CGA font port, floppy drives and the sector port (main clock)
+---------------------------------------------------------------------------------------------
+
+signal main_font_we           : std_logic;
+signal main_font_addr         : std_logic_vector(12 downto 0);
+signal main_font_data         : std_logic_vector(7 downto 0);
+signal main_drv_80trk         : std_logic_vector(1 downto 0);
+signal main_img_present       : std_logic_vector(1 downto 0);
+signal main_img_wp            : std_logic_vector(1 downto 0);
+signal main_img_tracks        : std_logic_vector(15 downto 0);
+signal main_img_heads         : std_logic_vector(3 downto 0);
+signal main_img_spt           : std_logic_vector(11 downto 0);
+signal main_drv_motor         : std_logic_vector(1 downto 0);
+signal main_fdc_active        : std_logic;
+signal main_fdd_busy          : std_logic;
+signal main_sp_req            : std_logic;
+signal main_sp_write          : std_logic;
+signal main_sp_drive          : std_logic;
+signal main_sp_lba            : std_logic_vector(15 downto 0);
+signal main_sp_rd_valid       : std_logic;
+signal main_sp_rd_data        : std_logic_vector(7 downto 0);
+signal main_sp_wr_valid       : std_logic;
+signal main_sp_wr_data        : std_logic_vector(7 downto 0);
+signal main_sp_wr_ready       : std_logic;
+signal main_sp_done           : std_logic;
+signal main_sp_err            : std_logic;
 
 begin
 
@@ -458,8 +500,6 @@ begin
    eth_txd_o            <= (others => '0');
    eth_txen_o           <= '0';
 
-   -- M2M-UPSTREAM sd-host: the engine port is not used (all requests 0)
-   sd_eng_o             <= (others => '0');
 
    -- Expansion port: tristate everything; enabled because of the R5/R6 joystick port 2 bug
    cart_ctrl_oe_o       <= '0';
@@ -520,11 +560,12 @@ begin
    -- main_clk
    ---------------------------------------------------------------------------------------------
 
-   -- Power LED: green; blue while the reset button is held long. Drive LED: off.
+   -- Power LED: green; blue while the reset button is held long. Drive LED: on while a drive
+   -- motor runs or the FDC transfers (green), yellow while a sector moves to/from the SD card.
    main_power_led_o     <= '1';
    main_power_led_col_o <= x"0000FF" when main_reset_m2m_i else x"00FF00";
-   main_drive_led_o     <= '0';
-   main_drive_led_col_o <= x"00FF00";
+   main_drive_led_o     <= main_drv_motor(0) or main_drv_motor(1) or main_fdc_active or main_fdd_busy;
+   main_drive_led_col_o <= x"FFC000" when main_fdd_busy = '1' else x"00FF00";
 
    -- Every reset source, registered (pc_system wants a synchronous reset): the MMCM lock,
    -- the M2M resets (reset button short/long, the Shell's CSR reset, i.e. the OSM's "Reset
@@ -575,6 +616,31 @@ begin
          rom_addr_o           => main_rom_addr,
          rom_rdata_i          => main_rom_rdata,
 
+         font_we_i            => main_font_we,
+         font_addr_i          => main_font_addr,
+         font_data_i          => main_font_data,
+         font_thin_i          => main_osm_control_i(C_MENU_CGA_THIN),
+
+         drv_80trk_i          => main_drv_80trk,
+         img_present_i        => main_img_present,
+         img_wp_i             => main_img_wp,
+         img_tracks_i         => main_img_tracks,
+         img_heads_i          => main_img_heads,
+         img_spt_i            => main_img_spt,
+         drv_motor_o          => main_drv_motor,
+         fdc_active_o         => main_fdc_active,
+         sp_req_o             => main_sp_req,
+         sp_write_o           => main_sp_write,
+         sp_drive_o           => main_sp_drive,
+         sp_lba_o             => main_sp_lba,
+         sp_rd_valid_i        => main_sp_rd_valid,
+         sp_rd_data_i         => main_sp_rd_data,
+         sp_wr_valid_o        => main_sp_wr_valid,
+         sp_wr_data_o         => main_sp_wr_data,
+         sp_wr_ready_i        => main_sp_wr_ready,
+         sp_done_i            => main_sp_done,
+         sp_err_i             => main_sp_err,
+
          dip_sw1_i            => C_DIP_SW1
       ); -- i_main
 
@@ -623,12 +689,30 @@ begin
       qnice_dev_wait_o <= '0';
       qnice_bios_ce    <= '0';
       qnice_bios_we    <= '0';
+      qnice_font_ce    <= '0';
+      qnice_font_we    <= '0';
+      qnice_fdd_ce     <= '0';
+      qnice_fdd_we     <= '0';
+      qnice_fdd_drive  <= '0';
 
       case qnice_dev_id_i is
          when C_DEV_PC_BIOS =>
             qnice_bios_ce    <= qnice_dev_ce_i;
             qnice_bios_we    <= qnice_dev_we_i;
             qnice_dev_data_o <= qnice_bios_data;
+
+         when C_DEV_PC_FONT =>
+            qnice_font_ce    <= qnice_dev_ce_i;
+            qnice_font_we    <= qnice_dev_we_i;
+            qnice_dev_data_o <= qnice_font_data;
+
+         when C_DEV_PC_FDA | C_DEV_PC_FDB =>
+            qnice_fdd_ce     <= qnice_dev_ce_i;
+            qnice_fdd_we     <= qnice_dev_we_i;
+            if qnice_dev_id_i = C_DEV_PC_FDB then
+               qnice_fdd_drive <= '1';
+            end if;
+            qnice_dev_data_o <= qnice_fdd_data;
 
          when others => null;
       end case;
@@ -649,5 +733,59 @@ begin
          rom_addr_i           => main_rom_addr,
          rom_rdata_o          => main_rom_rdata
       ); -- i_pc_bios
+
+   i_pc_font : entity work.pc_font
+      port map (
+         qnice_clk_i          => qnice_clk_i,
+         qnice_rst_i          => qnice_rst_i,
+         qnice_addr_i         => qnice_dev_addr_i,
+         qnice_data_i         => qnice_dev_data_i,
+         qnice_data_o         => qnice_font_data,
+         qnice_ce_i           => qnice_font_ce,
+         qnice_we_i           => qnice_font_we,
+         main_clk_i           => main_clk,
+         main_rst_i           => main_rst,
+         font_we_o            => main_font_we,
+         font_addr_o          => main_font_addr,
+         font_data_o          => main_font_data
+      ); -- i_pc_font
+
+   i_pc_fdd_sd : entity work.pc_fdd_sd
+      port map (
+         qnice_clk_i          => qnice_clk_i,
+         qnice_rst_i          => qnice_rst_i,
+         qnice_drive_i        => qnice_fdd_drive,
+         qnice_addr_i         => qnice_dev_addr_i,
+         qnice_data_i         => qnice_dev_data_i,
+         qnice_data_o         => qnice_fdd_data,
+         qnice_ce_i           => qnice_fdd_ce,
+         qnice_we_i           => qnice_fdd_we,
+         qnice_wp_i           => qnice_osm_control_i(C_MENU_WP_B) & qnice_osm_control_i(C_MENU_WP_A),
+         sd_c2q_o             => sd_eng_o,
+         sd_q2c_i             => sd_eng_i,
+         main_clk_i           => main_clk,
+         main_rst_i           => main_rst,
+         drv_80trk_o          => main_drv_80trk,
+         img_present_o        => main_img_present,
+         img_wp_o             => open,
+         img_tracks_o         => main_img_tracks,
+         img_heads_o          => main_img_heads,
+         img_spt_o            => main_img_spt,
+         sp_req_i             => main_sp_req,
+         sp_write_i           => main_sp_write,
+         sp_drive_i           => main_sp_drive,
+         sp_lba_i             => main_sp_lba,
+         sp_rd_valid_o        => main_sp_rd_valid,
+         sp_rd_data_o         => main_sp_rd_data,
+         sp_wr_valid_i        => main_sp_wr_valid,
+         sp_wr_data_i         => main_sp_wr_data,
+         sp_wr_ready_o        => main_sp_wr_ready,
+         sp_done_o            => main_sp_done,
+         sp_err_o             => main_sp_err,
+         main_busy_o          => main_fdd_busy
+      ); -- i_pc_fdd_sd
+
+   -- write protection: the menu (main clock domain; the FDC card reads WP for its status)
+   main_img_wp <= main_osm_control_i(C_MENU_WP_B) & main_osm_control_i(C_MENU_WP_A);
 
 end architecture synthesis;

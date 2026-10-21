@@ -14,7 +14,9 @@
 #   rbuild.sh stop <name>        kill this build's processes (only ours, by PID and cwd)
 #
 # Rules on the host: never stop a Megamiga build (running in parallel is fine: 16 cores,
-# 62 GB); never print ~/xilinx.txt. JOBS is passed through to build_all.sh.
+# 62 GB); never print ~/xilinx.txt. JOBS and NO_REF_SYNTH are passed through to build_all.sh;
+# REF=<earlier build name> (start only): incremental build from that build's checkpoints
+# (keep its tree on the host; it must have a RESULT line, OK or TIMING-FAILED).
 set -euo pipefail
 H=fedora
 B=pcxt-builds
@@ -32,6 +34,11 @@ start)
         | ssh -o Compression=no $H "tar -xf - -C ~/$B/$name"
     env=""
     [ -n "${JOBS:-}" ] && env+="JOBS=$JOBS "
+    [ -n "${NO_REF_SYNTH:-}" ] && env+="NO_REF_SYNTH=$NO_REF_SYNTH "
+    if [ -n "${REF:-}" ]; then
+        ssh $H "grep -q '^RESULT ' ~/$B/$REF.log" || { echo "REF build $REF has no RESULT line" >&2; exit 1; }
+        env+="REF_DIR=\$HOME/$B/$REF/CORE "
+    fi
     ssh $H "( cd ~/$B/$name/CORE && source ~/xilinx-env.sh && exec env $env ./build_all.sh $* ) > ~/$B/$name.log 2>&1 < /dev/null & echo \$! > ~/$B/$name.pid; echo started pid \$(cat ~/$B/$name.pid)"
     ;;
 status)
@@ -51,7 +58,7 @@ fetch)
     mkdir -p "$dest"
     d="$B/$name/CORE/CORE-$board.runs/impl_1"
     scp "$H:$d/mega65_$b.bit" "$H:$d/*timing_summary_routed.rpt" "$H:$d/*utilization_placed.rpt" \
-        "$H:$d/utilization_hierarchical.rpt" "$H:$d/*route_status.rpt" "$dest/" 2>/dev/null || true
+        "$H:$d/utilization_hierarchical.rpt" "$H:$d/worst_paths.rpt" "$H:$d/*route_status.rpt" "$dest/" 2>/dev/null || true
     scp "$H:$B/$name.log" "$dest/build.log"
     scp "$H:$B/$name/CORE/CORE-$board.runs/synth_1/runme.log" "$dest/synth_runme.log" 2>/dev/null || true
     ls -l "$dest"

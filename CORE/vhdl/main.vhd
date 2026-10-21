@@ -1,9 +1,10 @@
 ----------------------------------------------------------------------------------
 -- PC10-III for MEGA65
 --
--- Wrapper for the PC: pc_system (rtl/system/pc_system.sv; until it exists the stand-in
--- CORE/stub/pc_system.sv) plus what it needs from the MEGA65: keyboard, video into M2M,
--- audio. The RAM and the BIOS ROM are owned by mega65.vhd.
+-- Wrapper for the PC: pc_system (rtl/system/pc_system.sv, through CORE/sv/pc_system_flat.sv;
+-- the shell-only stand-in CORE/stub/pc_system.sv has the same ports) plus what it needs from
+-- the MEGA65: keyboard, video into M2M, audio. RAM, BIOS ROM, CGA font loader and the floppy
+-- backend are owned by mega65.vhd.
 --
 -- Video: pc_system gives RGBI on the 14.31818 MHz enable; it becomes 8-bit RGB here with
 -- the IBM 5153's brown (colour 6 = dark yellow with half green). The syncs are active high
@@ -59,6 +60,33 @@ entity main is
       rom_addr_o              : out std_logic_vector(15 downto 0);
       rom_rdata_i             : in  std_logic_vector(7 downto 0);
 
+      -- CGA character ROM load port (pc_font.vhd)
+      font_we_i               : in  std_logic;
+      font_addr_i             : in  std_logic_vector(12 downto 0);
+      font_data_i             : in  std_logic_vector(7 downto 0);
+      font_thin_i             : in  std_logic;
+
+      -- Floppy drives and the sector port (pc_fdd_sd.vhd)
+      drv_80trk_i             : in  std_logic_vector(1 downto 0);
+      img_present_i           : in  std_logic_vector(1 downto 0);
+      img_wp_i                : in  std_logic_vector(1 downto 0);
+      img_tracks_i            : in  std_logic_vector(15 downto 0);
+      img_heads_i             : in  std_logic_vector(3 downto 0);
+      img_spt_i               : in  std_logic_vector(11 downto 0);
+      drv_motor_o             : out std_logic_vector(1 downto 0);
+      fdc_active_o            : out std_logic;
+      sp_req_o                : out std_logic;
+      sp_write_o              : out std_logic;
+      sp_drive_o              : out std_logic;
+      sp_lba_o                : out std_logic_vector(15 downto 0);
+      sp_rd_valid_i           : in  std_logic;
+      sp_rd_data_i            : in  std_logic_vector(7 downto 0);
+      sp_wr_valid_o           : out std_logic;
+      sp_wr_data_o            : out std_logic_vector(7 downto 0);
+      sp_wr_ready_i           : in  std_logic;
+      sp_done_i               : in  std_logic;
+      sp_err_i                : in  std_logic;
+
       -- Configuration
       dip_sw1_i               : in  std_logic_vector(7 downto 0)
    );
@@ -66,7 +94,7 @@ end entity main;
 
 architecture synthesis of main is
 
-   component pc_system is
+   component pc_system_flat is
       generic (
          RAM_KB      : integer := 640
       );
@@ -87,13 +115,39 @@ architecture synthesis of main is
          vid_vsync   : out std_logic;
          vid_hblank  : out std_logic;
          vid_vblank  : out std_logic;
+         font_we     : in  std_logic;
+         font_addr   : in  std_logic_vector(12 downto 0);
+         font_data   : in  std_logic_vector(7 downto 0);
+         font_thin   : in  std_logic;
+         drv_80trk   : in  std_logic_vector(1 downto 0);
+         img_present : in  std_logic_vector(1 downto 0);
+         img_wp      : in  std_logic_vector(1 downto 0);
+         img_tracks  : in  std_logic_vector(15 downto 0);
+         img_heads   : in  std_logic_vector(3 downto 0);
+         img_spt     : in  std_logic_vector(11 downto 0);
+         drv_motor   : out std_logic_vector(1 downto 0);
+         fdc_active  : out std_logic;
+         sp_req      : out std_logic;
+         sp_write    : out std_logic;
+         sp_drive    : out std_logic;
+         sp_cyl      : out std_logic_vector(7 downto 0);
+         sp_head     : out std_logic;
+         sp_sector   : out std_logic_vector(7 downto 0);
+         sp_lba      : out std_logic_vector(15 downto 0);
+         sp_rd_valid : in  std_logic;
+         sp_rd_data  : in  std_logic_vector(7 downto 0);
+         sp_wr_valid : out std_logic;
+         sp_wr_data  : out std_logic_vector(7 downto 0);
+         sp_wr_ready : in  std_logic;
+         sp_done     : in  std_logic;
+         sp_err      : in  std_logic;
          kbd_code    : in  std_logic_vector(7 downto 0);
          kbd_valid   : in  std_logic;
          kbd_busy    : out std_logic;
          speaker     : out std_logic;
          dip_sw1     : in  std_logic_vector(7 downto 0)
       );
-   end component pc_system;
+   end component pc_system_flat;
 
    signal kbd_code     : std_logic_vector(7 downto 0);
    signal kbd_valid    : std_logic;
@@ -126,7 +180,7 @@ architecture synthesis of main is
 
 begin
 
-   i_pc_system : pc_system
+   i_pc_system : pc_system_flat
       generic map (
          RAM_KB      => G_RAM_KB
       )
@@ -151,6 +205,32 @@ begin
          kbd_valid   => kbd_valid,
          kbd_busy    => kbd_busy,
          speaker     => speaker,
+         font_we     => font_we_i,
+         font_addr   => font_addr_i,
+         font_data   => font_data_i,
+         font_thin   => font_thin_i,
+         drv_80trk   => drv_80trk_i,
+         img_present => img_present_i,
+         img_wp      => img_wp_i,
+         img_tracks  => img_tracks_i,
+         img_heads   => img_heads_i,
+         img_spt     => img_spt_i,
+         drv_motor   => drv_motor_o,
+         fdc_active  => fdc_active_o,
+         sp_req      => sp_req_o,
+         sp_write    => sp_write_o,
+         sp_drive    => sp_drive_o,
+         sp_cyl      => open,
+         sp_head     => open,
+         sp_sector   => open,
+         sp_lba      => sp_lba_o,
+         sp_rd_valid => sp_rd_valid_i,
+         sp_rd_data  => sp_rd_data_i,
+         sp_wr_valid => sp_wr_valid_o,
+         sp_wr_data  => sp_wr_data_o,
+         sp_wr_ready => sp_wr_ready_i,
+         sp_done     => sp_done_i,
+         sp_err      => sp_err_i,
          dip_sw1     => dip_sw1_i
       ); -- i_pc_system
 

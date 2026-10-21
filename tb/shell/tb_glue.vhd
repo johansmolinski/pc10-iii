@@ -2,11 +2,14 @@
 --   keyboard.vhd: make/break codes, the MEGA + digit Fn layer, the busy handshake
 --   pc_bios.vhd:  the right-aligned image (8 KB file -> FE000-FFFFF, 0xFF below), the gate
 --   pc_ram.vhd:   2-clock read latency with ack, the size limit (0xFF above it)
+--   pc_font.vhd:  the default font copied into the font port after the reset, a 2 KB font
+--                 loaded by QNICE and copied to 0x1800 and 0x1000
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity tb_glue is
+   generic (G_FONT_HEX : string := "../../CORE/font/cga_default.hex");
 end entity tb_glue;
 
 architecture sim of tb_glue is
@@ -38,6 +41,19 @@ architecture sim of tb_glue is
    signal mwd       : std_logic_vector(7 downto 0) := (others => '0');
    signal mrd       : std_logic_vector(7 downto 0);
    signal mack      : std_logic;
+
+   -- font
+   signal mrst      : std_logic := '1';
+   signal fqaddr    : std_logic_vector(27 downto 0) := (others => '0');
+   signal fqdin     : std_logic_vector(15 downto 0) := (others => '0');
+   signal fqdout    : std_logic_vector(15 downto 0);
+   signal fqce, fqwe : std_logic := '0';
+   signal font_we   : std_logic;
+   signal font_addr : std_logic_vector(12 downto 0);
+   signal font_data : std_logic_vector(7 downto 0);
+   type t_font is array (0 to 8191) of std_logic_vector(7 downto 0);
+   signal font      : t_font := (others => x"EE");
+   signal font_wr   : natural := 0;
 
    type t_codes is array (natural range <>) of std_logic_vector(7 downto 0);
    signal got       : t_codes(0 to 31);
@@ -83,6 +99,24 @@ begin
    i_ram : entity work.pc_ram
       port map (clk_i => clk, size_i => msize, ram_addr_i => maddr, ram_en_i => men, ram_we_i => mwe,
                 ram_wdata_i => mwd, ram_rdata_o => mrd, ram_ack_o => mack);
+
+   i_font : entity work.pc_font
+      generic map (G_INIT_FILE => G_FONT_HEX)
+      port map (qnice_clk_i => qclk, qnice_rst_i => '0', qnice_addr_i => fqaddr, qnice_data_i => fqdin,
+                qnice_data_o => fqdout, qnice_ce_i => fqce, qnice_we_i => fqwe,
+                main_clk_i => clk, main_rst_i => mrst,
+                font_we_o => font_we, font_addr_o => font_addr, font_data_o => font_data);
+
+   -- the CGA card's font RAM
+   p_font : process (clk)
+   begin
+      if rising_edge(clk) then
+         if font_we = '1' then
+            font(to_integer(unsigned(font_addr))) <= font_data;
+            font_wr <= font_wr + 1;
+         end if;
+      end if;
+   end process;
 
    p_test : process
       procedure qwrite(win : natural; ofs : natural; d : natural) is
@@ -175,7 +209,38 @@ begin
       ramrd(16#80000#, x"FF");
       ramrd(16#7FFFF#, x"22");
 
-      report "PASS: keyboard, BIOS alignment, RAM latency and size";
+      -- font: the default after the reset ('A' row 1 = 0x78, thin = 0x78 and not 0x3C = 0x40)
+      mrst <= '0';
+      wait for 100 us;
+      assert font_wr = 8192 report "default font: " & integer'image(font_wr) & " writes" severity failure;
+      assert font(16#1800# + 16#41# * 8 + 1) = x"78" and font(16#1000# + 16#41# * 8 + 1) = x"40" and
+             font(16#1800# + 16#C1# * 8 + 1) = x"00" and font(0) = x"00"
+         report "default font content" severity failure;
+      -- a 2 KB font from QNICE, then GO
+      for i in 0 to 2047 loop
+         wait until rising_edge(qclk);
+         fqaddr <= x"0000" & std_logic_vector(to_unsigned(i, 12));
+         fqdin  <= x"00" & (std_logic_vector(to_unsigned(i mod 256, 8)) xor x"3C");
+         fqce <= '1'; fqwe <= '1';
+         wait until rising_edge(qclk);
+         fqce <= '0'; fqwe <= '0';
+      end loop;
+      wait until rising_edge(qclk);
+      fqaddr <= x"0100" & x"000"; fqce <= '1';
+      wait until rising_edge(qclk);
+      assert fqdout = x"0800" report "font size " & to_hstring(fqdout) severity failure;
+      fqaddr <= x"0100" & x"002"; fqwe <= '1';
+      wait until rising_edge(qclk);
+      fqce <= '0'; fqwe <= '0';
+      wait for 100 us;
+      assert font_wr = 8192 + 4096 report "2 KB font: " & integer'image(font_wr - 8192) & " writes" severity failure;
+      for i in 0 to 2047 loop
+         assert font(16#1800# + i) = (std_logic_vector(to_unsigned(i mod 256, 8)) xor x"3C") and
+                font(16#1000# + i) = (std_logic_vector(to_unsigned(i mod 256, 8)) xor x"3C")
+            report "2 KB font byte " & integer'image(i) severity failure;
+      end loop;
+
+      report "PASS: keyboard, BIOS alignment, RAM latency and size, CGA font";
       done <= true;
       wait;
    end process;
