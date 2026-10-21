@@ -70,8 +70,15 @@
 // release to the cycle in which the 8088's EA microcode issues the operand
 // read.
 //
-// Not yet modelled: wait states (READY), DMA/HOLD, LOCK, HALT bus status
-// details, NMI/INTR timing.
+// Pins (pc10-iii, for the system board): READY is sampled at the end of T3
+// and of every Tw (low = another Tw; read data is taken in the last of them);
+// INTR is sampled at every 8088 clock edge; an NMI rising edge is latched
+// until the EU acknowledges it (BIU_NMI_DEBOUNCE, as MCL86's biu_max); LOCK
+// is low from T2 of the first INTA cycle to T2 of the second, and while the
+// EU's LOCK prefix is active.
+// Not yet modelled: HOLD (the 5160 uses READY for DMA), HALT bus status
+// details, the idle cycles between the two INTA cycles, interrupt latency
+// against MartyPC.
 
 module biu88 (
     input               CORE_CLK_INT,
@@ -131,6 +138,7 @@ module biu88 (
     // debug
     output     [2:0]    dbg_t_state,
     output     [2:0]    dbg_ta_state,
+    output     [2:0]    dbg_latch,          // status of the running bus cycle
     output     [2:0]    dbg_queue_len
 );
 
@@ -214,6 +222,8 @@ reg  [15:0] return_data;
 reg         done;
 
 reg         eu_req_d1, strobe_d1;
+reg         inta_lock;            // LOCK during the INTA pair
+reg         nmi_d1, nmi_d2, nmi_caught;
 
 // MCL86 pipelines the queue view by one core clock; keep that latency
 reg  [7:0]  pfq_top_d1;
@@ -249,8 +259,8 @@ assign BIU_SINCE_DONE       = since_done;
 assign BIU_SR_PENDING       = sr_armed;
 assign BIU_DONE             = done;
 assign BIU_CLK_COUNTER_ZERO = counter == 13'd0;
-assign BIU_NMI_CAUGHT       = 1'b0;
-assign LOCK_n               = 1'b1;
+assign BIU_NMI_CAUGHT       = nmi_caught;
+assign LOCK_n               = ~(inta_lock | EU_PREFIX_LOCK);
 
 assign PFQ_TOP_BYTE = pfq_top_d1;
 assign PFQ_EMPTY    = pfq_empty_d1;
@@ -265,6 +275,7 @@ assign S6_3_MUX  = t_cycle != T1;
 
 assign dbg_t_state   = t_cycle;
 assign dbg_ta_state  = ta_cycle;
+assign dbg_latch     = latch;
 assign dbg_queue_len = qlen;
 
 // ------------------------------------------------------------------ helpers
@@ -565,8 +576,11 @@ task do_cycle;
                 else if (latch == ST_HALT) begin
                     status = ST_PASV; latch = ST_PASV; t_cycle = TI;
                 end else t_cycle = T2;
-            T2: t_cycle = T3;
-            T3, TW: t_cycle = T4;                   // READY is not modelled yet
+            T2: begin
+                t_cycle = T3;
+                if (latch == ST_INTA) inta_lock = transfer_n != 2'd2;
+            end
+            T3, TW: t_cycle = READY_IN ? T4 : TW;
             T4: begin latch = ST_PASV; t_cycle = TI; end
             default: ;
         endcase
@@ -598,11 +612,20 @@ always @(posedge CORE_CLK_INT) begin
         eu_req_d1 = 1'b0;  strobe_d1 = 1'b0;
         pfq_top_d1 = 8'h0;  pfq_empty_d1 = 1'b1;  pfq_addr_d1 = 16'h0;
         BIU_INTR = 1'b0;
+        inta_lock = 1'b0;  nmi_d1 = 1'b0;  nmi_d2 = 1'b0;  nmi_caught = 1'b0;
     end else begin
         done = 1'b0;
 
         // ================= the 8088 clock edge
+        // NMI: a rising edge is caught until the EU takes it
+        if (nmi_d1 && !nmi_d2) nmi_caught = 1'b1;
+        else if (BIU_NMI_DEBOUNCE) nmi_caught = 1'b0;
+        nmi_d2 = nmi_d1;
+        nmi_d1 = NMI;
+
         if (step) begin
+            BIU_INTR = INTR;                    // sampled at the CLK edge
+
             // MartyPC runs the request's wait loops cycle by cycle; the
             // conditions are checked at the boundary BEFORE each cycle, which
             // is here (state = the cycle about to run)
@@ -640,6 +663,8 @@ always @(posedge CORE_CLK_INT) begin
                     // taken at T3), a final write when T3 is next
                     if (t_cycle == T4 && (r_type != ST_MEMW && r_type != ST_IOW || r_word && !r_second)) begin
                         if (r_type == ST_MEMW || r_type == ST_IOW) ;
+                        else if (r_second && r_type == ST_INTA)
+                            return_data = {8'h00, data_bus};   // the vector: 2nd INTA
                         else if (r_second) return_data[15:8] = data_bus;
                         else return_data = {8'h00, data_bus};
                         if (r_word && !r_second) begin
@@ -871,8 +896,6 @@ always @(posedge CORE_CLK_INT) begin
         pfq_top_d1   = ntaken != 2'd0 ? taken0 : q0;
         pfq_empty_d1 = ntaken == 2'd0 && qlen == 3'd0;
         pfq_addr_d1  = eu_ip;
-
-        BIU_INTR = 1'b0;
     end
 end
 
