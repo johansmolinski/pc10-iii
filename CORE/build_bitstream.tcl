@@ -43,7 +43,7 @@ foreach {clk want} {main_clk 9.977} {
         lappend gate "$clk period [get_property PERIOD $c] ns, expected $want ns (100.2273 MHz)"
     }
 }
-if {[llength [get_cells -quiet -hierarchical -filter {NAME =~ CORE/i_pc_ram/* && PRIMITIVE_GROUP == BLOCKRAM}]] < 160} {
+if {[llength [get_cells -quiet -hierarchical -filter {NAME =~ CORE/i_pc_ram/* && REF_NAME =~ RAMB*}]] < 160} {
     lappend gate "pc_ram has fewer than 160 block RAM primitives (640 KB optimised away?)"
 }
 if {[llength $gate] > 0} {
