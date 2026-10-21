@@ -423,13 +423,14 @@ end
 
 // ------------------------------------------------------------ READY
 // 8284 READY: IOCHRDY and the DMA wait are synchronized on the falling CLK
-// edge; the CPU samples READY at the end of T3/Tw. Every CPU I/O cycle gets
-// one wait state (the first T3 is never ready).
+// edge. The BIU samples READY as it enters T3 and each Tw (bus_t is still T2
+// or T3/Tw then) to know whether that state is the last. Every CPU I/O cycle
+// gets one wait state: its T3 is never the last.
 logic rdy_sync;
 always_ff @(posedge clk)
     if (reset) rdy_sync <= 1'b1;
     else if (cpu_fall) rdy_sync <= isa_ready & ~dma_wait;
 wire io_cycle = cpu_bus_type == ST_IOR || cpu_bus_type == ST_IOW;
-assign cpu_ready = rdy_sync && !(cpu_bus_t == T3 && io_cycle);
+assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle);
 
 endmodule

@@ -70,8 +70,11 @@
 // release to the cycle in which the 8088's EA microcode issues the operand
 // read.
 //
-// Pins (pc10-iii, for the system board): READY is sampled at the end of T3
-// and of every Tw (low = another Tw; read data is taken in the last of them);
+// Pins (pc10-iii, for the system board): READY is sampled as T3 and every Tw
+// begin and says whether that state is the last one (low = a Tw follows;
+// read data is taken in the last of them). The 8088 knows it there: a write
+// ends its instruction in its last T3/Tw (MartyPC: wait states are counted
+// at T2).
 // INTR is sampled at every 8088 clock edge; an NMI rising edge is latched
 // until the EU acknowledges it (BIU_NMI_DEBOUNCE, as MCL86's biu_max); LOCK
 // is low from T2 of the first INTA cycle to T2 of the second, and while the
@@ -225,6 +228,7 @@ reg         done;
 
 reg         eu_req_d1, strobe_d1;
 reg         inta_lock;            // LOCK during the INTA pair
+reg         t3_last;              // the running T3/Tw is the last one (READY)
 reg         nmi_d1, nmi_d2, nmi_caught;
 
 // MCL86 pipelines the queue view by one core clock; keep that latency
@@ -582,9 +586,11 @@ task do_cycle;
                 end else t_cycle = T2;
             T2: begin
                 t_cycle = T3;
+                t3_last = READY_IN;
                 if (latch == ST_INTA) inta_lock = transfer_n != 2'd2;
             end
-            T3, TW: t_cycle = READY_IN ? T4 : TW;
+            T3, TW: if (t3_last) t_cycle = T4;
+                    else begin t_cycle = TW; t3_last = READY_IN; end
             T4: begin latch = ST_PASV; t_cycle = TI; end
             default: ;
         endcase
@@ -617,7 +623,7 @@ always @(posedge CORE_CLK_INT) begin
         eu_req_d1 = 1'b0;  strobe_d1 = 1'b0;
         pfq_top_d1 = 8'h0;  pfq_empty_d1 = 1'b1;  pfq_addr_d1 = 16'h0;
         BIU_INTR = 1'b0;
-        inta_lock = 1'b0;  nmi_d1 = 1'b0;  nmi_d2 = 1'b0;  nmi_caught = 1'b0;
+        inta_lock = 1'b0;  t3_last = 1'b1;  nmi_d1 = 1'b0;  nmi_d2 = 1'b0;  nmi_caught = 1'b0;
     end else begin
         done = 1'b0;
 
@@ -674,7 +680,8 @@ always @(posedge CORE_CLK_INT) begin
                             since_done = 12'd0;
                             if (end_after_done) begin end_after_done = 1'b0; end_armed = 1'b1; counter = {1'b0, end_ad_n}; end
                         end
-                    end else if (t_cycle == T3 && (r_type == ST_MEMW || r_type == ST_IOW) &&
+                    end else if ((t_cycle == T3 || t_cycle == TW) && t3_last &&
+                                 (r_type == ST_MEMW || r_type == ST_IOW) &&
                                  (!r_word || r_second)) begin
                         rphase = RP_IDLE;
                         done = 1'b1;
