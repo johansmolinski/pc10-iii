@@ -5425,9 +5425,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 03F2
 #
 # Set biu_dataout register to Flags and set bits [15:12] to F like 8088 does.
+# pc10-iii: CALL the PUSHF value procedure at 0x12A0 (bit 1 set, bits 3/5 clear, 15-12 set)
 p 00 00000 00001 04F6
-p 01 00000 00001 5F8F
-p 01 00000 00001 F000
+p 01 00000 00001 1100
+p 01 00000 00001 12A0
 #
 # CALL PUSH Procedure
 p 00 00000 00001 04F7
@@ -8325,9 +8326,10 @@ p 01 00000 00001 1002
 p 01 00000 00001 0755
 #
 # Set eu_alu_a flag to 1
+# pc10-iii: the override flag is kept in flag bit 3 (scratch; PUSHF/LAHF mask it), not in AF
 p 00 00000 00001 0752
 p 01 00000 00001 588F
-p 01 00000 00001 0010
+p 01 00000 00001 0008
 #
 # Set segment_override prefix bit to 0
 p 00 00000 00001 0753
@@ -8340,9 +8342,10 @@ p 01 00000 00001 1030
 p 01 00000 00001 4000
 #
 # B: Set eu_alu_a flag to 0
+# pc10-iii: flag bit 3, not AF
 p 00 00000 00001 0755
 p 01 00000 00001 488F
-p 01 00000 00001 FFEF
+p 01 00000 00001 FFF7
 #
 # Set segment_override prefix bit to 0
 p 00 00000 00001 0756
@@ -8364,9 +8367,10 @@ p 01 00000 00001 4000
 # --------------------------------------------------------------------
 #
 # Isolate eu_alu_a flag into Dummy
+# pc10-iii: flag bit 3, not AF
 p 00 00000 00001 075A
 p 01 00000 00001 4E8F
-p 01 00000 00001 0010
+p 01 00000 00001 0008
 #
 # Return to calling code if last ALU=0
 p 00 00000 00001 075B

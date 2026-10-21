@@ -541,3 +541,15 @@ so READY, the status polling and VRAM writes work with `xt_board.sv`
 Open: composite decoding; a trace comparison with MartyPC itself running a
 program (`tb/sys`); the font port in `pc_system`.
 
+
+## 2026-10-21 - INT flags, AF in string ops (run p)
+
+- **INT/INT3/INTO/exceptions** pushed FLAGS without bit 1 (and with MCL86's
+  prefix state in 15-12): the INTERRUPT routine (0x04F6) now calls the PUSHF
+  value procedure 0x12A0. CC/CD state 0 -> 100%, CE 49 -> 100%.
+- **String ops** kept the segment override across their ES access in AF
+  (STORE/RESTORE_SEG_PREFIX 0x0750/0x075A): now in flag bit 3 (scratch;
+  PUSHF/LAHF mask it).
+- Run p: state 2,907,858 -> 2,934,084; trace 2,322,516 (F6.7 IDIV r/m8 lost
+  2 tests: its divide-error path is a few microinstructions longer; IDIV is
+  not timed yet).
