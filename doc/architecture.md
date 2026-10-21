@@ -95,7 +95,7 @@ module pc_system #(
 
     // Video (CGA): on clk with the 14.31818 MHz enable
     output logic        vid_ce,       // = ce_14m
-    output logic [3:0]  vid_rgbi,
+    output logic [3:0]  vid_rgbi,     // {I, R, G, B}; the glue makes colour 6 brown
     output logic        vid_hsync,    // active high
     output logic        vid_vsync,    // active high
     output logic        vid_hblank,
@@ -110,9 +110,22 @@ module pc_system #(
     output logic        speaker,      // 8253 OUT2 AND port B bit 1
 
     // Configuration (from the OSM)
-    input  logic [7:0]  dip_sw1       // SW1 of the 5160 (drives, video, RAM)
+    input  logic [7:0]  dip_sw1       // SW1 of the 5160 as the 8255 reads it
+                                      // (1 = switch off); bit 0 = switch 1
 );
 ```
+
+Notes (2026-10-21, from the shell build):
+- `ram_ack` may come later than 1 clk (the shell answers after 2: the request
+  is registered before it fans out to 160 BRAM tiles); `xt_board` takes read
+  data at `ram_ack`, well before the CPU samples it at the end of T3.
+- The keyboard self-test answer (0xAA after the BIOS holds the clock low for
+  more than ~10 ms) comes from `xt_board`; the glue only sends scan codes.
+- The CGA's 59.92 Hz against HDMI's 60 Hz drops or repeats a frame about
+  every 13 s; a 59.92 Hz HDMI mode would be a new framework exception.
+- Timing closure (open): the CPU alone misses 100.2 MHz by 6.6 ns (BIU) and
+  2.6 ns (EU); the BIU's state only advances on `cpu_step`, so it can be
+  restructured into multicycle paths without changing its behaviour.
 
 Not yet in the contract: floppy, hard disk, serial/parallel, MDA,
 composite video, turbo. They get added here when their module exists.
