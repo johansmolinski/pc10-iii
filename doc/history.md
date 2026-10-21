@@ -595,3 +595,27 @@ EOP_n) and gives DMA memory-to-I/O cycles the card's own `isa_din` on
   memory forms end one cycle late in ~75% (open).
 - Run q: trace 2,338,519 (77.8%); run r: 2,419,649 (80.5%), length
   2,424,870, state 2,942,050 (97.8%). No file worse.
+
+## 2026-10-21 - LEA, LES/LDS, XCHG, POP r/m, the FF group (run s)
+
+All timed from the suite plus MartyPC's single-test traces
+(tools/martypc/sst_trace.sh, which shows where the 8088's EU issues each bus
+request, SUSP and FLUSH):
+- **LEA**: end at the EA release r2 + 2 after the last queue read.
+- **LES/LDS**: the second word released 4 after the first, end at its end.
+- **XCHG r/m**: write released 6 after the read, end at the write.
+- **POP r/m**: stack read released r2 + 3 (CALC_EA's release plus a release
+  add), the write 3 after it, end at the write; no legacy wait.
+- **JMP r/m**: SUSP (memory: 2 after the read), flush 1 after the SUSP
+  completed (it completes at a running fetch's T4), end at the first new byte.
+- **CALL r/m**: flush first (SYNC 3 after the ModR/M byte, memory 2 after the
+  read; SUSP; 4 later the jump), then push the return address.
+- **JMP FAR m**: SUSP 3 after the offset read, the segment read 1 after the
+  SUSP completed, the jump right after it (inline; FETCH_EA's tail was a
+  cycle too slow).
+- **CALL FAR m**: the 8088's order: segment read 3 after the offset, SUSP 1
+  after it, push CS 3 after the SUSP, flush 4 after that push, push IP.
+- **PUSH r/m**: write released 4 after the ModR/M byte (register) or 5 after
+  the read; PUSH SP through FF F4 pushes SP - 2 (state fix).
+- Run s: trace 2,534,445 (84.3%), state 2,942,637. No file worse. 8D, C4,
+  C5, 86, 87, 8F and FF.0-FF.7 are 100%.
