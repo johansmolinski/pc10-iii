@@ -139,7 +139,8 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-i | + JMP/CALL near, RET/RETF (+imm), harness NOP fetches, SUSP fix | 96.7% | 63.6% | 1,674,263 (55.7%) |
 | biu88-j | + JMP/CALL FAR, loops, one read per cycle, idle start | 96.7% | 65.2% | 1,713,805 (57.0%) |
 | biu88-k | + direct moves, port I/O, XLAT, LAHF, CWD, BCD adjusts | 96.7% | 71.3% | 1,897,857 (63.1%) |
-| biu88-l | + ALU groups 80-83, ModR/M memory ends by class, MOV [m],r | see below | | |
+| biu88-l | + ALU groups 80-83, ModR/M memory ends by class, MOV [m],r | 96.7% | 74.1% | 2,206,857 (73.4%) |
+| biu88-m | + MOV r/m,imm, TEST imm, NOT/NEG, writeback fix | see below | | |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
