@@ -41,6 +41,8 @@ why, test numbers).
   references).
 - `tools/mcasm.py`: microcode assembler; `tools/mcset.py`: change words in
   the listing in place.
+- `rtl/video/cga/` (cga_card.sv, cga_crtc.sv) and `tb/cga/` (Verilator TB
+  with a C++ MartyPC model, `make run`, mutants `mut.py`): `doc/cga.md`.
 
 ## Harness facts
 

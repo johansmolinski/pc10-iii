@@ -30,6 +30,9 @@ The full plan, with its research and open questions, is in
   licence), which is "cycle compatible, not cycle exact" by its own
   datasheet. It is corrected against the test suite step by step.
 - `tb/sst/`: the SingleStepTests harness (Verilator + C++).
+- `rtl/video/cga/`: the IBM CGA card (MC6845, wait states, snow), timed
+  after MartyPC; `tb/cga/`: its testbench (`make run`). See
+  [doc/cga.md](doc/cga.md).
 - `tools/`: `mcasm.py`, the MCL86 microcode assembler.
 
 ## Testing the CPU
