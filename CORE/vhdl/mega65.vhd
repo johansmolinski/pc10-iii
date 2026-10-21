@@ -356,6 +356,8 @@ constant C_DIP_SW1            : std_logic_vector(7 downto 0) := x"6D";
 
 signal main_clk               : std_logic;
 signal main_rst               : std_logic;
+signal video_clk              : std_logic;
+signal video_rst              : std_logic;
 signal main_pc_reset          : std_logic := '1';
 signal main_bios_valid        : std_logic;
 signal main_mem_size          : std_logic_vector(1 downto 0);
@@ -548,13 +550,15 @@ begin
       port map (
          sys_clk_i         => clk_i,           -- expects 100 MHz
          main_clk_o        => main_clk,        -- 100.2273 MHz
-         main_rst_o        => main_rst
+         main_rst_o        => main_rst,
+         video_clk_o       => video_clk,       -- 28.63636 MHz
+         video_rst_o       => video_rst
       ); -- clk_gen
 
    main_clk_o  <= main_clk;
    main_rst_o  <= main_rst;
-   video_clk_o <= main_clk;
-   video_rst_o <= main_rst;
+   video_clk_o <= video_clk;
+   video_rst_o <= video_rst;
 
    ---------------------------------------------------------------------------------------------
    -- main_clk
@@ -589,6 +593,7 @@ begin
       port map (
          clk_main_i           => main_clk,
          reset_i              => main_pc_reset,
+         clk_video_i          => video_clk,
 
          video_ce_o           => video_ce_o,
          video_ce_ovl_o       => video_ce_ovl_o,

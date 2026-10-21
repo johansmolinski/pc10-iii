@@ -1,6 +1,7 @@
 -- tb_glue.vhd - checks of the shell's VHDL glue (ghdl, see run.sh):
 --   keyboard.vhd: make/break codes, the MEGA + digit Fn layer, the busy handshake
---   pc_bios.vhd:  the right-aligned image (8 KB file -> FE000-FFFFF, 0xFF below), the gate
+--   pc_bios.vhd:  the window reads the RAM 1:1 (the firmware right-aligns the image), 0xFF
+--                 while the gate is closed
 --   pc_ram.vhd:   2-clock read latency with ack, the size limit (0xFF above it)
 --   pc_font.vhd:  the default font copied into the font port after the reset, a 2 KB font
 --                 loaded by QNICE and copied to 0x1800 and 0x1000
@@ -159,7 +160,7 @@ begin
             n := n + 1;
             exit when mack = '1';
          end loop;
-         assert n = 2 report "RAM ack after " & integer'image(n) & " TB waits (expected 2: ack 2 clocks after ram_en)" severity failure;
+         assert n = 3 report "RAM ack after " & integer'image(n) & " TB waits (expected 3: ack 3 clocks after ram_en)" severity failure;
          assert mrd = d report "RAM " & to_hstring(to_unsigned(a, 20)) & ": " & to_hstring(mrd)
                                 & " expected " & to_hstring(d) severity failure;
       end procedure;
@@ -181,10 +182,14 @@ begin
          assert got(i) = exp(i) report "code " & integer'image(i) & ": " & to_hstring(got(i)) severity failure;
       end loop;
 
-      -- BIOS: an 8 KB image, byte i = i mod 251, then released
+      -- BIOS: an 8 KB image where the firmware puts it (E000-FFFF; byte i = i mod 251) and
+      -- 0xFF below (two samples), first with the gate closed, then released
       for i in 0 to 8191 loop
-         qwrite(i / 4096, i mod 4096, i mod 251);
+         qwrite(16#E000# / 4096 + i / 4096, i mod 4096, i mod 251);
       end loop;
+      qwrite(0, 0, 16#FF#);
+      qwrite(13, 4095, 16#FF#);
+      romchk(16#E000#, x"FF");                -- gate closed
       qwrite(16#0100#, 2, 1);
       wait for 1 us;
       assert bvalid = '1' report "BIOS not valid" severity failure;

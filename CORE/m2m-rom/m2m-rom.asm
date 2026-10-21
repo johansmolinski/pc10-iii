@@ -307,7 +307,13 @@ _PCPS_HI        MOVE    R1, R2                  ; 64 KB: the low word is 0
                 CMP     0, @R2
                 RBRA    _PCPS_BIG, !Z
 
-_PCPS_OK        RSUB    FONT_START, 1           ; the CGA font (optional)
+_PCPS_OK        MOVE    R1, R2                  ; right-align the image (pc_bios
+                ADD     PC_BIOS_SIZEHI, R2      ; reads the RAM without an adder)
+                CMP     0, @R2
+                RBRA    _PCPS_AL, !Z            ; 64 KB: already in place
+                MOVE    @R1, R8                 ; R8: size (PC_BIOS_SIZELO = 0)
+                RSUB    BIOS_ALIGN, 1
+_PCPS_AL        RSUB    FONT_START, 1           ; the CGA font (optional)
                 CMP     0, R8
                 RBRA    _PCPS_RET, !Z
                 MOVE    M2M$RAMROM_DEV, R0      ; back to the BIOS device
@@ -332,6 +338,50 @@ _PCPS_RET       DECRB
 
 ERR_BIOS_BIG    .ASCII_W "/pc10/bios.rom is larger than 64 KB"
 ERR_BIOS_SMALL  .ASCII_W "/pc10/bios.rom is smaller than 8 KB"
+
+; BIOS_ALIGN: move the BIOS image (R8 = its size, 0 < size < 65536, loaded at
+; offset 0) to the top of the 64 KB window, so that it ends at FFFFF like a ROM
+; in the top socket, and fill the space below it with 0xFF (an empty socket).
+; Byte by byte from the top down (the regions may overlap); about 0.2 s.
+; Registers preserved (own bank); the RAMROM selection is changed.
+BIOS_ALIGN      INCRB
+                MOVE    M2M$RAMROM_DEV, R0
+                MOVE    PC_DEV_BIOS, @R0
+                MOVE    R8, R1                  ; R1: bytes to move
+                MOVE    R8, R2
+                SUB     1, R2                   ; R2: source
+                MOVE    0xFFFF, R3              ; R3: destination
+_BA_MOVE        MOVE    R2, R8
+                RSUB    _BA_ADDR, 1
+                MOVE    @R8, R4
+                MOVE    R3, R8
+                RSUB    _BA_ADDR, 1
+                MOVE    R4, @R8
+                SUB     1, R2
+                SUB     1, R3
+                SUB     1, R1
+                RBRA    _BA_MOVE, !Z
+                MOVE    R3, R1                  ; R1: bytes to fill = R3 + 1
+                ADD     1, R1                   ; (R3 = 65535 - size)
+_BA_FILL        MOVE    R3, R8
+                RSUB    _BA_ADDR, 1
+                MOVE    0x00FF, @R8
+                SUB     1, R3
+                SUB     1, R1
+                RBRA    _BA_FILL, !Z
+                DECRB
+                RET
+
+; _BA_ADDR: R8 = byte address 0..65535 -> its 4K window selected, R8 = the
+; address in the RAMROM window (same register bank as the caller: R5, R6 used)
+_BA_ADDR        MOVE    R8, R5
+                AND     0xFFFB, SR              ; (C = 0: shift in zeros)
+                SHR     12, R5
+                MOVE    M2M$RAMROM_4KWIN, R6
+                MOVE    R5, @R6
+                AND     0x0FFF, R8
+                ADD     M2M$RAMROM_DATA, R8
+                RET
 
 ; FONT_START: if /pc10/cga.rom was loaded (pc_font.vhd's size is not 0), check
 ; it (2 KB or 8 KB) and have it copied into the CGA card; without it the free

@@ -66,13 +66,16 @@ report_utilization -hierarchical -file CORE-${board}.runs/impl_1/utilization_hie
 report_timing -max_paths 50 -nworst 1 -sort_by group -file CORE-${board}.runs/impl_1/worst_paths.rpt
 set gate {}
 if {$uc_gate ne ""} { lappend gate $uc_gate }
-foreach {clk want} {main_clk 9.977} {
+foreach {clk want} {main_clk 9.977 video_clk 34.921} {
     set c [get_clocks -quiet $clk]
     if {[llength $c] == 0} {
         lappend gate "generated clock $clk missing"
     } elseif {[expr {abs([get_property PERIOD $c] - $want)}] > 0.01} {
-        lappend gate "$clk period [get_property PERIOD $c] ns, expected $want ns (100.2273 MHz)"
+        lappend gate "$clk period [get_property PERIOD $c] ns, expected $want ns"
     }
+}
+if {[llength [get_cells -quiet -hierarchical -filter {NAME =~ CORE/i_pc_fdd_sd/i_cdc_geo/*dst_data_o_reg*}]] == 0} {
+    lappend gate "multicycle target CORE/i_pc_fdd_sd/i_cdc_geo missing"
 }
 if {[llength [get_cells -quiet -hierarchical -filter {NAME =~ CORE/i_pc_ram/* && REF_NAME =~ RAMB*}]] < 160} {
     lappend gate "pc_ram has fewer than 160 block RAM primitives (640 KB optimised away?)"
