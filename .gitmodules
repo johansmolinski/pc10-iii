@@ -1,0 +1,4 @@
+[submodule "M2M/QNICE"]
+	path = M2M/QNICE
+	url = https://github.com/johansmolinski/QNICE-FPGA
+	branch = fat32-fastseek
