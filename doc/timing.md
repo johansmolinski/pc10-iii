@@ -5,12 +5,15 @@ its own branch (`cpu-timing`); this is everything else in `pc_system` and the
 glue that failed 100.2273 MHz in build `pc10-real-d` (doc/m2m-shell.md
 section 11).
 
-The rule: **no change of behaviour**, not even by one `clk` where anything
-outside the changed piece could see it. Every change in `pc_system` is a
+The rule: **no change of behaviour**. Every change in `pc_system` is a
 retiming that keeps the value of every signal the rest of the design sees in
 every `clk`, or one whose difference is provably never used (the 8253
-decrements, the DACK next value). The glue's RAM answers 2 clocks later,
-which the board does not see (section 2.10). No multicycle constraints.
+decrements, the DACK flip-flop's next value), each checked against the
+original expression in simulation. Two exceptions, both invisible to the PC:
+the glue's RAM answers 2 clocks later (section 2.10), and in the first `clk`
+of a PC reset the registered bus address can differ from the original while
+everything that reads it is being reset (section 2.11). No multicycle
+constraints.
 
 ## 1. What failed (pc10-real-d) and why
 
@@ -42,24 +45,34 @@ the CLK-falling-edge update). A register loaded with f(D of A, D of B) holds
 f(A, B) in every clk (after reset both give 4'b1111). The D input is
 exported as `dma_acknowledge_next` for the board.
 
-`dma_acknowledge_ff_next` uses a copy of the state decoder with READY = 1
-(`next_state_r1`): READY only decides between S4 and staying in S2/S3/SW, and
-the one case where that matters for the DACK flip-flop (`next_state == S2` in
-S2, compressed timing, verify, not ready) reloads it with
-`dma_acknowledge_internal`, the value it already holds (loaded on entering S2;
-the internal value only changes in SI). So the card's IOCHRDY no longer feeds
-DACK and the bus address register through the 8237's state decoder.
+The DACK flip-flop's next value (and the flip-flop itself) uses a copy of the
+state decoder with READY = 1 (`next_state_r1`), and only its transitions out
+of S1 and S4:
+- READY only decides between S4 and staying in S2/S3/SW. The one case where
+  that matters for the flip-flop (`next_state == S2` in S2: compressed
+  timing, verify, not ready) reloads it with `dma_acknowledge_internal`, the
+  value it already holds (loaded on entering S2; the internal value only
+  changes in SI).
+- In SI and S0 the flip-flop is 0 already (cleared when SI is entered, from
+  S4 or by reset or master clear), so the original "next_state == SI -> 0"
+  in SI changes nothing.
 
-### 2.2 Board: bus address select and page as registers (`xt_board.sv`)
+So neither the card's IOCHRDY nor the DMA requests and mask bits (SI -> S0)
+feed DACK and the bus address register. The hold request and the high
+address strobe use `next_state_r1` too; there it is exact (READY never makes
+the next state S0 or SI and does nothing in S1).
+
+### 2.2 Board: the bus address as a register (`xt_board.sv`)
 
 `bus_addr = dma_owns && !(&dack_n) ? {dma_page, dma_addr} : cpu_addr`, with
 `dma_owns = dma_wait & aen` and `dma_page` the 74LS670 output selected by
-DACK2/DACK3. The select and the page are now registers `dma_sel_q`,
-`dma_page_q`, loaded from the same expressions on the D inputs of `dma_wait`
-and `aen` (now written as `*_next` combinational signals), DACK
-(`dma_acknowledge_next`) and the page registers (`page_next`). `dma_addr`
-(the 8237's `transfer_address`) and `cpu_addr` are registers, so `bus_addr`
-is one LUT3 behind registers.
+DACK2/DACK3, is a register now, loaded with the same expression on the D
+inputs of the registers it is made of: `dma_wait`, `aen` (written as
+`*_next` combinational signals), DACK (`dma_acknowledge_next`), the page
+registers (`page_next`), the 8237's transfer address
+(`address_out_next`, exported from `KF8237_Address_And_Count_Registers`) and
+the address latch (`cpu_addr_next = bus_t == T1 ? cpu_ad : cpu_addr`). Every
+card, the RAM and the ROM decode a register.
 
 The page registers and the NMI mask take their data from `cpu_dout` instead
 of `bus_wdata`: they are written only by CPU I/O writes, which need AEN low,
@@ -120,10 +133,16 @@ instead of two in a row. The same value for every input (no term exceeds
 16 bits; checked against the original formula in every clk). The geometry
 keeps its multicycle constraint (CORE.xdc).
 
-### 2.7 765: op decodes as registers (`upd765.sv`)
+### 2.7 765 and the card: registered decodes (`upd765.sv`, `fdc_card.sv`)
 
-`op == OP_RTRK` and `op == OP_RD || op == OP_RDDEL` are registers loaded
-together with `op` (reset and the command byte) from `dec_op`.
+- `op == OP_RTRK` and `op == OP_RD || op == OP_RDDEL` are registers loaded
+  together with `op` (reset and the command byte) from `dec_op`.
+- The selected drive's cylinder (`cyl[pd]`, the 765's `drv_cyl`, which goes
+  into its tag compares and the track format check) is a register loaded
+  with `cyl_next[dor_next[0]]` (the DOR and the cylinders with their D inputs
+  written out).
+- The track format check gets `drv_cyl < img_tracks[pd]` from the card
+  (`geo_cyl_ok`) instead of the tracks.
 
 ### 2.8 Glue: the PC reset
 
@@ -151,6 +170,39 @@ either, `ram_q` is not used (the bus trace's data column samples `cpu_din`
 at every CPU clock edge; the first edge after MEMR falls is 13 clk later,
 still after the 6-clock answer). tb/sys has a RAM latency option (`-L n`,
 default 1) and gives the identical traces with `-L 6` (section 3).
+
+### 2.11 The first clk of a PC reset
+
+The KF chips reset asynchronously, the board and the cards synchronously. In
+the first `clk` of a PC reset the original bus address was already the
+CPU's (DACK cleared at once), while the register of section 2.2 still holds
+the address of the clk before (the DMA's, if a DMA cycle was running). In
+that clk nothing that keeps state reads it: no strobe starts (the CPU's
+command registers are unchanged, the 8237's strobes go inactive), the board,
+the cards and the 765 take their synchronous reset branches, which ignore the
+bus, and the KF chips are held in reset; from the next clk on the address is
+equal again. Registered bus strobes were tried as well (build bt-f/bt-g) and
+dropped: going inactive at once at a reset ends a CPU strobe one clk early,
+which lets the CGA commit a pending VRAM write (`acc_abort`) that the
+original drops.
+
+### 2.12 Board: CPU read data
+
+The priority chain that picks the CPU's read data (INTA, the board's chips,
+RAM/ROM, the card bus, 0xFF) now only decides the source, and the block RAM
+data (BIOS ROM, RAM register, the cards' `isa_din`) go through one 4:1
+multiplexer at the end. The same function.
+
+### 2.13 FDC: address decode one clk ahead
+
+The FDC decodes its I/O address (3F2, 3F4/3F5) into registers from
+`isa_addr_next`/`isa_aen_next`, new on the card bus (doc/architecture.md
+section 3): the D inputs of the board's bus address register and AEN. The
+register equals the combinational decode in every clk (checked). Parameter
+`REG_DECODE` (1 in `pc_system`, 0 in tb/fdc, whose bus model has no next
+values).
+
+The 765's `xslot` (about 100 loads) gets `max_fanout 24`.
 
 ## 3. Verification
 
