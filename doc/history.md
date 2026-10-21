@@ -137,7 +137,8 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-g | + EA timing (displacement SYNC, request release), ALU writebacks | 96.4% | 47.0% | 1,071,852 (35.6%) |
 | biu88-h | + PUSH/POP, PUSHF fix, conditional jumps | 96.7% | 60.4% | 1,570,430 (52.2%) |
 | biu88-i | + JMP/CALL near, RET/RETF (+imm), harness NOP fetches, SUSP fix | 96.7% | 63.6% | 1,674,263 (55.7%) |
-| biu88-j | + JMP/CALL FAR, loops, one read per cycle, idle start | see below | | |
+| biu88-j | + JMP/CALL FAR, loops, one read per cycle, idle start | 96.7% | 65.2% | 1,713,805 (57.0%) |
+| biu88-k | + direct moves, port I/O, XLAT, LAHF, CWD, BCD adjusts | see below | | |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
@@ -362,4 +363,25 @@ i to j:
   at the BIU's schedule while the EU was still finishing it, and the test's
   first ModR/M read then came a cycle late (see the EU-lag risk above).
 - Sampled: E0-E3, 9A, EA exact on all cycles.
+
+## 2026-10-21 - Single transfers and one-byte arithmetic
+
+j to k:
+- **ARMn wrappers** (0x13C8-0x13F6): set the request release (n cycles after
+  the last queue read) and the end (where the transfer ends). The I/O
+  routines call them from their WAIT_CLOCKS slot, before they read any port
+  byte, because the release counts from whatever read comes last. JARMn
+  (0x140A-0x1416) do ARMn and then the fetch-word call for MOV AL/AX
+  <-> [addr].
+  - Measured: A0/A1 1, A2/A3 2 (3 matches too), E4/E5 2, E6/E7 3, EC/ED 2,
+    EE/EF 3, XLAT 5.
+- **Absolute-end patches** (0x1420-0x1447) for one-byte instructions that
+  ended through NOP's code with old counts:
+  - LAHF 2, DAA/DAS 4;
+  - CWD 5 (AX positive) / 6 (negative);
+  - AAA/AAS 8 with adjust, 9 without. The adjust branch falls into the
+    other's code and arms first; the BIU ignores the later load.
+- Losses in j against i: lucky traces of group opcodes (C6, F6.0/F6.1, D0,
+  1B/3B memory forms) whose immediate read moved with the one-read-per-cycle
+  SYNC. Their timing is not done yet.
 

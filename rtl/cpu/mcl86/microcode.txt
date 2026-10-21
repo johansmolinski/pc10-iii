@@ -1606,9 +1606,10 @@ p 01 00000 00001 0202
 # -----------------------------------------------------
 #
 # Byte swap Flags into r0
+# pc10-iii: via the end patch at 0x1420 (this word moved there)
 p 00 00000 00001 0210
-p 01 00000 00001 398F
-p 01 00000 00001 0000
+p 01 00000 00001 1000
+p 01 00000 00001 1420
 #
 # Zero the lower byte of r0
 p 00 00000 00001 0211
@@ -1785,9 +1786,10 @@ p 01 00000 00001 1001
 p 01 00000 00001 023C
 #
 # Set DX to 0000
+# pc10-iii: via the end patch at 0x142A (this word moved there)
 p 00 00000 00001 023A
-p 01 00000 00001 43FF
-p 01 00000 00001 0000
+p 01 00000 00001 1000
+p 01 00000 00001 142A
 #
 # Jump unconditional to NOP Microcode since it is identical 
 p 00 00000 00001 023B
@@ -1795,9 +1797,10 @@ p 01 00000 00001 1000
 p 01 00000 00001 0041
 #
 # Set DX to FFFF
+# pc10-iii: via the end patch at 0x142F (this word moved there)
 p 00 00000 00001 023C
-p 01 00000 00001 53FF
-p 01 00000 00001 FFFF
+p 01 00000 00001 1000
+p 01 00000 00001 142F
 #
 # Jump unconditional to NOP Microcode since it is identical 
 p 00 00000 00001 023D
@@ -1848,9 +1851,10 @@ p 01 00000 00001 024E
 #
 #
 # Isolate AL into r0
+# pc10-iii: via the end patch at 0x1434 (this word moved there)
 p 00 00000 00001 0247
-p 01 00000 00001 490F
-p 01 00000 00001 00FF
+p 01 00000 00001 1000
+p 01 00000 00001 1434
 #
 # r0 = r0 + 6
 p 00 00000 00001 0248
@@ -1884,9 +1888,10 @@ p 01 00000 00001 0010
 #
 #
 # Zero AL[7:4]
+# pc10-iii: via the end patch at 0x1439 (this word moved there)
 p 00 00000 00001 024E
-p 01 00000 00001 400F
-p 01 00000 00001 FF0F
+p 01 00000 00001 1000
+p 01 00000 00001 1439
 #
 #
 # Set the CF Flag to 1
@@ -1959,9 +1964,10 @@ p 01 00000 00001 0264
 #
 #
 # Isolate AL into r0
+# pc10-iii: via the end patch at 0x143E (this word moved there)
 p 00 00000 00001 025D
-p 01 00000 00001 490F
-p 01 00000 00001 00FF
+p 01 00000 00001 1000
+p 01 00000 00001 143E
 #
 # r0 = r0 - 6  (( Add FFFA ))
 p 00 00000 00001 025E
@@ -1995,9 +2001,10 @@ p 01 00000 00001 0010
 #
 #
 # Zero AL[7:4]
+# pc10-iii: via the end patch at 0x1443 (this word moved there)
 p 00 00000 00001 0264
-p 01 00000 00001 400F
-p 01 00000 00001 FF0F
+p 01 00000 00001 1000
+p 01 00000 00001 1443
 #
 #
 # Set the CF Flag to 1
@@ -2054,9 +2061,10 @@ p 01 00000 00001 0001
 # START1:
 # 
 # Isolate Aux and CF Flags into into r2
+# pc10-iii: via the end patch at 0x1425 (this word moved there)
 p 00 00000 00001 0273
-p 01 00000 00001 4B8F
-p 01 00000 00001 0011
+p 01 00000 00001 1000
+p 01 00000 00001 1425
 #
 # Clear the AUX and Carry Flags
 p 00 00000 00001 0274
@@ -6012,9 +6020,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C0DC
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM5 at 0x13E8 (XLAT: the read 5 cycles after the opcode, end at its end)
 p 00 00000 00001 0571
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13E8
 #
 # r0 = AX AND 0x00FF
 p 00 00000 00001 0572
@@ -6167,9 +6176,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C08C
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM2 at 0x13D0 (release and end)
 p 00 00000 00001 0591
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D0
 #
 # r3 = DX
 p 00 00000 00001 0592
@@ -6234,9 +6244,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C08C
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM2 at 0x13D0 (release and end)
 p 00 00000 00001 05A1
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D0
 #
 # r3 = DX
 p 00 00000 00001 05A2
@@ -6285,9 +6296,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C0C8
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM2 at 0x13D0 (release and end)
 p 00 00000 00001 05AD
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D0
 #
 # Call procedure to fetch next byte from prefetch queue into r3
 p 00 00000 00001 05AE
@@ -6362,9 +6374,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C0A0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM2 at 0x13D0 (release and end)
 p 00 00000 00001 05BC
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D0
 #
 # Call procedure to fetch next byte from prefetch queue into r3
 p 00 00000 00001 05BD
@@ -6424,9 +6437,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C0A0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM3 at 0x13D8 (release and end)
 p 00 00000 00001 05C8
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D8
 #
 # r3 = DX
 p 00 00000 00001 05C9
@@ -6476,9 +6490,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C0F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM3 at 0x13D8 (release and end)
 p 00 00000 00001 05D5
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D8
 #
 # biu_dataout = AX
 p 00 00000 00001 05D6
@@ -6513,9 +6528,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C0B6
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM3 at 0x13D8 (release and end)
 p 00 00000 00001 05DE
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D8
 #
 # biu_dataout = AX
 p 00 00000 00001 05DF
@@ -6575,9 +6591,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C108
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: CALL ARM3 at 0x13D8 (release and end)
 p 00 00000 00001 05EA
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 13D8
 #
 # biu_dataout = AX
 p 00 00000 00001 05EB
@@ -15878,9 +15895,10 @@ p 01 00000 00001 093A
 # -----------------------------------------------------
 #
 # CALL Fetch Opcode word with QS=First opcode byte  - into r3
+# pc10-iii: CALL JARM1 at 0x140A (release and end)
 p 00 00000 00001 0D28
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 140A
 #
 # Set the segment to DS  (Can be overridden)
 p 00 00000 00001 0D29
@@ -15935,9 +15953,10 @@ p 01 00000 00001 093B
 # -----------------------------------------------------
 #
 # CALL Fetch Opcode word with QS=First opcode byte  - into r3
+# pc10-iii: CALL JARM1 at 0x140A (release and end)
 p 00 00000 00001 0D32
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 140A
 #
 # Set the segment to DS  (Can be overridden)
 p 00 00000 00001 0D33
@@ -15967,9 +15986,10 @@ p 01 00000 00001 0D2F
 # -----------------------------------------------------
 #
 # CALL Fetch Opcode word with QS=First opcode byte  - into r3
+# pc10-iii: CALL JARM2 at 0x140C (release and end)
 p 00 00000 00001 0D38
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 140C
 #
 # Set the segment to DS  (Can be overridden)
 p 00 00000 00001 0D39
@@ -15999,9 +16019,10 @@ p 01 00000 00001 0D2F
 # -----------------------------------------------------
 #
 # CALL Fetch Opcode word with QS=First opcode byte  - into r3
+# pc10-iii: CALL JARM2 at 0x140C (release and end)
 p 00 00000 00001 0D3D
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 140C
 #
 # Set the segment to DS  (Can be overridden)
 p 00 00000 00001 0D3E
@@ -22362,3 +22383,578 @@ p 01 00000 00001 1378
 p 00 00000 00001 1399
 p 01 00000 00001 1000
 p 01 00000 00001 0341
+#
+# --------------------------------------------------------------------
+# Single-transfer instructions: MOV AL/AX <-> [addr] (A0-A3), IN/OUT with an
+# immediate port (E4-E7) or DX (EC-EF). The 8088 issues the transfer n
+# cycles after the last queue read (the address or port byte, or the
+# opcode) and reads the next opcode where the transfer ends. ARMn sets the
+# request release and that end (called from the I/O routines' WAIT_CLOCKS
+# slot, before they read any port byte - the release counts from whatever
+# read comes last); for A0-A3, which start with the fetch word call, JARMn
+# does ARMn and then that call. Measured: A0/A1 1, A2/A3 2, E4/E5 2, E6/E7 3,
+# EC/ED 2, EE/EF 3.
+#
+# ARM1
+#
+# biu_dataout = 0001 (release: 1 cycle(s) after the last queue read)
+p 00 00000 00001 13C8
+p 01 00000 00001 5FFF
+p 01 00000 00001 0001
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 13C9
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 13CA
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 13CB
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 13CC
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13CD
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 13CE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# ARM2
+#
+# biu_dataout = 0002 (release: 2 cycle(s) after the last queue read)
+p 00 00000 00001 13D0
+p 01 00000 00001 5FFF
+p 01 00000 00001 0002
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 13D1
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 13D2
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 13D3
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 13D4
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13D5
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 13D6
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# ARM3
+#
+# biu_dataout = 0003 (release: 3 cycle(s) after the last queue read)
+p 00 00000 00001 13D8
+p 01 00000 00001 5FFF
+p 01 00000 00001 0003
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 13D9
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 13DA
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 13DB
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 13DC
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13DD
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 13DE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# ARM4
+#
+# biu_dataout = 0004 (release: 4 cycle(s) after the last queue read)
+p 00 00000 00001 13E0
+p 01 00000 00001 5FFF
+p 01 00000 00001 0004
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 13E1
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 13E2
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 13E3
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 13E4
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13E5
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 13E6
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# ARM5
+#
+# biu_dataout = 0005 (release: 5 cycle(s) after the last queue read)
+p 00 00000 00001 13E8
+p 01 00000 00001 5FFF
+p 01 00000 00001 0005
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 13E9
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 13EA
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 13EB
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 13EC
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13ED
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 13EE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# ARM6
+#
+# biu_dataout = 0006 (release: 6 cycle(s) after the last queue read)
+p 00 00000 00001 13F0
+p 01 00000 00001 5FFF
+p 01 00000 00001 0006
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 13F1
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 13F2
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 13F3
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 13F4
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13F5
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 13F6
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# ARM7
+#
+# biu_dataout = 0007 (release: 7 cycle(s) after the last queue read)
+p 00 00000 00001 13F8
+p 01 00000 00001 5FFF
+p 01 00000 00001 0007
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 13F9
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 13FA
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 13FB
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 13FC
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13FD
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 13FE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# JARM1
+#
+# CALL ARM1
+p 00 00000 00001 140A
+p 01 00000 00001 1100
+p 01 00000 00001 13C8
+#
+# Jump unconditional to Fetch word (it returns to the caller)
+p 00 00000 00001 140B
+p 01 00000 00001 1000
+p 01 00000 00001 02E0
+#
+# JARM2
+#
+# CALL ARM2
+p 00 00000 00001 140C
+p 01 00000 00001 1100
+p 01 00000 00001 13D0
+#
+# Jump unconditional to Fetch word (it returns to the caller)
+p 00 00000 00001 140D
+p 01 00000 00001 1000
+p 01 00000 00001 02E0
+#
+# JARM3
+#
+# CALL ARM3
+p 00 00000 00001 140E
+p 01 00000 00001 1100
+p 01 00000 00001 13D8
+#
+# Jump unconditional to Fetch word (it returns to the caller)
+p 00 00000 00001 140F
+p 01 00000 00001 1000
+p 01 00000 00001 02E0
+#
+# JARM4
+#
+# CALL ARM4
+p 00 00000 00001 1410
+p 01 00000 00001 1100
+p 01 00000 00001 13E0
+#
+# Jump unconditional to Fetch word (it returns to the caller)
+p 00 00000 00001 1411
+p 01 00000 00001 1000
+p 01 00000 00001 02E0
+#
+# JARM5
+#
+# CALL ARM5
+p 00 00000 00001 1412
+p 01 00000 00001 1100
+p 01 00000 00001 13E8
+#
+# Jump unconditional to Fetch word (it returns to the caller)
+p 00 00000 00001 1413
+p 01 00000 00001 1000
+p 01 00000 00001 02E0
+#
+# JARM6
+#
+# CALL ARM6
+p 00 00000 00001 1414
+p 01 00000 00001 1100
+p 01 00000 00001 13F0
+#
+# Jump unconditional to Fetch word (it returns to the caller)
+p 00 00000 00001 1415
+p 01 00000 00001 1000
+p 01 00000 00001 02E0
+#
+# JARM7
+#
+# CALL ARM7
+p 00 00000 00001 1416
+p 01 00000 00001 1100
+p 01 00000 00001 13F8
+#
+# Jump unconditional to Fetch word (it returns to the caller)
+p 00 00000 00001 1417
+p 01 00000 00001 1000
+p 01 00000 00001 02E0
+#
+# --------------------------------------------------------------------
+# Absolute ends for one-byte instructions that ended through NOP's code with
+# old core-clock counts: each patch arms the end at cycle n of the
+# instruction, does the word it replaced and jumps back.
+#
+# LAHF: end in cycle 2 (from 0x0210)
+#
+# biu_dataout = E002 (end: cycle 2 of the instruction)
+p 00 00000 00001 1420
+p 01 00000 00001 5FFF
+p 01 00000 00001 E002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1421
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1422
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x0210)
+p 00 00000 00001 1423
+p 01 00000 00001 398F
+p 01 00000 00001 0000
+#
+# Jump unconditional back to 0x0211
+p 00 00000 00001 1424
+p 01 00000 00001 1000
+p 01 00000 00001 0211
+#
+# DAA/DAS (common code): end in cycle 4 (from 0x0273)
+#
+# biu_dataout = E004 (end: cycle 4 of the instruction)
+p 00 00000 00001 1425
+p 01 00000 00001 5FFF
+p 01 00000 00001 E004
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1426
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1427
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x0273)
+p 00 00000 00001 1428
+p 01 00000 00001 4B8F
+p 01 00000 00001 0011
+#
+# Jump unconditional back to 0x0274
+p 00 00000 00001 1429
+p 01 00000 00001 1000
+p 01 00000 00001 0274
+#
+# CWD, AX positive: end in cycle 5 (from 0x023A)
+#
+# biu_dataout = E005 (end: cycle 5 of the instruction)
+p 00 00000 00001 142A
+p 01 00000 00001 5FFF
+p 01 00000 00001 E005
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 142B
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 142C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x023A)
+p 00 00000 00001 142D
+p 01 00000 00001 43FF
+p 01 00000 00001 0000
+#
+# Jump unconditional back to 0x023B
+p 00 00000 00001 142E
+p 01 00000 00001 1000
+p 01 00000 00001 023B
+#
+# CWD, AX negative: end in cycle 6 (from 0x023C)
+#
+# biu_dataout = E006 (end: cycle 6 of the instruction)
+p 00 00000 00001 142F
+p 01 00000 00001 5FFF
+p 01 00000 00001 E006
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1430
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1431
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x023C)
+p 00 00000 00001 1432
+p 01 00000 00001 53FF
+p 01 00000 00001 FFFF
+#
+# Jump unconditional back to 0x023D
+p 00 00000 00001 1433
+p 01 00000 00001 1000
+p 01 00000 00001 023D
+#
+# AAA, adjust: end in cycle 8 (from 0x0247)
+#
+# biu_dataout = E008 (end: cycle 8 of the instruction)
+p 00 00000 00001 1434
+p 01 00000 00001 5FFF
+p 01 00000 00001 E008
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1435
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1436
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x0247)
+p 00 00000 00001 1437
+p 01 00000 00001 490F
+p 01 00000 00001 00FF
+#
+# Jump unconditional back to 0x0248
+p 00 00000 00001 1438
+p 01 00000 00001 1000
+p 01 00000 00001 0248
+#
+# AAA, no adjust (the adjust path arms first): end in cycle 9 (from 0x024E)
+#
+# biu_dataout = E009 (end: cycle 9 of the instruction)
+p 00 00000 00001 1439
+p 01 00000 00001 5FFF
+p 01 00000 00001 E009
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 143A
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 143B
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x024E)
+p 00 00000 00001 143C
+p 01 00000 00001 400F
+p 01 00000 00001 FF0F
+#
+# Jump unconditional back to 0x024F
+p 00 00000 00001 143D
+p 01 00000 00001 1000
+p 01 00000 00001 024F
+#
+# AAS, adjust: end in cycle 8 (from 0x025D)
+#
+# biu_dataout = E008 (end: cycle 8 of the instruction)
+p 00 00000 00001 143E
+p 01 00000 00001 5FFF
+p 01 00000 00001 E008
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 143F
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1440
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x025D)
+p 00 00000 00001 1441
+p 01 00000 00001 490F
+p 01 00000 00001 00FF
+#
+# Jump unconditional back to 0x025E
+p 00 00000 00001 1442
+p 01 00000 00001 1000
+p 01 00000 00001 025E
+#
+# AAS, no adjust (the adjust path arms first): end in cycle 9 (from 0x0264)
+#
+# biu_dataout = E009 (end: cycle 9 of the instruction)
+p 00 00000 00001 1443
+p 01 00000 00001 5FFF
+p 01 00000 00001 E009
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1444
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1445
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# (the word from 0x0264)
+p 00 00000 00001 1446
+p 01 00000 00001 400F
+p 01 00000 00001 FF0F
+#
+# Jump unconditional back to 0x0265
+p 00 00000 00001 1447
+p 01 00000 00001 1000
+p 01 00000 00001 0265
