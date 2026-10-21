@@ -14,12 +14,13 @@
 --     offset 3 (R)   bit 0: a write went to a window outside 0..15 (the file is > 64 KB)
 --     offset 4 (W)   any write: forget the image (size, overflow and valid back to 0)
 --
--- PC side (main clock domain): rom_addr_i is the offset in F0000-FFFFF. An image of N bytes
--- is right-aligned, i.e. it ends at FFFFF like a real ROM in the top socket: rom_addr maps to
--- image byte rom_addr - (65536 - N) = (rom_addr + N) mod 65536, and below the image (the
--- carry of that sum is 0) the window reads 0xFF like an empty socket. 1 clock read latency.
--- The size crosses into the main clock domain through cdc_stable; it only changes while the
--- PC is held in reset (valid = 0).
+-- PC side (main clock domain): rom_addr_i is the offset in F0000-FFFFF, read straight from the
+-- block RAM (1 clock latency; no adder in the address path: timing at 100 MHz). An image of N
+-- bytes must end at FFFFF like a real ROM in the top socket: the firmware (PREP_START,
+-- BIOS_ALIGN) moves the loaded image from offset 0 to the top of the 64 KB and fills the space
+-- below it with 0xFF (an empty socket) before it sets the valid bit. While valid = 0 the PC
+-- reads 0xFF (it is held in reset anyway). valid crosses into the main clock domain through
+-- cdc_stable.
 --
 -- done by Johan Smolinski in 2026 and licensed under GPL v3
 ----------------------------------------------------------------------------------
@@ -66,9 +67,8 @@ architecture synthesis of pc_bios is
    signal main_size       : unsigned(16 downto 0);
    signal main_valid      : std_logic;
 
-   signal main_sum        : unsigned(16 downto 0);
    signal main_ram_q      : std_logic_vector(7 downto 0);
-   signal main_in_img     : std_logic := '0';
+   signal main_valid_q    : std_logic := '0';
 
 begin
 
@@ -134,8 +134,6 @@ begin
    -- The 64 KB image: port A = QNICE (falling edge), port B = the PC (main clock)
    ---------------------------------------------------------------------------------------------
 
-   main_sum <= resize(unsigned(rom_addr_i), 17) + main_size;
-
    i_rom : entity work.dualport_2clk_ram
       generic map (
          ADDR_WIDTH        => 16,
@@ -151,7 +149,7 @@ begin
          q_a               => qnice_ram_q,
 
          clock_b           => main_clk_i,
-         address_b         => std_logic_vector(main_sum(15 downto 0)),
+         address_b         => rom_addr_i,
          data_b            => (others => '0'),
          wren_b            => '0',
          q_b               => main_ram_q
@@ -160,14 +158,14 @@ begin
    p_main : process (main_clk_i)
    begin
       if rising_edge(main_clk_i) then
-         main_in_img <= main_sum(16) and main_valid;
+         main_valid_q <= main_valid;
       end if;
    end process p_main;
 
-   rom_rdata_o  <= main_ram_q when main_in_img = '1' else x"FF";
+   rom_rdata_o  <= main_ram_q when main_valid_q = '1' else x"FF";
 
    ---------------------------------------------------------------------------------------------
-   -- Clock domain crossing: size and valid are static while the PC runs
+   -- Clock domain crossing: valid (and the size, for debugging) are static while the PC runs
    ---------------------------------------------------------------------------------------------
 
    i_cdc : entity work.cdc_stable

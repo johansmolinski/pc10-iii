@@ -4,13 +4,15 @@
 -- System RAM: 640 KB of byte-wide block RAM behind pc_system's abstract memory port
 -- (doc/architecture.md section 4).
 --
--- * 512 KB at 00000-7FFFF plus 128 KB at 80000-9FFFF: two inferred arrays, 160 RAMB36
---   tiles in all. NO QNICE port (Megamiga hard rule 4: QNICE accesses on the falling
+-- * 20 banks of 32 KB at 00000-9FFFF (8 RAMB36 each, 160 in all). NO QNICE port
+--   (Megamiga hard rule 4: QNICE accesses on the falling
 --   clock edge, a half-period path into 160 spread tiles does not close).
--- * Latency: the request is registered first (address fan-out to 160 tiles from a
---   register), then the block RAM reads; read data and ram_ack_o are valid 2 clocks
---   after ram_en_i. pc_system waits for ram_ack_o (the contract allows a later answer
---   than the 1 clock of a bare BRAM).
+-- * Latency (timing at 100 MHz): the request is registered as it comes (pc_system's address
+--   and data come out of deep logic), then decoded into one of 20 banks of 32 KB with one
+--   copy of the address, write enable and data per bank (so a register drives only the 8
+--   RAMB36 of its bank); the banks' outputs are multiplexed into a register. Read data and
+--   ram_ack_o are valid 4 clocks after ram_en_i; pc_system waits for ram_ack_o
+--   (architecture.md section 4 allows a later answer than the 1 clock of a bare BRAM).
 -- * size_i limits the RAM seen by the PC at run time (OSM "Memory"): 00 = 640 KB,
 --   01 = 512 KB, 10 = 256 KB, 11 = 128 KB. Above the limit reads return 0xFF (open
 --   bus) and writes are dropped; both are acknowledged.
@@ -37,27 +39,37 @@ end entity pc_ram;
 
 architecture synthesis of pc_ram is
 
-   type t_ram_lo is array (0 to 2**19 - 1) of std_logic_vector(7 downto 0);
-   type t_ram_hi is array (0 to 2**17 - 1) of std_logic_vector(7 downto 0);
+   constant C_BANKS : natural := 20;                  -- 20 x 32 KB = 640 KB
 
-   signal ram_lo : t_ram_lo;
-   signal ram_hi : t_ram_hi;
-   attribute ram_style : string;
-   attribute ram_style of ram_lo : signal is "block";
-   attribute ram_style of ram_hi : signal is "block";
+   type t_bank   is array (0 to 2**15 - 1) of std_logic_vector(7 downto 0);
+   type t_addr   is array (0 to C_BANKS - 1) of std_logic_vector(14 downto 0);
+   type t_data   is array (0 to C_BANKS - 1) of std_logic_vector(7 downto 0);
 
-   -- stage 1: the registered request
-   signal a_q      : std_logic_vector(19 downto 0) := (others => '0');
-   signal d_q      : std_logic_vector(7 downto 0)  := (others => '0');
+   -- stage 0: the request as it comes
+   signal r_addr   : std_logic_vector(19 downto 0) := (others => '0');
+   signal r_wdata  : std_logic_vector(7 downto 0) := (others => '0');
+   signal r_en     : std_logic := '0';
+   signal r_we     : std_logic := '0';
+
+   -- stage 1: the decoded request, one copy per bank
+   signal b_addr   : t_addr := (others => (others => '0'));
+   signal b_wdata  : t_data := (others => (others => '0'));
+   signal b_we     : std_logic_vector(C_BANKS - 1 downto 0) := (others => '0');
+   attribute keep : string;
+   attribute keep of b_addr  : signal is "true";
+   attribute keep of b_wdata : signal is "true";
+   signal bank_q   : natural range 0 to 31 := 0;
    signal en_q     : std_logic := '0';
-   signal we_q     : std_logic := '0';
    signal inr_q    : std_logic := '0';
 
-   -- stage 2: the block RAM outputs
-   signal q_lo     : std_logic_vector(7 downto 0);
-   signal q_hi     : std_logic_vector(7 downto 0);
-   signal sel_hi_q : std_logic := '0';
+   -- stage 2: the banks
+   signal b_q      : t_data;
+   signal bank_q2  : natural range 0 to 31 := 0;
+   signal en_q2    : std_logic := '0';
    signal inr_q2   : std_logic := '0';
+
+   -- stage 3: the output register
+   signal rdata_q  : std_logic_vector(7 downto 0) := (others => '1');
    signal ack_q    : std_logic := '0';
 
    signal limit    : unsigned(19 downto 0);
@@ -70,53 +82,74 @@ begin
       to_unsigned(16#40000#, 20) when "10",
       to_unsigned(16#20000#, 20) when others;
 
-   p_req : process (clk_i)
+   p_in : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         a_q   <= ram_addr_i;
-         d_q   <= ram_wdata_i;
-         en_q  <= ram_en_i;
-         we_q  <= ram_en_i and ram_we_i;
-         if unsigned(ram_addr_i) < limit then
-            inr_q <= '1';
+         r_addr  <= ram_addr_i;
+         r_wdata <= ram_wdata_i;
+         r_en    <= ram_en_i;
+         r_we    <= ram_we_i;
+      end if;
+   end process p_in;
+
+   p_req : process (clk_i)
+      variable v_bank : natural range 0 to 31;
+      variable v_inr  : std_logic;
+   begin
+      if rising_edge(clk_i) then
+         v_bank := to_integer(unsigned(r_addr(19 downto 15)));
+         if unsigned(r_addr) < limit then
+            v_inr := '1';
          else
-            inr_q <= '0';
+            v_inr := '0';
          end if;
+         for k in 0 to C_BANKS - 1 loop
+            b_addr(k)  <= r_addr(14 downto 0);
+            b_wdata(k) <= r_wdata;
+            if r_en = '1' and r_we = '1' and v_inr = '1' and v_bank = k then
+               b_we(k) <= '1';
+            else
+               b_we(k) <= '0';
+            end if;
+         end loop;
+         bank_q <= v_bank;
+         en_q   <= r_en;
+         inr_q  <= v_inr;
       end if;
    end process p_req;
 
-   p_lo : process (clk_i)
+   g_bank : for k in 0 to C_BANKS - 1 generate
+      signal mem : t_bank;
+      attribute ram_style : string;
+      attribute ram_style of mem : signal is "block";
    begin
-      if rising_edge(clk_i) then
-         if we_q = '1' and inr_q = '1' and a_q(19) = '0' then
-            ram_lo(to_integer(unsigned(a_q(18 downto 0)))) <= d_q;
+      p_bank : process (clk_i)
+      begin
+         if rising_edge(clk_i) then
+            if b_we(k) = '1' then
+               mem(to_integer(unsigned(b_addr(k)))) <= b_wdata(k);
+            end if;
+            b_q(k) <= mem(to_integer(unsigned(b_addr(k))));
          end if;
-         q_lo <= ram_lo(to_integer(unsigned(a_q(18 downto 0))));
-      end if;
-   end process p_lo;
-
-   p_hi : process (clk_i)
-   begin
-      if rising_edge(clk_i) then
-         if we_q = '1' and inr_q = '1' and a_q(19 downto 17) = "100" then
-            ram_hi(to_integer(unsigned(a_q(16 downto 0)))) <= d_q;
-         end if;
-         q_hi <= ram_hi(to_integer(unsigned(a_q(16 downto 0))));
-      end if;
-   end process p_hi;
+      end process p_bank;
+   end generate g_bank;
 
    p_out : process (clk_i)
    begin
       if rising_edge(clk_i) then
-         sel_hi_q <= a_q(19);
-         inr_q2   <= inr_q;
-         ack_q    <= en_q;
+         bank_q2 <= bank_q;
+         en_q2   <= en_q;
+         inr_q2  <= inr_q;
+         ack_q   <= en_q2;
+         if inr_q2 = '0' or bank_q2 >= C_BANKS then
+            rdata_q <= x"FF";
+         else
+            rdata_q <= b_q(bank_q2);
+         end if;
       end if;
    end process p_out;
 
-   ram_rdata_o <= x"FF" when inr_q2 = '0' else
-                  q_hi  when sel_hi_q = '1' else
-                  q_lo;
+   ram_rdata_o <= rdata_q;
    ram_ack_o   <= ack_q;
 
 end architecture synthesis;

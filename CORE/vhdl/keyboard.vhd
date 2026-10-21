@@ -175,45 +175,69 @@ architecture synthesis of keyboard is
    signal code_q    : std_logic_vector(7 downto 0) := (others => '0');
    signal valid_q   : std_logic := '0';
 
+   -- pipeline (timing at 100 MHz): A registers the scan, B looks the key up, C decides. The
+   -- framework shows each key for many clocks, so after a change C ignores the next two clocks
+   -- (B may still hold the key's state from before the change).
+   signal a_num     : integer range 0 to 79 := 0;
+   signal a_pressed : std_logic := '0';
+   signal b_num     : integer range 0 to 79 := 0;
+   signal b_pressed : std_logic := '0';
+   signal b_state   : std_logic := '0';
+   signal b_fn      : std_logic := '0';
+   signal b_mega    : std_logic := '0';
+   signal b_map     : std_logic_vector(7 downto 0) := (others => '0');
+   signal c_lock    : natural range 0 to 2 := 0;
+
 begin
 
    p_scan : process (clk_main_i)
-      variable v_pressed : std_logic;
       variable v_make    : std_logic_vector(7 downto 0);
       variable v_fn      : std_logic;
       variable v_push    : boolean;
       variable v_pop     : boolean;
    begin
       if rising_edge(clk_main_i) then
-         v_pressed := not key_pressed_n_i;
          v_push    := false;
          v_pop     := false;
          valid_q   <= '0';
 
-         -- 1) a key changed: queue its make or break code
-         if v_pressed /= key_state(key_num_i) and count < 2**C_FIFO_LOG then
-            key_state(key_num_i) <= v_pressed;
-            if v_pressed = '1' then
+         -- A, B
+         a_num     <= key_num_i;
+         a_pressed <= not key_pressed_n_i;
+         b_num     <= a_num;
+         b_pressed <= a_pressed;
+         b_state   <= key_state(a_num);
+         b_fn      <= key_fn(a_num);
+         b_mega    <= key_state(m65_mega);
+         b_map     <= C_MAP(a_num);
+
+         -- C: a key changed: queue its make or break code
+         if c_lock /= 0 then
+            c_lock <= c_lock - 1;
+         elsif b_pressed /= b_state and count < 2**C_FIFO_LOG then
+            c_lock <= 2;
+            key_state(b_num) <= b_pressed;
+            if b_pressed = '1' then
                v_fn := '0';
-               if key_state(m65_mega) = '1' and fn_code(C_MAP(key_num_i)) /= x"00" then
+               if b_mega = '1' and fn_code(b_map) /= x"00" then
                   v_fn := '1';
                end if;
-               key_fn(key_num_i) <= v_fn;
+               key_fn(b_num) <= v_fn;
             else
-               v_fn := key_fn(key_num_i);
+               v_fn := b_fn;
             end if;
             if v_fn = '1' then
-               v_make := fn_code(C_MAP(key_num_i));
+               v_make := fn_code(b_map);
             else
-               v_make := C_MAP(key_num_i);
+               v_make := b_map;
             end if;
             if v_make /= x"00" then
-               fifo(to_integer(wr_ptr)) <= (not v_pressed) & v_make(6 downto 0);
+               fifo(to_integer(wr_ptr)) <= (not b_pressed) & v_make(6 downto 0);
                v_push := true;
             end if;
          end if;
 
-         -- 2) hand the oldest code to the board
+         -- hand the oldest code to the board
          if holdoff /= 0 then
             holdoff <= holdoff - 1;
          elsif count /= 0 and kbd_busy_i = '0' then
@@ -243,6 +267,7 @@ begin
             count     <= (others => '0');
             holdoff   <= 0;
             valid_q   <= '0';
+            c_lock    <= 2;
          end if;
       end if;
    end process p_scan;
