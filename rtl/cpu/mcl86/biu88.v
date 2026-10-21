@@ -748,7 +748,9 @@ always @(posedge CORE_CLK_INT) begin
                 5'h1E: begin                        // SUSP
                     fetch_state = FS_SUSP;
                     rphase = RP_SUSP;
-                    if (latch != ST_CODE) begin
+                    // MartyPC biu_fetch_suspend: wait for a running code
+                    // fetch to reach T4 (no wait when this cycle is its T4)
+                    if (latch != ST_CODE || t_cycle == T4) begin
                         ta_cycle  = TA_TD;
                         pl_status = ST_PASV;
                         rphase    = RP_IDLE;

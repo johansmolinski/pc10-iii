@@ -135,7 +135,8 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-e | + ModR/M read at 1, ALU-imm end armed after the read, harness write fix | 96.4% | 32.6% | 819,712 (27.3%) |
 | biu88-f | + register-form ends at the ModR/M read | 96.4% | 35.3% | 900,920 (30.0%) |
 | biu88-g | + EA timing (displacement SYNC, request release), ALU writebacks | 96.4% | 47.0% | 1,071,852 (35.6%) |
-| biu88-h | + PUSH/POP, PUSHF fix, conditional jumps | see below | | |
+| biu88-h | + PUSH/POP, PUSHF fix, conditional jumps | 96.7% | 60.4% | 1,570,430 (52.2%) |
+| biu88-i | + JMP/CALL near, RET/RETF (+imm), harness NOP fetches, SUSP fix | see below | | |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
@@ -298,4 +299,30 @@ g to h:
 - Losses in -g against -f: lucky traces of instructions that call CALC_EA
   directly (80.3/82.3, LEA, D0/D1 shifts, F6.3/F7.3 NEG). Their memory reads
   are timed now, the rest of them is not yet. States unchanged.
+
+## 2026-10-21 - Near jumps and calls, returns
+
+h to i:
+- **Harness:** code fetches after the instruction's own (not prefetched)
+  bytes return 0x90, whatever the address. The suite's generator does that
+  ("All bytes fetched after the initial instruction bytes are set to
+  0x90"), and a jump can land on the instruction's own bytes. The last Jcc
+  and JMP failures were this.
+- **BIU:** a SUSP that arrives in the T4 of a running code fetch is done at
+  once (MartyPC's wait-until-T4 is already satisfied there).
+- **JMP near** (0x12B8 from 0x03B7, a former NOP slot): SUSP 1 cycle after
+  the displacement's high byte, flush 4 cycles after the EU resumes. JMP
+  short already went through the Jcc taken path.
+- **CALL near:** MCL86 pushed the return address first and then jumped; the
+  8088 reads the displacement, suspends, flushes, and pushes 3 cycles later.
+  Rewritten at 0x12C0.
+- **RET** (0x12D8): pop released at cycle 2, SUSP where the EU resumes, flush
+  1 cycle later, end at the first new byte.
+- **RET imm16** (0x12F0): MCL86 popped before reading the immediate.
+  Rewritten: immediate, pop released 3 cycles after it, SUSP, flush 2
+  cycles later (MartyPC's farret).
+- **RETF** (0x1308): IP pop released at cycle 4, SUSP, 3 cycles, CS pop,
+  flush. **RETF imm16** (0x1320): immediate first, then the same, with SP
+  adjusted after both pops.
+- Sampled: E8, E9, EB, C2, C3, CA, CB and every Jcc exact on all cycles.
 

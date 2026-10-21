@@ -197,6 +197,8 @@ static Result run_test(Sim &sim, const Test &t) {
     int prev_jump = 0, prev_strobe = 0, prev_dispatch = 0;
     int preload_at = 0;
     int snap_st = 7, snap_qs = 0, snap_qb = 0;
+    int code_fetches = 0;
+    const int code_bytes = (int)t.bytes.size() - (int)t.queue.size();
     bool cycle_of_test = true;
     unsigned snap_ad = 0;
 
@@ -249,7 +251,10 @@ static Result run_test(Sim &sim, const Test &t) {
                     if (!test_mode)
                         read_val = lptr < loader.size() ? loader[lptr++] : 0x90;
                     else
-                        read_val = mem[latched];
+                        // like the suite's generator: the instruction's own
+                        // bytes (those not prefetched), then NOPs, whatever
+                        // the address (a jump may land on its own bytes)
+                        read_val = code_fetches++ < code_bytes ? mem[latched] : 0x90;
                 } else if (st == 5) {                // memory read
                     read_val = test_mode ? mem[latched]
                                          : flagbytes[dptr++ & 1];
@@ -489,15 +494,15 @@ static void print_trace(const Test &t, const Result &r) {
         char a[64] = "", b[64] = "";
         if (i < t.cycles.size()) {
             const Cycle &c = t.cycles[i];
-            snprintf(a, sizeof a, "%c %05X %-4s %-2s %s %02X", c.ale ? 'A' : ' ',
+            snprintf(a, sizeof a, "%c %05X %-4s %-2s %s %02X %s", c.ale ? 'A' : ' ',
                      c.ale ? c.addr : 0, c.bus.c_str(), c.t.c_str(),
-                     c.qop.c_str(), c.qbyte);
+                     c.qop.c_str(), c.qbyte, c.t == "T3" ? (std::to_string(c.data)).c_str() : "");
         }
         if (i < r.got.size()) {
             const Cycle &c = r.got[i];
-            snprintf(b, sizeof b, "%c %05X %-4s %-2s %s %02X", c.ale ? 'A' : ' ',
+            snprintf(b, sizeof b, "%c %05X %-4s %-2s %s %02X %s", c.ale ? 'A' : ' ',
                      c.ale ? c.addr : 0, c.bus.c_str(), c.t.c_str(),
-                     c.qop.c_str(), c.qbyte);
+                     c.qop.c_str(), c.qbyte, c.t == "T3" ? (std::to_string(c.data)).c_str() : "");
         }
         bool same = strcmp(a, b) == 0;
         printf("  %3zu %-30s %s %s\n", i, a, same ? "|" : "#", b);

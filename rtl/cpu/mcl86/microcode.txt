@@ -3836,10 +3836,10 @@ p 00 00000 00001 03B6
 p 01 00000 00001 1100
 p 01 00000 00001 02E0
 #
-# NOP
+# pc10-iii: CALL the JMP near timing at 0x12B8 (was a NOP)
 p 00 00000 00001 03B7
-p 01 00000 00001 0000
-p 01 00000 00001 0000
+p 01 00000 00001 1100
+p 01 00000 00001 12B8
 #
 # NOP
 p 00 00000 00001 03B8
@@ -3882,9 +3882,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C0FF
 #
 # Jump unconditional to Multibyte Ending except dont assert the QS as it has already been done.
+# pc10-iii: to 0x12B0 instead (the end at the first byte from the new address)
 p 00 00000 00001 03C0
 p 01 00000 00001 1000
-p 01 00000 00001 0352
+p 01 00000 00001 12B0
 #
 # -----------------------------------------------------
 #
@@ -5051,10 +5052,11 @@ p 01 00000 00001 0045
 #
 # -----------------------------------------------------
 #
-# Load r0 with 0x3
+# pc10-iii: CALL near is done by the routine at 0x12C0 (the 8088 reads the
+# displacement and jumps before it pushes); the words below are unused now
 p 00 00000 00001 04A0
-p 01 00000 00001 59FF
-p 01 00000 00001 0003
+p 01 00000 00001 1000
+p 01 00000 00001 12C0
 #
 # Add r0 to the current IP into biu_dataout for the address to push to the stack
 p 00 00000 00001 04A1
@@ -5115,10 +5117,10 @@ p 01 00000 00001 03C1
 #
 # -----------------------------------------------------
 #
-# Write 20 clocks to clock counter
+# pc10-iii: RET is done by the routine at 0x12D8; the words below are unused
 p 00 00000 00001 04BC
-p 01 00000 00001 5FFF
-p 01 00000 00001 C053
+p 01 00000 00001 1000
+p 01 00000 00001 12D8
 #
 # CALL WAIT_CLOCKS
 p 00 00000 00001 04BD
@@ -5177,10 +5179,10 @@ p 01 00000 00001 0004
 #
 # -----------------------------------------------------
 #
-# Write 34 clocks to clock counter
+# pc10-iii: RETF is done by the routine at 0x1308; the words below are unused
 p 00 00000 00001 04C7
-p 01 00000 00001 5FFF
-p 01 00000 00001 C063
+p 01 00000 00001 1000
+p 01 00000 00001 1308
 #
 # CALL WAIT_CLOCKS
 p 00 00000 00001 04C8
@@ -5239,10 +5241,11 @@ p 01 00000 00001 04C2
 #
 # -----------------------------------------------------
 #
-# Write 24 clocks to clock counter
+# pc10-iii: RET imm16 is done by the routine at 0x12F0 (the 8088 reads the
+# immediate before it pops); the words below are unused now
 p 00 00000 00001 04D5
-p 01 00000 00001 5FFF
-p 01 00000 00001 C03F
+p 01 00000 00001 1000
+p 01 00000 00001 12F0
 #
 # CALL WAIT_CLOCKS
 p 00 00000 00001 04D6
@@ -5317,9 +5320,10 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # Write 33 clocks to clock counter
+# pc10-iii: RETF imm16 is done by the routine at 0x1320 (immediate first)
 p 00 00000 00001 04E6
-p 01 00000 00001 5FFF
-p 01 00000 00001 C063
+p 01 00000 00001 1000
+p 01 00000 00001 1320
 #
 # CALL WAIT_CLOCKS
 p 00 00000 00001 04E7
@@ -21344,3 +21348,499 @@ p 01 00000 00001 CFFF
 p 00 00000 00001 12B3
 p 01 00000 00001 1000
 p 01 00000 00001 0004
+#
+# --------------------------------------------------------------------
+# JMP near (JUMP_TAKEN16, from 0x03B7): SUSP 1 cycle after the high byte of
+# the displacement; the flush 4 cycles after the EU resumes from SUSP.
+#
+# SYNC: 1 cycle after the last queue read
+p 00 00000 00001 12B8
+p 01 00000 00001 0000
+p 01 00000 00001 4001
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 12B9
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 12BA
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 12BB
+p 01 00000 00001 1002
+p 01 00000 00001 12BA
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 12BC
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 4 cycles from now (the flush follows)
+p 00 00000 00001 12BD
+p 01 00000 00001 0000
+p 01 00000 00001 8004
+#
+# Return to calling code
+p 00 00000 00001 12BE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# --------------------------------------------------------------------
+# CALL near (0xE8, from 0x04A0). The 8088 reads the displacement (cycles 2
+# and 3), suspends prefetching 1 cycle after the high byte, flushes 4
+# cycles after the EU resumes, then pushes the return address 3 cycles
+# later and reads the next opcode in the T3 of the second write.
+#
+# CALL Fetch word (the displacement) into r3
+p 00 00000 00001 12C0
+p 01 00000 00001 1100
+p 01 00000 00001 02E0
+#
+# r2 = r3
+p 00 00000 00001 12C1
+p 01 00000 00001 5BFC
+p 01 00000 00001 0000
+#
+# r0 = prefetch_queue_address (the high byte of the displacement)
+p 00 00000 00001 12C2
+p 01 00000 00001 29F8
+p 01 00000 00001 0000
+#
+# r0 = r0 + 1 (the return address)
+p 00 00000 00001 12C3
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# r3 = r2 + r0 (the target)
+p 00 00000 00001 12C4
+p 01 00000 00001 2CB9
+p 01 00000 00001 0000
+#
+# CALL the JMP near timing (SUSP, then the flush cycle)
+p 00 00000 00001 12C5
+p 01 00000 00001 1100
+p 01 00000 00001 12B8
+#
+# Set the BIU Command fields - Jump Request
+p 00 00000 00001 12C6
+p 01 00000 00001 5DDF
+p 01 00000 00001 0398
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 12C7
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 12C8
+p 01 00000 00001 1002
+p 01 00000 00001 12C7
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 12C9
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 3 cycles from now
+p 00 00000 00001 12CA
+p 01 00000 00001 0000
+p 01 00000 00001 8003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 12CB
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 12CC
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 12CD
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# biu_dataout = r0 (the return address)
+p 00 00000 00001 12CE
+p 01 00000 00001 5FF9
+p 01 00000 00001 0000
+#
+# CALL PUSH Procedure
+p 00 00000 00001 12CF
+p 01 00000 00001 1100
+p 01 00000 00001 0400
+#
+# Jump unconditional to main microcode loop
+p 00 00000 00001 12D0
+p 01 00000 00001 1000
+p 01 00000 00001 0004
+#
+# --------------------------------------------------------------------
+# RET (0xC3, from 0x04BC). The 8088 pops the return address (reads released
+# at cycle 2), suspends prefetching where the EU resumes, flushes 1 cycle
+# later and reads the next opcode at the first byte from the new address.
+#
+# biu_dataout = 4002 (release: cycle 2 of the instruction)
+p 00 00000 00001 12D8
+p 01 00000 00001 5FFF
+p 01 00000 00001 4002
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 12D9
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 12DA
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# CALL POP Procedure
+p 00 00000 00001 12DB
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+# Copy BIU Return Data to r3; the biu address register
+p 00 00000 00001 12DC
+p 01 00000 00001 5CF7
+p 01 00000 00001 0000
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 12DD
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 12DE
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 12DF
+p 01 00000 00001 1002
+p 01 00000 00001 12DE
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 12E0
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 1 cycle from now
+p 00 00000 00001 12E1
+p 01 00000 00001 0000
+p 01 00000 00001 8001
+#
+# Set the BIU Command fields - Jump Request
+p 00 00000 00001 12E2
+p 01 00000 00001 5DDF
+p 01 00000 00001 0390
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 12E3
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 12E4
+p 01 00000 00001 1002
+p 01 00000 00001 12E3
+#
+# Debounce the BIU Command fields and all prefixes
+p 00 00000 00001 12E5
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# biu_dataout = A000 (end: at the next byte in the queue)
+p 00 00000 00001 12E6
+p 01 00000 00001 5FFF
+p 01 00000 00001 A000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 12E7
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 12E8
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to main microcode loop
+p 00 00000 00001 12E9
+p 01 00000 00001 1000
+p 01 00000 00001 0004
+#
+# --------------------------------------------------------------------
+# RET imm16 (0xC2, from 0x04D5). The 8088 reads the immediate (cycles 2 and
+# 3), pops the return address (reads released 3 cycles after the
+# immediate), suspends prefetching where the EU resumes and flushes 2
+# cycles later (MartyPC farret: one cycle more than RET); then as RET.
+#
+# CALL Fetch word (the immediate) into r3
+p 00 00000 00001 12F0
+p 01 00000 00001 1100
+p 01 00000 00001 02E0
+#
+# r1 = r3
+p 00 00000 00001 12F1
+p 01 00000 00001 5AFC
+p 01 00000 00001 0000
+#
+# biu_dataout = 0003 (release: 3 cycles after the last queue read)
+p 00 00000 00001 12F2
+p 01 00000 00001 5FFF
+p 01 00000 00001 0003
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 12F3
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 12F4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# CALL POP Procedure
+p 00 00000 00001 12F5
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+# SP = SP + r1
+p 00 00000 00001 12F6
+p 01 00000 00001 244A
+p 01 00000 00001 0000
+#
+# Copy BIU Return Data to r3; the biu address register
+p 00 00000 00001 12F7
+p 01 00000 00001 5CF7
+p 01 00000 00001 0000
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 12F8
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 12F9
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 12FA
+p 01 00000 00001 1002
+p 01 00000 00001 12F9
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 12FB
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 2 cycles from now
+p 00 00000 00001 12FC
+p 01 00000 00001 0000
+p 01 00000 00001 8002
+#
+# Jump unconditional to RET's flush and end
+p 00 00000 00001 12FD
+p 01 00000 00001 1000
+p 01 00000 00001 12E2
+#
+# --------------------------------------------------------------------
+# RETF (0xCB, from 0x04C7). MartyPC farret: pop IP (reads released at
+# cycle 4), SUSP where the EU resumes, 3 cycles, pop CS, flush; then the
+# end at the first byte from the new address (RET's tail at 0x12E2).
+#
+# biu_dataout = 4004 (release: cycle 4 of the instruction)
+p 00 00000 00001 1308
+p 01 00000 00001 5FFF
+p 01 00000 00001 4004
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1309
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 130A
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# CALL POP Procedure - pop the IP
+p 00 00000 00001 130B
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+# Copy BIU Return Data to r2
+p 00 00000 00001 130C
+p 01 00000 00001 5BF7
+p 01 00000 00001 0000
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 130D
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 130E
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 130F
+p 01 00000 00001 1002
+p 01 00000 00001 130E
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1310
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 3 cycles from now
+p 00 00000 00001 1311
+p 01 00000 00001 0000
+p 01 00000 00001 8003
+#
+# CALL POP Procedure - pop the CS
+p 00 00000 00001 1312
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+# Copy BIU Return Data to biu_dataout register
+p 00 00000 00001 1313
+p 01 00000 00001 5FF7
+p 01 00000 00001 0000
+#
+# Strobe BIU - Set new CS Segment
+p 00 00000 00001 1314
+p 01 00000 00001 5DDF
+p 01 00000 00001 3020
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1315
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFD3
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1316
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# Copy r2 to r3 to set the biu address
+p 00 00000 00001 1317
+p 01 00000 00001 5CFB
+p 01 00000 00001 0000
+#
+# Jump unconditional to RET's flush and end
+p 00 00000 00001 1318
+p 01 00000 00001 1000
+p 01 00000 00001 12E2
+#
+# --------------------------------------------------------------------
+# RETF imm16 (0xCA, from 0x04E6): the immediate first (cycles 2 and 3), then
+# as RETF with the IP pop released 3 cycles after the immediate; SP gets the
+# immediate after both pops.
+#
+# CALL Fetch word (the immediate) into r3
+p 00 00000 00001 1320
+p 01 00000 00001 1100
+p 01 00000 00001 02E0
+#
+# r1 = r3
+p 00 00000 00001 1321
+p 01 00000 00001 5AFC
+p 01 00000 00001 0000
+#
+# biu_dataout = 0003 (release: 3 cycles after the last queue read)
+p 00 00000 00001 1322
+p 01 00000 00001 5FFF
+p 01 00000 00001 0003
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1323
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1324
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# CALL POP Procedure - pop the IP
+p 00 00000 00001 1325
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+# Copy BIU Return Data to r2
+p 00 00000 00001 1326
+p 01 00000 00001 5BF7
+p 01 00000 00001 0000
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 1327
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 1328
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 1329
+p 01 00000 00001 1002
+p 01 00000 00001 1328
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 132A
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 3 cycles from now
+p 00 00000 00001 132B
+p 01 00000 00001 0000
+p 01 00000 00001 8003
+#
+# CALL POP Procedure - pop the CS
+p 00 00000 00001 132C
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+# Copy BIU Return Data to biu_dataout register
+p 00 00000 00001 132D
+p 01 00000 00001 5FF7
+p 01 00000 00001 0000
+#
+# Strobe BIU - Set new CS Segment
+p 00 00000 00001 132E
+p 01 00000 00001 5DDF
+p 01 00000 00001 3020
+#
+# Debounce BIU Strobe
+p 00 00000 00001 132F
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFD3
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1330
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SP = SP + r1
+p 00 00000 00001 1331
+p 01 00000 00001 244A
+p 01 00000 00001 0000
+#
+# Copy r2 to r3 to set the biu address
+p 00 00000 00001 1332
+p 01 00000 00001 5CFB
+p 01 00000 00001 0000
+#
+# Jump unconditional to RET's flush and end
+p 00 00000 00001 1333
+p 01 00000 00001 1000
+p 01 00000 00001 12E2
