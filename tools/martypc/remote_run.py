@@ -97,10 +97,14 @@ def main():
     ap.add_argument("--no-wait-states", action="store_true")
     ap.add_argument("--cga-clock", default="Cycle")
     ap.add_argument("--ram-kb", type=int, default=640)
+    ap.add_argument("--exe", help="binary (default MARTY/target/release/martypc_headless)")
+    ap.add_argument("--tests", help="SingleStepTests mode: directory with metadata.json and one XX[.E].json.gz; "
+                    "needs a binary built with --features cpu_tests (see sst_trace.sh)")
+    ap.add_argument("--test-opcode", help="hex opcode of the test file (with --tests)")
     a = ap.parse_args()
 
     marty = os.path.abspath(a.marty)
-    exe = os.path.join(marty, "target/release/martypc_headless")
+    exe = os.path.abspath(a.exe) if a.exe else os.path.join(marty, "target/release/martypc_headless")
     out = os.path.abspath(a.out)
     if os.path.exists(out):
         shutil.rmtree(out)
@@ -146,6 +150,22 @@ def main():
         ("emulator.benchmark", "end_condition", '"Cycles"'),
         ("emulator.benchmark", "cycles", str(a.cycles)),
     ]
+    if a.tests:
+        # Test runner (cpu_test/run_tests.rs): a bare CPU without wait states; the trace file name
+        # is used as given, so make it absolute.
+        op = int(a.test_opcode, 16)
+        edits += [
+            ("machine.cpu", "trace_file", '"%s"' % os.path.join(out, "output/traces", a.mode + ".log")),
+            ("emulator", "benchmark_mode", "false"),
+            ("tests", "test_mode", '"Run"'),
+            ("tests", "test_path", '"%s"' % os.path.abspath(a.tests)),
+            ("tests", "test_opcode_range", "[%d, %d]" % (op, op)),
+            ("tests", "test_opcode_exclude_list", "[]"),
+            ("tests", "test_run_validate_cycles", "true"),
+            ("tests", "test_run_validate_memops", "true"),
+            ("tests", "test_run_validate_registers", "true"),
+            ("tests", "test_run_validate_flags", "true"),
+        ]
     for sec, key, val in edits:
         t = set_key(t, sec, key, val)
     open(os.path.join(out, "martypc.toml"), "w").write(t)

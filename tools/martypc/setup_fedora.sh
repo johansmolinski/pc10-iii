@@ -23,3 +23,6 @@ ssh "$HOST" "cd '$RSRC' && patch -p1" < "$HERE/headless-trace.patch"
 # rust-toolchain.toml pins 1.92.0 (+ the wasm32 target); rustup fetches it on the first build.
 ssh "$HOST" "cd '$RSRC' && ~/.cargo/bin/cargo build --release -p martypc_headless 2>&1 | tail -3"
 ssh "$HOST" "ls -la '$RSRC/target/release/martypc_headless'"
+# Second binary for sst_trace.sh: MartyPC's SingleStepTests runner with trace comments.
+ssh "$HOST" "cd '$RSRC' && ~/.cargo/bin/cargo build --release -p martypc_headless \
+    --features cpu_tests,cpu_trace_comments --target-dir target-sst 2>&1 | tail -1"
