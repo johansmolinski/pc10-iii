@@ -309,6 +309,12 @@ static Result run_test(Sim &sim, const Test &t) {
             int strobe = ((cmd >> 12) & 3) == 1;
             int dispatch = top->dbg_dispatch;
 #ifdef BIU88
+            // SST_UC=1 with -d: every microcode address the EU visits
+            static const bool uc_trace = getenv("SST_UC") != nullptr;
+            static unsigned prev_uc = ~0u;
+            if (g_dump && uc_trace && test_mode && top->dbg_rom_addr != prev_uc)
+                printf("      uc c%ld %04X\n", g_cyc, (unsigned)top->dbg_rom_addr);
+            prev_uc = top->dbg_rom_addr;
             if (g_dump && ((dispatch && !prev_dispatch) || (strobe && !prev_strobe) ||
                            (jump && !prev_jump)))
                 printf("      ev c%ld%s rom=%03X cmd=%04X top=%02X empty=%d hold=%d qlen=%d pc=%04X %s%s%s\n",
@@ -382,6 +388,11 @@ static Result run_test(Sim &sim, const Test &t) {
                    c.data, c.qop.c_str(),
                    (unsigned)top->dbg_ip, (unsigned)top->dbg_sp,
                    (unsigned)top->dbg_ss, done ? " (drain)" : !test_mode ? " (load)" : "");
+#ifdef BIU88
+        if (g_dump && test_mode)
+            printf("         ta=%u ql=%u cmd=%04X\n", (unsigned)top->dbg_ta_state,
+                   (unsigned)top->dbg_queue_len, (unsigned)top->dbg_eu_cmd);
+#endif
 
 #ifdef BIU88
         {
@@ -522,12 +533,13 @@ static void print_trace(const Test &t, const Result &r) {
 int main(int argc, char **argv) {
     Verilated::commandArgs(argc, argv);
     int verbose_idx = -1, limit = -1;
-    bool first_fail = false, only_reg = false, only_mem = false;
+    bool first_fail = false, only_reg = false, only_mem = false, list = false;
     std::vector<std::string> files;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-v") && i + 1 < argc) verbose_idx = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-n") && i + 1 < argc) limit = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-f")) first_fail = true;
+        else if (!strcmp(argv[i], "-l")) list = true;   // one line per test
         else if (!strcmp(argv[i], "-d")) g_dump = true;
         else if (!strcmp(argv[i], "-r")) only_reg = true;
         else if (!strcmp(argv[i], "-p")) g_prefix = true;
@@ -562,6 +574,12 @@ int main(int argc, char **argv) {
                 if (r.trace_ok) tr++;
             }
             bool fail = !r.state_ok || !r.trace_ok;
+            if (list) {
+                printf("%5d %c%c q%zu c%-3zu %-24s", t.idx, r.state_ok ? 's' : 'S', r.trace_ok ? 't' : 'T',
+                       t.queue.size(), t.cycles.size(), t.name.c_str());
+                for (int b : t.bytes) printf(" %02X", b);
+                printf("\n");
+            }
             if (t.idx == verbose_idx || (first_fail && fail && !shown)) {
                 print_trace(t, r);
                 shown = true;

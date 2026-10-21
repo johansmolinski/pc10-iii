@@ -672,3 +672,21 @@ bus (b292ea6).
   "Booted from floppy A: (pc10-iii FDC+DMA)", then the image's halt loop at
   0000:7C1D. First end-to-end boot of the whole PC (CPU, board, DMA, FDC,
   CGA) in simulation.
+
+## 2026-10-22 - Prefixed Jcc (run w)
+
+- The 6x opcodes (8088 aliases of 70-7F) are the only Jcc tests with
+  prefixes. A taken prefixed jump with a full queue suspended one cycle
+  early: our EU reads the queue one clock before MartyPC's queue-read point
+  (QS shows it a clock later, as on the 8088), so "SYNC 2 after the last
+  queue read" is MartyPC's read + 1, and the SUSP fell in the T4 of a code
+  fetch and cancelled the fetch the BIU had already committed for the next
+  cycle. MartyPC: Jcc spends a cycle (0x0E9) before RELJMP, JMP short jumps
+  straight in. Jcc taken now enters at 0x1AA0 with SYNC 4003; JMP short
+  keeps 0x0344 and SYNC 4002. Without a prefix the earlier SUSP fell into a
+  running fetch and waited for its T4, which hid the difference.
+- tb/sst: `-l` lists every test (state/trace, queue length, cycle count,
+  bytes); with `-d` the dump shows the BIU's address-cycle state and queue
+  length, and `SST_UC=1` every microcode address the EU visits.
+- Run w: trace 2,798,156 (93.05%), +7,442 (69, 6B-6F to 100%). No file
+  worse.

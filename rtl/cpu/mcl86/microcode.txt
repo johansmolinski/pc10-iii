@@ -3191,10 +3191,10 @@ p 01 00000 00001 0350
 #
 # -----------------------------------------------------
 #
-# Write clock count=16 to the BIU Dataout register
+# pc10-iii: Jcc taken goes through 0x1AA0 (SUSP one cycle later than JMP short)
 p 00 00000 00001 0343
-p 01 00000 00001 5FFF
-p 01 00000 00001 C114
+p 01 00000 00001 1000
+p 01 00000 00001 1AA0
 #
 # CALL Fetch Opcode with QS=First opcode byte
 p 00 00000 00001 0344
@@ -28008,3 +28008,60 @@ p 01 00000 00001 CFFF
 p 00 00000 00001 1A9C
 p 01 00000 00001 1030
 p 01 00000 00001 0000
+#
+# pc10-iii: Jcc taken. The 8088 spends one more cycle between the
+# displacement read and the jump than JMP short does (MartyPC: microcode
+# 0x0E9 before RELJMP), so its SUSP comes 3 cycles after the read, not 2.
+# With a prefix the BIU has already committed the next code fetch then,
+# and the SUSP waits for it (6x aliases with prefixes). JMP short keeps
+# entering at 0x0344 with the 2-cycle SYNC of 0x12A8.
+#
+# Jcc taken (from 0x0343): MCL86's clock count, as at 0x0343
+p 00 00000 00001 1AA0
+p 01 00000 00001 5FFF
+p 01 00000 00001 C114
+#
+# CALL Fetch Opcode with QS=First opcode byte (as 0x0344)
+p 00 00000 00001 1AA1
+p 01 00000 00001 1100
+p 01 00000 00001 02A0
+#
+# Strobe BIU - read the displacement (subsequent byte)
+p 00 00000 00001 1AA2
+p 01 00000 00001 5DDF
+p 01 00000 00001 100C
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1AA3
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# CALL Sign Extend r3
+p 00 00000 00001 1AA4
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+#
+# r3 = r3 + prefetch_queue_address -- the new IP
+p 00 00000 00001 1AA5
+p 01 00000 00001 2CC8
+p 01 00000 00001 0000
+#
+# CALL the Jcc taken-jump timing
+p 00 00000 00001 1AA6
+p 01 00000 00001 1100
+p 01 00000 00001 1AA8
+#
+# Jump back into JUMP_TAKEN8: the jump request
+p 00 00000 00001 1AA7
+p 01 00000 00001 1000
+p 01 00000 00001 034A
+#
+# SYNC: 3 cycles after the displacement read (Jcc: one more than JMP short)
+p 00 00000 00001 1AA8
+p 01 00000 00001 0000
+p 01 00000 00001 4003
+#
+# Jump into the taken-jump timing after its SYNC (SUSP, flush, RET)
+p 00 00000 00001 1AA9
+p 01 00000 00001 1000
+p 01 00000 00001 12A9
