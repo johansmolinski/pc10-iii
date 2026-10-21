@@ -465,3 +465,26 @@ Run m against l:
   These belong to the known limit (slow ADC/SBB/SUB microcode) and come back
   when that microcode is sped up.
 
+
+## 2026-10-21 - INC/DEC r/m; request release timing; the system board
+
+n to o:
+- **BIU, request release:** a request held by a release (strobe 11 code 6)
+  was released before the step's per-cycle phase work, so a pending fetch
+  delay lost a cycle in the release step. Now the release comes after it,
+  as for a request the EU makes directly. This was the "1 cycle early"
+  class: NOT to memory (~20%), MOV [m],r with a segment prefix (88/89, 3%).
+- **INC/DEC r/m (FE.0/FE.1, FF.0/FF.1):** same schedule as NOT: the register
+  form ends 2 cycles after the ModR/M byte (wrappers 0x1700/0x1704, armed
+  entry 0x1710), the memory form goes through the NOT/NEG writebacks.
+- Run n (BIU pins READY/INTR/NMI/LOCK added, READY tied high in the suite):
+  identical to m on every file.
+- Run o: trace-exact 2,322,518 (77.2%), length 2,327,739; no file worse.
+  FE.0/FE.1/FF.0/FF.1, F6.2/F7.2, 88/89 are 100%.
+
+The system board (commit 5f224fb) and a Verilator model of the whole PC
+(tb/sys) boot GLaBIOS 0.4.2 to its banner. tools/itrace_diff.py and
+tools/ctrace_diff.py compare instruction and cycle traces with MartyPC
+(branch martypc-ref): the first 16,460 instructions match register for
+register; the first cycle difference is the end of an instruction whose
+last bus cycle has a wait state (OUT A0h, clock 347).

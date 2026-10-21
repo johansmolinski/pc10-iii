@@ -16423,9 +16423,10 @@ p 01 00000 00001 0D73
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: CALL the FF CALC_EA wrapper at 0x1704
 p 00 00000 00001 0D8B
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1704
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0D8C
@@ -16536,9 +16537,10 @@ p 01 00000 00001 588A
 p 01 00000 00001 0000
 #
 # Jump unconditional to common code to write back to the ea
+# pc10-iii: to the NOT/NEG writeback at 0x16A0
 p 00 00000 00001 0DA5
 p 01 00000 00001 1000
-p 01 00000 00001 0D8F
+p 01 00000 00001 16A0
 #
 # DEC REG16/MEM16
 # ----------------
@@ -16574,9 +16576,10 @@ p 01 00000 00001 688F
 p 01 00000 00001 0010
 #
 # Jump unconditional to common code to write back to the ea
+# pc10-iii: to the NOT/NEG writeback at 0x16A0
 p 00 00000 00001 0DAC
 p 01 00000 00001 1000
-p 01 00000 00001 0D8F
+p 01 00000 00001 16A0
 #
 #
 # DEC16 Flags processing - Inverts the Aux Carry bit.
@@ -16847,9 +16850,10 @@ p 01 00000 00001 0D90
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: CALL the FE CALC_EA wrapper at 0x1700
 p 00 00000 00001 0DF0
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1700
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0DF1
@@ -16960,9 +16964,10 @@ p 01 00000 00001 588A
 p 01 00000 00001 0000
 #
 # Jump unconditional to common code to write back to the ea
+# pc10-iii: to the NOT/NEG writeback at 0x1690
 p 00 00000 00001 0E05
 p 01 00000 00001 1000
-p 01 00000 00001 0DF4
+p 01 00000 00001 1690
 #
 # DEC REG8/MEM8
 # ----------------
@@ -16998,9 +17003,10 @@ p 01 00000 00001 688F
 p 01 00000 00001 0010
 #
 # Jump unconditional to common code to write back to the ea
+# pc10-iii: to the NOT/NEG writeback at 0x1690
 p 00 00000 00001 0E0F
 p 01 00000 00001 1000
-p 01 00000 00001 0DF4
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -24884,5 +24890,113 @@ p 01 00000 00001 C003
 #
 # Return to calling code
 p 00 00000 00001 16E5
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+
+#
+# --------------------------------------------------------------------
+# pc10-iii: INC/DEC r/m (FE.0/FE.1, FF.0/FF.1). The 8088's schedule is the
+# same as NOT's: register form ends 2 cycles after the ModR/M byte, memory
+# form writes 4 cycles after the read ended (the NOT/NEG writebacks 0x1690/
+# 0x16A0, jumped to from 0x0E05/0x0E0F/0x0DA5/0x0DAC).
+# CALC_EA wrappers for the groups FE (0x1700, byte) and FF (0x1704, word),
+# called from 0x0DF0/0x0D8B, and their armed ModR/M entry (0x1710): mod = 11
+# with reg 0/1 arms the end 2 cycles after the ModR/M read; the other reg
+# fields (CALL/JMP/PUSH r/m) nothing yet.
+#
+# CALC_EA wrapper, group FE: Set r0 to 0x0000
+p 00 00000 00001 1700
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1701
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+p 00 00000 00001 1702
+p 01 00000 00001 1100
+p 01 00000 00001 1710
+#
+p 00 00000 00001 1703
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+p 00 00000 00001 1704
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+p 00 00000 00001 1705
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+p 00 00000 00001 1706
+p 01 00000 00001 1100
+p 01 00000 00001 1710
+#
+p 00 00000 00001 1707
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+p 00 00000 00001 1710
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+p 00 00000 00001 1711
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+p 00 00000 00001 1712
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+p 00 00000 00001 1713
+p 01 00000 00001 1002
+p 01 00000 00001 1712
+#
+p 00 00000 00001 1714
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+p 00 00000 00001 1715
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1716
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+p 00 00000 00001 1717
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+p 00 00000 00001 1718
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+p 00 00000 00001 1719
+p 01 00000 00001 1001
+p 01 00000 00001 171F
+#
+p 00 00000 00001 171A
+p 01 00000 00001 4ACF
+p 01 00000 00001 0030
+#
+p 00 00000 00001 171B
+p 01 00000 00001 1001
+p 01 00000 00001 171F
+#
+p 00 00000 00001 171C
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+p 00 00000 00001 171D
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+p 00 00000 00001 171E
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+p 00 00000 00001 171F
 p 01 00000 00001 1030
 p 01 00000 00001 0000

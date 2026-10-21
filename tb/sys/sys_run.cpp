@@ -1,5 +1,5 @@
 // sys_run.cpp - Verilator driver for the pc_system simulation.
-//   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-q]
+//   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-i itrace.txt from_ms] [-q]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
 #include <cstdio>
@@ -14,7 +14,8 @@
 static const double CLK_HZ = 100227272.7;
 
 int main(int argc, char **argv) {
-    const char *bios = nullptr, *trace = nullptr;
+    const char *bios = nullptr, *trace = nullptr, *itrace = nullptr;
+    double itrace_from = 0.0;
     double secs = 1.0;
     bool quiet = false;
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
@@ -24,6 +25,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-t") && i + 1 < argc) trace = argv[++i];
         else if (!strcmp(argv[i], "-d") && i + 1 < argc) dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-q")) quiet = true;
+        else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
     }
     if (!bios) { fprintf(stderr, "usage: sys_run -b bios.rom [-s secs] [-t trace]\n"); return 1; }
 
@@ -46,6 +48,8 @@ int main(int argc, char **argv) {
     Verilated::commandArgs(2, vargs);
     Vtb_sys *tb = new Vtb_sys;
     FILE *tf = trace ? fopen(trace, "w") : nullptr;
+    FILE *itf = itrace ? fopen(itrace, "w") : nullptr;
+    unsigned long long itrace_cyc = (unsigned long long)(itrace_from * 1e-3 * CLK_HZ);
 
     tb->dip_sw1 = dip;
     tb->kbd_valid = 0;
@@ -69,6 +73,32 @@ int main(int argc, char **argv) {
                         bt[tb->bus_type & 7], tb->bus_addr, tb->bus_data, tb->qs, tb->cs, tb->ip);
             }
         }
+        // instruction log: at the EU's dispatch of an instruction's first
+        // byte (a prefix starts the instruction it belongs to)
+        auto *r = tb->rootp;
+        bool disp = ((r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_rom_address >> 8) & 0x1F) == 1;
+        static bool disp_d = false, in_prefix = false;
+        if (itf && disp && !disp_d && cyc >= itrace_cyc) {
+            unsigned ob = r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__op_byte;
+            bool pre = ob == 0x26 || ob == 0x2E || ob == 0x36 || ob == 0x3E || ob == 0xF0 || ob == 0xF2 || ob == 0xF3;
+            if (!in_prefix)
+            fprintf(itf, "%.6f %04X:%04X AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X DS=%04X ES=%04X SS=%04X F=%04X\n",
+                    cyc / CLK_HZ * 1e3, tb->cs, r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__op_ip,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_ax,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_bx,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_cx,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_dx,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_sp,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_bp,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_si,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_di,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__reg_ds,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__reg_es,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__reg_ss,
+                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_flags);
+            in_prefix = pre;
+        }
+        disp_d = disp;
         if (tb->io_wr) {
             if ((tb->io_addr & 0xFFFF) == 0x80 && !quiet)
                 printf("[%9.3f ms] POST %02X\n", cyc / CLK_HZ * 1e3, tb->io_data);
@@ -92,6 +122,7 @@ int main(int argc, char **argv) {
         printf("%s\n", line);
     }
     if (tf) fclose(tf);
+    if (itf) fclose(itf);
     delete tb;
     return 0;
 }

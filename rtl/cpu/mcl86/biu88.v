@@ -192,6 +192,8 @@ reg  [11:0] end_ad_n;             // ... and comes n clocks after it
 reg  [15:0] eu_ip;                // offset of the EU's current byte
 reg  [1:0]  queue_op;             // queue operation of the running cycle
 reg  [7:0]  queue_byte;
+reg  [15:0] op_ip;                // debug: offset and byte of the last opcode read
+reg  [7:0]  op_byte;
 
 reg  [15:0] reg_es, reg_ss, reg_cs, reg_ds, reg_rm, reg_reg;
 reg  [12:0] counter;
@@ -492,6 +494,8 @@ task take_byte;
         q_pop;
         queue_op   = op;
         if (op == QO_FIRST) begin
+            op_ip   = eu_ip + {14'd0, ntaken - 2'd1};
+            op_byte = queue_byte;
             since_dispatch = 12'd0;
             rel_armed = 1'b0;           // an unused release ends with its instruction
             sr_armed  = 1'b0;
@@ -600,6 +604,7 @@ always @(posedge CORE_CLK_INT) begin
         preread = 1'b0;  end_armed = 1'b0;  end_after_done = 1'b0;  end_ad_n = 12'd0;
         eu_ip = 16'h0;  queue_op = QO_IDLE;  QS_OUT = QO_IDLE;
         queue_byte = 8'h0;  QS_BYTE = 8'h0;
+        op_ip = 16'h0;  op_byte = 8'h0;
         reg_es = 16'h0; reg_ss = 16'h0; reg_cs = 16'hFFFF; reg_ds = 16'h0;
         reg_rm = 16'h0; reg_reg = 16'h0;
         counter = 13'd0;  counter_cycles = 1'b0;  since_dispatch = 12'd0;  since_read = 12'd0;
@@ -640,13 +645,6 @@ always @(posedge CORE_CLK_INT) begin
             if (since_dispatch != 12'hFFF) since_dispatch = since_dispatch + 12'd1;
             if (since_read != 12'hFFF) since_read = since_read + 12'd1;
             if (since_done != 12'hFFF) since_done = since_done + 12'd1;
-
-            // a held request is released at the start of its cycle
-            if (rphase == RP_HOLD && rel_due(rel_n)) begin
-                rel_armed = 1'b0;
-                request_begin;
-                request_advance;
-            end
 
             // request phases that need a whole cycle
             case (rphase)
@@ -695,6 +693,15 @@ always @(posedge CORE_CLK_INT) begin
             endcase
             if (rphase == RP_FINISH || rphase == RP_ADDR || rphase == RP_ADDR2)
                 request_advance;
+
+            // a held request is released at the start of its cycle; its
+            // phases that need a whole cycle (a fetch delay) start counting
+            // with the next step, as for a request the EU makes directly
+            if (rphase == RP_HOLD && rel_due(rel_n)) begin
+                rel_armed = 1'b0;
+                request_begin;
+                request_advance;
+            end
         end else begin
             if (!counter_cycles && counter != 13'd0) counter = counter - 13'd1;
         end
