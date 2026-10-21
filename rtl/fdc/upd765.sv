@@ -64,7 +64,7 @@ module upd765 #(
     input  logic        drv_ts,         // TS pin (two-sided)
     input  logic        drv_spin,       // index pulses come: drive selected, medium in, motor on
     input  logic [7:0]  drv_cyl,        // physical head position = C of the ID fields
-    input  logic [7:0]  geo_tracks,     // medium geometry (selected drive)
+    input  logic        geo_cyl_ok,     // drv_cyl < the medium's tracks (pc10-iii: computed per drive by the card)
     input  logic [1:0]  geo_heads,
     input  logic [5:0]  geo_spt,
 
@@ -172,7 +172,7 @@ always_ff @(posedge clk) begin
 end
 
 // the surface under the head (events are one-clk pulses after ev_adv)
-wire        trk_fmt  = drv_spin && drv_cyl < geo_tracks && {1'b0, hd} < geo_heads;
+wire        trk_fmt  = drv_spin && geo_cyl_ok && {1'b0, hd} < geo_heads;
 wire        in_sec   = rsec != 5'd31 && {1'b0, rsec} < geo_spt;
 wire        ev_index = ev_adv && rpos == 14'd0 && drv_spin;
 wire        ev_id    = ev_adv && trk_fmt && in_sec && roff == 11'(ID_END);
@@ -311,7 +311,7 @@ wire        drain_ok  = !dir_wr || (slot_st[0] != SL_DIRTY && slot_st[0] != SL_B
                                     slot_st[1] != SL_DIRTY && slot_st[1] != SL_BUSYW && !x_busy);
 wire [7:0]  st0_cmd  = {2'b00, 1'b0, 1'b0, !drv_ready, hd, us};
 wire        fmt_store = n_r == 8'd2 && fid[2] >= 8'd1 && fid[2] <= {2'b00, geo_spt} &&
-                        drv_cyl < geo_tracks && {1'b0, hd} < geo_heads;
+                        geo_cyl_ok && {1'b0, hd} < geo_heads;
 wire [13:0] fpitch   = 14'd62 + (14'd128 << n_r[2:0]) + 14'(gpl_r);
 wire [16:0] step_us  = 17'((16 - int'(srt)) * 1000 * TIME_SCALE);
 

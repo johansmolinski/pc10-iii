@@ -418,6 +418,10 @@ module KF8237_Timing_And_Control (
 
     //
     // Hold Request Signal
+    // pc10-iii (timing): next_state_r1 (the decoder with READY = 1, below)
+    // here and in the two blocks after the address enable: READY never makes
+    // next_state S0 or SI, and from S1 it has no effect, so these are exact.
+    // For dma_acknowledge_ff see dack_sense_next below.
     //
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
@@ -425,9 +429,9 @@ module KF8237_Timing_And_Control (
         else if (master_clear)
             hold_request <= 1'b0;
         else if (cpu_clock_posedge)
-            if (next_state == S0)
+            if (next_state_r1 == S0)
                 hold_request <= 1'b1;
-            else if (next_state == SI)
+            else if (next_state_r1 == SI)
                 hold_request <= 1'b0;
             else
                 hold_request <= hold_request;
@@ -486,7 +490,7 @@ module KF8237_Timing_And_Control (
         else if (cpu_clock_negedge)
             if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE)
                 output_highst_address <= 1'b0;
-            else if ((state == S1) && (next_state == S2))
+            else if ((state == S1) && (next_state_r1 == S2))
                 output_highst_address <= 1'b1;
             else
                 output_highst_address <= 1'b0;
@@ -496,6 +500,7 @@ module KF8237_Timing_And_Control (
 
     //
     // DMA Acknowledge Signal
+    // pc10-iii (timing): next_state_r1, see dack_sense_next below
     //
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
@@ -503,9 +508,9 @@ module KF8237_Timing_And_Control (
         else if (master_clear)
             dma_acknowledge_ff <= 0;
         else if (cpu_clock_negedge)
-            if (next_state == S2)
+            if (next_state_r1 == S2)
                 dma_acknowledge_ff <= dma_acknowledge_internal;
-            else if (next_state == SI)
+            else if (next_state_r1 == SI)
                 dma_acknowledge_ff <= 0;
             else
                 dma_acknowledge_ff <= dma_acknowledge_ff;
@@ -554,6 +559,10 @@ module KF8237_Timing_And_Control (
     assign  dma_acknowledge = dma_acknowledge_q;
 
 `ifndef SYNTHESIS
+    always_ff @(posedge clock)
+        if (!reset && ((next_state_r1 == S0) !== (next_state == S0) || (next_state_r1 == SI) !== (next_state == SI) ||
+                       (state == S1 && (next_state_r1 == S2) !== (next_state == S2))))
+            $fatal(1, "KF8237: state decode without READY differs where it must not");
     always_ff @(posedge clock)
         if (!reset && !master_clear && cpu_clock_negedge && dma_acknowledge_ff_next !==
             ((next_state == S2) ? dma_acknowledge_internal : (next_state == SI) ? 4'b0000 : dma_acknowledge_ff))

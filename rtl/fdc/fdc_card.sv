@@ -196,7 +196,10 @@ assign drv_motor  = dor[5:4];
 assign fdc_active = active;
 
 // geometry of the selected drive's medium and the image address
-wire [7:0]  g_tracks = img_tracks[pd];
+// pc10-iii (timing): the head's cylinder against the medium's tracks, compared
+// per drive and then selected (the 765's track format check; the same value as
+// cyl[pd] < img_tracks[pd])
+wire        g_cyl_ok = pd ? cyl[1] < img_tracks[1] : cyl[0] < img_tracks[0];
 wire [1:0]  g_heads  = img_heads[pd];
 wire [5:0]  g_spt    = img_spt[pd];
 // Timing (pc10-iii, doc/timing.md): the image address is computed for both
@@ -253,7 +256,7 @@ upd765 #(
     .drv_ts     (1'b1),
     .drv_spin   (drv_sel && img_present[pd]),
     .drv_cyl    (cyl[pd]),
-    .geo_tracks (g_tracks),
+    .geo_cyl_ok (g_cyl_ok),
     .geo_heads  (g_heads),
     .geo_spt    (g_spt),
     .buf_addr   (buf_addr),
