@@ -3,6 +3,7 @@ __pycache__/
 *.vcd
 *.fst
 obj_*/
+tb/*/obj/
 # Vivado
 CORE/*.runs/
 CORE/*.cache/
