@@ -134,7 +134,6 @@ assign tc_pulse = (iow_rise && dma_wr_cyc && tc_q) || (ior_rise && dma_rd_cyc &&
 
 always_ff @(posedge clk) begin
     if (reset) begin
-        dor <= 8'h00;
         dma_rd_cyc <= 1'b0;  dma_wr_cyc <= 1'b0;  tc_q <= 1'b0;
         io_cyc_dor <= 1'b0;  io_cyc_fdc <= 1'b0;
         isa_din <= 8'h00;
@@ -148,7 +147,6 @@ always_ff @(posedge clk) begin
         if (iow_rise) begin
             io_cyc_dor <= 1'b0;
             io_cyc_fdc <= 1'b0;
-            if (io_cyc_dor) dor <= wdat_q;
         end
         if (cpu_rd) isa_din <= cpu_rdata;
 
@@ -180,26 +178,50 @@ wire       drv_sel  = int'(psel) < NDRIVES && dor[4 + psel];
 wire       pd       = psel[0];
 logic [7:0] cyl [2];
 
-always_ff @(posedge clk) begin
+// pc10-iii (timing): the DOR and the cylinders with their D inputs written
+// out, so that the selected drive's cylinder (the 765's drv_cyl, which goes
+// into its tag compares) is a register of its own: loaded with
+// cyl_next[dor_next[0]] it equals cyl[pd] in every clk.
+logic [7:0] dor_next;
+logic [7:0] cyl_next [2];
+logic [7:0] drv_cyl_q;
+always_comb begin
+    dor_next = dor;
+    if (reset)
+        dor_next = 8'h00;
+    else if (iow_rise && io_cyc_dor)
+        dor_next = wdat_q;
+
+    cyl_next = cyl;
     if (reset) begin
-        cyl[0] <= 8'd0;
-        cyl[1] <= 8'd0;
+        cyl_next[0] = 8'd0;
+        cyl_next[1] = 8'd0;
     end else if (step && drv_sel) begin
         if (step_dir) begin
-            if (cyl[pd] < (drv_80trk[pd] ? 8'd83 : 8'd41)) cyl[pd] <= cyl[pd] + 8'd1;
+            if (cyl[pd] < (drv_80trk[pd] ? 8'd83 : 8'd41)) cyl_next[pd] = cyl[pd] + 8'd1;
         end else if (cyl[pd] != 8'd0)
-            cyl[pd] <= cyl[pd] - 8'd1;
+            cyl_next[pd] = cyl[pd] - 8'd1;
     end
 end
+always_ff @(posedge clk) begin
+    dor       <= dor_next;
+    cyl       <= cyl_next;
+    drv_cyl_q <= cyl_next[dor_next[0]];
+end
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (drv_cyl_q !== cyl[pd])
+        $fatal(1, "fdc_card: registered drive cylinder differs from cyl[pd]");
+`endif
 
 assign drv_motor  = dor[5:4];
 assign fdc_active = active;
 
 // geometry of the selected drive's medium and the image address
-// pc10-iii (timing): the head's cylinder against the medium's tracks, compared
-// per drive and then selected (the 765's track format check; the same value as
+// pc10-iii (timing): the head's cylinder against the medium's tracks for the
+// 765's track format check, from the registered cylinder (the same value as
 // cyl[pd] < img_tracks[pd])
-wire        g_cyl_ok = pd ? cyl[1] < img_tracks[1] : cyl[0] < img_tracks[0];
+wire        g_cyl_ok = drv_cyl_q < img_tracks[pd];
 wire [1:0]  g_heads  = img_heads[pd];
 wire [5:0]  g_spt    = img_spt[pd];
 // Timing (pc10-iii, doc/timing.md): the image address is computed for both
@@ -250,12 +272,12 @@ upd765 #(
     .hd         (hd),
     .step       (step),
     .step_dir   (step_dir),
-    .drv_trk0   (drv_sel && cyl[pd] == 8'd0),
+    .drv_trk0   (drv_sel && drv_cyl_q == 8'd0),
     .drv_wp     (drv_sel && img_present[pd] && img_wp[pd]),
     .drv_ready  (1'b1),
     .drv_ts     (1'b1),
     .drv_spin   (drv_sel && img_present[pd]),
-    .drv_cyl    (cyl[pd]),
+    .drv_cyl    (drv_cyl_q),            // = cyl[pd]
     .geo_cyl_ok (g_cyl_ok),
     .geo_heads  (g_heads),
     .geo_spt    (g_spt),

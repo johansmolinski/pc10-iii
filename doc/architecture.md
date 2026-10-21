@@ -135,9 +135,10 @@ module pc_system #(
 ```
 
 Notes (2026-10-21, from the shell build):
-- `ram_ack` may come later than 1 clk (the shell answers after 2: the request
-  is registered before it fans out to 160 BRAM tiles); `xt_board` takes read
-  data at `ram_ack`, well before the CPU samples it at the end of T3.
+- `ram_ack` may come later than 1 clk (the shell answers after 6: the request
+  is pipelined on its way to and from 160 BRAM tiles, doc/timing.md);
+  `xt_board` takes read data at `ram_ack`, well before the CPU samples it at
+  the end of T3.
 - The keyboard self-test answer (0xAA after the BIOS holds the clock low for
   more than ~10 ms) comes from `xt_board`; the glue only sends scan codes.
 - The CGA's 59.92 Hz against HDMI's 60 Hz drops or repeats a frame about

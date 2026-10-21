@@ -81,8 +81,9 @@ localparam logic [2:0] ST_INTA = 3'd0, ST_IOR = 3'd1, ST_IOW = 3'd2, ST_HALT = 3
 
 // ------------------------------------------------------------ address latch
 logic [19:0] cpu_addr;
+wire  [19:0] cpu_addr_next = cpu_bus_t == T1 ? cpu_ad : cpu_addr;   // its D input
 always_ff @(posedge clk)
-    if (cpu_bus_t == T1) cpu_addr <= cpu_ad;
+    cpu_addr <= cpu_addr_next;
 wire [7:0] cpu_dout = cpu_ad[7:0];      // write data from T2 on
 
 // ------------------------------------------------------------ 8288 function
@@ -194,7 +195,7 @@ wire  cs_nmi   = board_io && bus_addr[7:5] == 3'd5;   // A0-BF
 // ------------------------------------------------------------ 8237
 logic [7:0]  dma_dout;
 logic        dma_ior_n, dma_iow_n, dma_memr_n, dma_memw_n, dma_eop;
-logic [15:0] dma_addr;
+logic [15:0] dma_addr, dma_addr_next;
 logic [3:0]  dack_n, dack_n_next;
 logic        drq0;
 logic [7:0]  bus_wdata;                  // data the writing master drives
@@ -224,6 +225,7 @@ KF8237 u_dma (
     .end_of_process_n_out   (dma_eop),
     .address_in             (bus_addr[3:0]),
     .address_out            (dma_addr),
+    .address_out_next       (dma_addr_next),    // pc10-iii
     .output_highst_address  (),
     .hold_request           (hold_request),
     .dma_acknowledge        (dack_n),           // a register (pc10-iii)
@@ -246,20 +248,17 @@ end
 always_ff @(posedge clk) page <= page_next;
 
 // the bus address: the DMA's while it owns the bus, else the CPU's.
-// Timing (pc10-iii): the select and the page are registers whose D inputs are
-// the original expressions on the D inputs of the registers they are made of
-// (dma_wait, aen, DACK, the page registers), so they hold the original values
-// in every clk (checked in simulation), and bus_addr is one LUT behind
-// registers. Originally:
+// Timing (pc10-iii): a register, loaded with the original expression on the D
+// inputs of the registers it is made of (dma_wait, aen, DACK, the page
+// registers, the 8237's address, the address latch), so it holds the original
+// value in every clk (checked in simulation): the cards, the RAM and the ROM
+// decode a register. Originally:
 //   wire [3:0] dma_page = !dack_n[2] ? page[1] : !dack_n[3] ? page[2] : page[3];
 //   assign bus_addr  = dma_owns && !(&dack_n) ? {dma_page, dma_addr} : cpu_addr;
-logic       dma_sel_q;
-logic [3:0] dma_page_q;
-always_ff @(posedge clk) begin
-    dma_sel_q  <= dma_wait_next && aen_next && !(&dack_n_next);
-    dma_page_q <= !dack_n_next[2] ? page_next[1] : !dack_n_next[3] ? page_next[2] : page_next[3];
-end
-assign bus_addr  = dma_sel_q ? {dma_page_q, dma_addr} : cpu_addr;
+wire        dma_owns_next = dma_wait_next && aen_next;
+wire [3:0]  dma_page_next = !dack_n_next[2] ? page_next[1] : !dack_n_next[3] ? page_next[2] : page_next[3];
+always_ff @(posedge clk)
+    bus_addr <= dma_owns_next && !(&dack_n_next) ? {dma_page_next, dma_addr_next} : cpu_addr_next;
 
 `ifndef SYNTHESIS
 always_ff @(posedge clk)
@@ -268,7 +267,7 @@ always_ff @(posedge clk)
 wire [3:0] dma_page_ref = !dack_n[2] ? page[1] : !dack_n[3] ? page[2] : page[3];
 always_ff @(posedge clk)
     if (!reset && bus_addr != (dma_owns && !(&dack_n) ? {dma_page_ref, dma_addr} : cpu_addr))
-        $fatal(1, "xt_board: registered bus address select differs from the original");
+        $fatal(1, "xt_board: the bus address register differs from the original");
 `endif
 
 // ------------------------------------------------------------ 8253
@@ -491,16 +490,55 @@ assign isa_dack_n = dack_n;
 assign isa_tc     = !dma_eop;              // the 8237's EOP is active low
 
 // ------------------------------------------------------------ CPU read data
+// Timing (pc10-iii): the priority chain below decides only which source, and
+// the memory and card data (block RAM outputs) go through one 4:1
+// multiplexer at the end. The same function as the original:
+//   if (inta)                              cpu_din = pic_dout;
+//   else if (cpu_ior && cs_dma)            cpu_din = dma_dout;
+//   else if (cpu_ior && cs_pic)            cpu_din = pic_dout;
+//   else if (cpu_ior && cs_pit)            cpu_din = pit_dout;
+//   else if (cpu_ior && cs_ppi)            cpu_din = ppi_dout;
+//   else if (cpu_memr && (sel_ram || sel_rom)) cpu_din = mem_rdata;
+//   else if (isa_dsel)                     cpu_din = isa_din;
+//   else                                   cpu_din = 8'hFF;
+localparam logic [1:0] DIN_ROM = 2'd0, DIN_RAM = 2'd1, DIN_ISA = 2'd2, DIN_REG = 2'd3;
+logic [1:0] din_src;
+logic [7:0] din_reg;
 always_comb begin
-    if (inta)                              cpu_din = pic_dout;
-    else if (cpu_ior && cs_dma)            cpu_din = dma_dout;
-    else if (cpu_ior && cs_pic)            cpu_din = pic_dout;
-    else if (cpu_ior && cs_pit)            cpu_din = pit_dout;
-    else if (cpu_ior && cs_ppi)            cpu_din = ppi_dout;
-    else if (cpu_memr && (sel_ram || sel_rom)) cpu_din = mem_rdata;
-    else if (isa_dsel)                     cpu_din = isa_din;
-    else                                   cpu_din = 8'hFF;
+    din_src = DIN_REG;
+    din_reg = 8'hFF;
+    if (inta)                              din_reg = pic_dout;
+    else if (cpu_ior && cs_dma)            din_reg = dma_dout;
+    else if (cpu_ior && cs_pic)            din_reg = pic_dout;
+    else if (cpu_ior && cs_pit)            din_reg = pit_dout;
+    else if (cpu_ior && cs_ppi)            din_reg = ppi_dout;
+    else if (cpu_memr && sel_ram)          din_src = DIN_RAM;
+    else if (cpu_memr && sel_rom)          din_src = DIN_ROM;
+    else if (isa_dsel)                     din_src = DIN_ISA;
 end
+always_comb
+    case (din_src)
+        DIN_ROM: cpu_din = rom_rdata;
+        DIN_RAM: cpu_din = ram_q;
+        DIN_ISA: cpu_din = isa_din;
+        default: cpu_din = din_reg;
+    endcase
+`ifndef SYNTHESIS
+logic [7:0] cpu_din_ref;
+always_comb begin
+    if (inta)                              cpu_din_ref = pic_dout;
+    else if (cpu_ior && cs_dma)            cpu_din_ref = dma_dout;
+    else if (cpu_ior && cs_pic)            cpu_din_ref = pic_dout;
+    else if (cpu_ior && cs_pit)            cpu_din_ref = pit_dout;
+    else if (cpu_ior && cs_ppi)            cpu_din_ref = ppi_dout;
+    else if (cpu_memr && (sel_ram || sel_rom)) cpu_din_ref = mem_rdata;
+    else if (isa_dsel)                     cpu_din_ref = isa_din;
+    else                                   cpu_din_ref = 8'hFF;
+end
+always_ff @(posedge clk)
+    if (!reset && cpu_din !== cpu_din_ref)
+        $fatal(1, "xt_board: CPU read data differs from the original multiplexer");
+`endif
 
 // ------------------------------------------------------------ READY
 // 8284 READY: IOCHRDY and the DMA wait are synchronized on the falling CLK

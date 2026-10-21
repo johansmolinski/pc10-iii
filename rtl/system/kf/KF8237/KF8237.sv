@@ -26,6 +26,7 @@ module KF8237 (
     output  logic           end_of_process_n_out,
     input   logic   [3:0]   address_in,
     output  logic   [15:0]  address_out,
+    output  logic   [15:0]  address_out_next,       // pc10-iii: address_out of the next clk
     output  logic           output_highst_address,
     output  logic           hold_request,
     output  logic   [3:0]   dma_acknowledge,
@@ -174,7 +175,8 @@ module KF8237 (
         .next_word                          (next_word),
         .update_high_address                (update_high_address),
         .underflow                          (underflow),
-        .transfer_address                   (address_out)
+        .transfer_address                   (address_out),
+        .transfer_address_next              (address_out_next)
     );
 
 
