@@ -210,6 +210,7 @@ logic       dir_rd, dir_wr;            // data direction of the current command
 logic       idx_cnt;                   // one index pulse seen while searching
 logic       seen_id, seen_wc;
 logic       xfer;                      // this sector's data go to/from the host
+(* max_fanout = 24 *)                  // pc10-iii (timing): it drives ~100 loads
 logic       xslot;                     // slot of the next sector transfer
 logic       cm_flag, cm_term, nd_flag;
 logic       tc_seen, wr_err;

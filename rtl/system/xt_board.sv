@@ -51,6 +51,8 @@ module xt_board #(
 
     // the card bus (section 3)
     output logic [19:0] isa_addr,
+    output logic [19:0] isa_addr_next,  // pc10-iii: isa_addr of the next clk (registered decodes)
+    output logic        isa_aen_next,   // pc10-iii: isa_aen of the next clk
     output logic [7:0]  isa_dout,
     input  logic [7:0]  isa_din,
     input  logic        isa_dsel,       // a card drives isa_din
@@ -289,8 +291,9 @@ always_ff @(posedge clk) page <= page_next;
 //   assign bus_addr  = dma_owns && !(&dack_n) ? {dma_page, dma_addr} : cpu_addr;
 wire        dma_owns_next = dma_wait_next && aen_next;
 wire [3:0]  dma_page_next = !dack_n_next[2] ? page_next[1] : !dack_n_next[3] ? page_next[2] : page_next[3];
+wire [19:0] bus_addr_next = dma_owns_next && !(&dack_n_next) ? {dma_page_next, dma_addr_next} : cpu_addr_next;
 always_ff @(posedge clk)
-    bus_addr <= dma_owns_next && !(&dack_n_next) ? {dma_page_next, dma_addr_next} : cpu_addr_next;
+    bus_addr <= bus_addr_next;
 
 `ifndef SYNTHESIS
 always_ff @(posedge clk)
@@ -517,6 +520,8 @@ assign isa_memw_n = mem_wr_n;
 assign isa_ior_n  = io_rd_n;
 assign isa_iow_n  = io_wr_n;
 assign isa_aen    = aen;
+assign isa_addr_next = bus_addr_next;
+assign isa_aen_next  = aen_next;
 assign isa_ale    = cpu_bus_t == T1;
 assign isa_dack_n = dack_n;
 assign isa_tc     = !dma_eop;              // the 8237's EOP is active low

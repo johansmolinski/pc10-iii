@@ -28,13 +28,19 @@ module fdc_card #(
     parameter int US_DEN    = 2205,
     parameter int TIME_SCALE   = 2,
     parameter int RQM_DELAY_US = 12,
-    parameter int RESET_US     = 1000
+    parameter int RESET_US     = 1000,
+    // pc10-iii (timing): 1 = decode the address registered, from
+    // isa_addr_next/isa_aen_next (the values the bus has in the next clk);
+    // 0 = combinationally from isa_addr/isa_aen (the card bus alone)
+    parameter bit REG_DECODE   = 1'b0
 ) (
     input  logic        clk,
     input  logic        reset,          // RESET DRV
 
     // card bus (doc/architecture.md section 3)
     input  logic [19:0] isa_addr,
+    input  logic [19:0] isa_addr_next,  // REG_DECODE: isa_addr of the next clk
+    input  logic        isa_aen_next,   // REG_DECODE: isa_aen of the next clk
     input  logic [7:0]  isa_dout,
     output logic [7:0]  isa_din,
     output logic        isa_dsel,       // this card drives isa_din
@@ -97,8 +103,22 @@ logic       dma_rd_cyc, dma_wr_cyc, tc_q, io_cyc_dor, io_cyc_fdc;
 logic       io_a0;
 wire        dack2  = !isa_dack_n[2];
 wire        io_sel = !isa_aen && isa_addr[9:3] == 7'b1111_110;        // 3F0-3F7
-wire        sel_dor = io_sel && isa_addr[2:0] == 3'd2;
-wire        sel_fdc = io_sel && (isa_addr[2:0] == 3'd4 || isa_addr[2:0] == 3'd5);
+wire        sel_dor_c = io_sel && isa_addr[2:0] == 3'd2;
+wire        sel_fdc_c = io_sel && (isa_addr[2:0] == 3'd4 || isa_addr[2:0] == 3'd5);
+// pc10-iii (timing): the same decode one clk ahead into registers (REG_DECODE)
+logic       sel_dor_q, sel_fdc_q;
+wire        io_sel_n = !isa_aen_next && isa_addr_next[9:3] == 7'b1111_110;
+always_ff @(posedge clk) begin
+    sel_dor_q <= io_sel_n && isa_addr_next[2:0] == 3'd2;
+    sel_fdc_q <= io_sel_n && (isa_addr_next[2:0] == 3'd4 || isa_addr_next[2:0] == 3'd5);
+end
+wire        sel_dor = REG_DECODE ? sel_dor_q : sel_dor_c;
+wire        sel_fdc = REG_DECODE ? sel_fdc_q : sel_fdc_c;
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (REG_DECODE && (sel_dor_q !== sel_dor_c || sel_fdc_q !== sel_fdc_c))
+        $fatal(1, "fdc_card: registered address decode differs from the bus");
+`endif
 wire        ior_fall = !isa_ior_n && ior_d;
 wire        iow_fall = !isa_iow_n && iow_d;
 wire        iow_rise = isa_iow_n && !iow_d;
