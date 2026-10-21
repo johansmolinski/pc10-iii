@@ -11,7 +11,9 @@ the reference for the system simulation (`tb/sys`, `sys_run -t`).
   - `run_ref.sh`: run a BIOS and fetch the traces;
   - `remote_run.py`: run directory + config, runs on the host;
   - `marty2norm.py`: converter to the normalized format;
-  - `headless-trace.patch`: our patch to MartyPC (below).
+  - `headless-trace.patch`: our patch to MartyPC (below);
+  - `sst_trace.sh`, `sst_extract.py`, `sst_annot.py`: single
+    SingleStepTests through MartyPC's runner (section 7).
 - Traces: `~/pcxt-work/martypc-traces/<name>/`, outside the repo.
 
 ## 1. Setup (once)
@@ -334,3 +336,74 @@ type `INTA` without data.
 
 MartyPC's `pit_phase` is the free parameter that our `pc_clocks.sv`
 reset phase corresponds to (`architecture.md` section 1).
+
+## 7. Single SingleStepTests through MartyPC (`sst_trace.sh`)
+
+```
+tools/martypc/sst_trace.sh AA 7 [more indices...]
+```
+
+This runs single tests of `~/pcxt-work/ext/sst8088/v2/XX.json.gz` through
+MartyPC's own test runner (`cpu_test/run_tests.rs`). The index is the one in
+`~/pcxt-work/sst-txt/XX.txt` (`T <idx>`), i.e. the position in the JSON
+file. Each trace is written to `~/pcxt-work/martypc-traces/sst/XX-IDX.txt`
+and printed. Each test takes a few seconds, most of it ssh and tar.
+
+How it works:
+
+- `sst_extract.py` writes a JSON file with only that test, under the
+  suite's name (`AA.json.gz`, `F6.6.json.gz`): the runner takes the opcode
+  and group extension from the file name. It also copies `metadata.json`
+  and lists the test's `cycles` array as `expected.txt`.
+- The runner selects tests only by opcode range and `test_run_limit`, so
+  there is one run per test.
+- The run uses a second binary, `target-sst/release/martypc_headless`,
+  built with `--features cpu_tests,cpu_trace_comments`. `cpu_tests` is the
+  runner itself (with cycle-state collection); `cpu_trace_comments` adds
+  MartyPC's BIU/EU annotations to the CycleText lines.
+  `setup_fedora.sh` builds it; `sst_trace.sh` builds it if it is missing.
+- `remote_run.py --tests DIR --test-opcode XX` writes the config:
+  `tests.test_mode = "Run"`, the opcode range, all `test_run_validate_*`
+  true, and an absolute `trace_file`. MartyPC still loads a machine and its
+  ROMs before it looks at the test mode, so the run directory has the usual
+  `pc10_ref` machine and BIOS; they are not used.
+- The runner uses a bare CPU without wait states (`EnableWaitStates(false)`)
+  and limits CX of string instructions to 0..127, as in the suite.
+- `sst_annot.py` runs on the host. It removes the microcode **text** before
+  anything is copied back (AGENTS.md rule 4) and aligns the clocks.
+
+Output:
+
+```
+# test AA 7: ss stosb
+# bytes: 36 AA   prefetched: no   cycles: 15
+# MartyPC: PASS
+  c mN   <CycleText line without the cycle number> | uc NNN | [CS:IP] instr ; COMMENTS  || exp <test cycle>
+```
+
+- `c` is the index in the test's `cycles` list. 0 is the clock whose QS
+  shows the first byte (the prefix, if any): MartyPC's runner trims its
+  cycle states the same way (`clean_cycle_states`). Negative `c` are the
+  reset sequence and the fetches before it.
+- `mN` is MartyPC's cycle number.
+- `uc NNN` is the microcode line number (`---` = none, `JMP`/`RET`/`COR` =
+  MartyPC's markers for jumps, returns and the IP correction routine).
+- `; ...` are MartyPC's trace comments. Line N carries what the EU emitted
+  between clocks N-1 and N (the EU runs between `cycle()` calls) and what the
+  BIU emitted while it processed clock N. They include:
+  - `BUS_BEGIN`: the EU requests a bus cycle;
+  - `TR`/`TS`/`T0`/`TA`/`TD` and `AS_TR`/`AS_TS`: Ta-pipeline
+    transitions;
+  - `WAIT_ADDRESS` / `WAIT_ADDRESS_DONE`, `WAIT_TX`/`TX`: the EU waits for
+    the address cycle or the transfer;
+  - `SUSP`, `FLUSH`, `ABORT` (prefetch aborted), `DECIDE`/`FETCH_*` (the
+    prefetch decision), `EXECUTE`, `RNI`.
+- The pipeline column (`CODE T4 CODE T0`) shows MartyPC's two bus slots.
+  The address phase of the next cycle (Tr, Ts, T0, then Td or Ta) runs in
+  the second slot while the current cycle finishes.
+- `exp` gives the test's cycle: status pins, T-state, the 20-bit bus value
+  (multiplexed: address only in T1), MRDC/AMWC/MWTC and IORC/AIOWC/IOWC,
+  data and QS.
+- A `!` before `||` marks a clock where MartyPC's status, T-state or QS
+  differ from the test. The MartyPC column shows the address latch, not
+  the bus; its read data is stale in T2.
