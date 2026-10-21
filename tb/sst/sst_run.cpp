@@ -317,7 +317,9 @@ static Result run_test(Sim &sim, const Test &t) {
                        (unsigned)top->dbg_pc, dispatch && !prev_dispatch ? "DISPATCH " : "",
                        strobe && !prev_strobe ? "STROBE " : "", jump && !prev_jump ? "JUMP" : "");
 #endif
-            if (dispatch && !prev_dispatch && test_mode) {
+            // a REP iteration re-dispatches the same opcode through MCL86's
+            // main loop; the microcode marks those with flag bit 1
+            if (dispatch && !prev_dispatch && test_mode && !(top->dbg_flags & 2)) {
                 int byte = top->dbg_pfq_top;
                 if (g_dump) printf("    dispatch top=%02X\n", byte);
                 if (done) {
