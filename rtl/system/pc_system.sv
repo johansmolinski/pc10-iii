@@ -26,6 +26,12 @@ module pc_system #(
     output logic        vid_hblank,
     output logic        vid_vblank,
 
+    // CGA character ROM, loaded by the glue (8 KB, IBM 5788005 layout)
+    input  logic        font_we,
+    input  logic [12:0] font_addr,
+    input  logic [7:0]  font_data,
+    input  logic        font_thin,
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -147,11 +153,23 @@ cga_card u_cga (
     .isa_iow_n  (isa_iow_n),
     .isa_aen    (isa_aen),
     .isa_ready  (cga_ready),
+    .font_we    (font_we),
+    .font_addr  (font_addr),
+    .font_data  (font_data),
+    .font_thin  (font_thin),
+    .lpen_trig  (1'b0),
+    .lpen_sw    (1'b0),
     .vid_rgbi   (vid_rgbi),
     .vid_hsync  (vid_hsync),
     .vid_vsync  (vid_vsync),
     .vid_hblank (vid_hblank),
-    .vid_vblank (vid_vblank)
+    .vid_vblank (vid_vblank),
+    .comp_cphase(),
+    .comp_hsync (),
+    .comp_vsync (),
+    .comp_burst (),
+    .comp_bw    (),
+    .comp_mode  ()
 );
 
 assign isa_din   = cga_dsel ? cga_din : 8'h00;

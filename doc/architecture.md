@@ -23,6 +23,7 @@ exact, 2205/22 MHz). Everything PC-side runs on `clk` with clock enables:
 - The 8088 CLK has a 1/3 duty cycle: high for 7 `clk`, low for 14. Logic that
   the IBM schematic clocks on the falling CLK edge uses `cpu_fall`
   (7 `clk` after `cpu_step`).
+- `ce_14m` falls on `cpu_step` and on `cpu_fall` (7 and 21 are multiples of 7).
 - MCL86's EU runs on `clk`: 21 microinstructions per 8088 clock, exactly the
   ratio the CPU work was tuned for (`AGENTS.md`).
 - Turbo (FE2010A 7.16/9.54 MHz) is not part of this contract yet.
@@ -56,6 +57,7 @@ The bus a card sees, all on `clk`. Signals are levels, valid for the many
 | `isa_addr[19:0]` | in | SA19-SA0 (CPU address after ALE, or DMA address) |
 | `isa_dout[7:0]` | in | data from the CPU/DMA (writes) |
 | `isa_din[7:0]` | out | the card's read data, ORed (0 when not selected) |
+| `isa_dsel` | out | the card drives `isa_din` (none: the bus reads 0xFF) |
 | `isa_memr_n`, `isa_memw_n` | in | MEMR/MEMW |
 | `isa_ior_n`, `isa_iow_n` | in | IOR/IOW |
 | `isa_aen` | in | 1 = DMA owns the bus (I/O decoders must ignore it) |
@@ -69,6 +71,16 @@ The bus a card sees, all on `clk`. Signals are levels, valid for the many
 
 A card's read data must be valid within 2 `clk` of the strobe going low and
 held while it stays low.
+
+Bus timing (`xt_board.sv`, the 8288 function; marked CAL there, cards such as
+the CGA depend on it):
+- MEMR/IOR/INTA go low at the CLK falling edge (`cpu_fall`) in T1, MEMW/IOW
+  at the falling edge in T2; all go high in the `clk` where T4 begins (+1).
+- READY: `isa_ready` is synchronized at `cpu_fall`; the BIU samples READY as
+  it enters T3 and each Tw (it says whether that state is the last one);
+  every CPU I/O cycle gets one wait state.
+- Read data is taken in the `clk` where T4 begins.
+- `ce_14m` coincides with `cpu_step` and `cpu_fall` (pc_clocks, any PHASE).
 
 ## 4. `pc_system` ports (what the MEGA65 glue sees)
 
@@ -100,6 +112,13 @@ module pc_system #(
     output logic        vid_vsync,    // active high
     output logic        vid_hblank,
     output logic        vid_vblank,
+
+    // CGA character ROM, loaded by the glue: 8 KB in the layout of IBM's
+    // 5788005 (8x8 font at 0x1800, thin font at 0x1000; char * 8 + row)
+    input  logic        font_we,
+    input  logic [12:0] font_addr,
+    input  logic [7:0]  font_data,
+    input  logic        font_thin,    // jumper P3: the thin font
 
     // Keyboard: XT (set 1) scan codes from the glue
     input  logic [7:0]  kbd_code,

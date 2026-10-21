@@ -6,7 +6,7 @@ RTL  = ../../rtl
 CPU  = $(RTL)/cpu/mcl86
 KF   = $(RTL)/system/kf
 ROMHEX ?= $(abspath $(CPU))/microcode.hex
-CGA  ?= cga_stub.sv
+CGA  ?= $(RTL)/video/cga/cga_crtc.sv $(RTL)/video/cga/cga_card.sv
 SRC  = $(CPU)/eu.v $(CPU)/biu88.v $(CPU)/eu_rom.v $(RTL)/cpu/cpu8088.sv \
        $(wildcard $(KF)/KF8237/*.sv) $(wildcard $(KF)/KF8253/*.sv) \
        $(wildcard $(KF)/KF8255/*.sv) $(wildcard $(KF)/KF8259/*.sv) \
