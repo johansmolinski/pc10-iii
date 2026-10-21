@@ -505,17 +505,8 @@ module KF8237_Timing_And_Control (
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             dma_acknowledge_ff <= 0;
-        else if (master_clear)
-            dma_acknowledge_ff <= 0;
-        else if (cpu_clock_negedge)
-            if (next_state_r1 == S2)
-                dma_acknowledge_ff <= dma_acknowledge_internal;
-            else if (next_state_r1 == SI)
-                dma_acknowledge_ff <= 0;
-            else
-                dma_acknowledge_ff <= dma_acknowledge_ff;
         else
-            dma_acknowledge_ff <= dma_acknowledge_ff;
+            dma_acknowledge_ff <= dma_acknowledge_ff_next;
     end
 
     // pc10-iii (timing): DACK is a register of its own instead of the XOR of the
@@ -536,12 +527,17 @@ module KF8237_Timing_And_Control (
         else
             dack_sense_next = dack_sense_active_high;
 
+        // only the transitions out of S1 and S4 load the flip-flop: in SI
+        // (and S0) it is 0 already (cleared when SI is entered, from S4 or
+        // by reset/master clear), so the original "next_state == SI ->
+        // 0" in SI changes nothing, and next_state_r1 is never S2 from S2.
+        // This keeps the DMA requests and masks (SI -> S0) out of DACK.
         if (master_clear)
             dma_acknowledge_ff_next = 0;
         else if (cpu_clock_negedge)
-            if (next_state_r1 == S2)
+            if (((state == S1) || (state == S4)) && (next_state_r1 == S2))
                 dma_acknowledge_ff_next = dma_acknowledge_internal;
-            else if (next_state_r1 == SI)
+            else if ((state == S4) && (next_state_r1 == SI))
                 dma_acknowledge_ff_next = 0;
             else
                 dma_acknowledge_ff_next = dma_acknowledge_ff;
