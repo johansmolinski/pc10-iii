@@ -78,3 +78,74 @@ why, test numbers).
   value is in 100 MHz core clocks (legacy).
 - **Flags:** MCL86 keeps prefix state in flag bits 15..12, 5, 3 and 1. The
   harness maps them: `(flags & 0x0FD5) | 0xF002`.
+
+## CPU timing mechanisms (MCL86 + biu88)
+
+MCL86's EU is a fast microsequencer (about 21 microinstructions per 8088
+clock at 100 MHz); the 8088's timing is imposed on it from these pieces.
+
+**SYNC microinstruction** (type 0, non-zero immediate). The sequencer and
+the ROM output freeze until:
+
+| Immediate | Waits until |
+|---|---|
+| `0x0nnn` | cycle n of the instruction (counted from the opcode read, `BIU_CYC`) |
+| `0x4nnn` | n cycles after the last queue read |
+| `0x8nnn` | n cycles from now |
+| `0xCnnn` | n cycles after the last EU transfer ended |
+
+**End counter** (BIU, strobe 10). A cycle-mode load marks the end of the
+instruction: when it expires, the BIU reads the next opcode itself (QS=F),
+even if the EU is still busy.
+
+| Value | End |
+|---|---|
+| `0xE00n` | cycle n |
+| `0xF00n` | n from now |
+| `0xA00n` | n after the last queue read |
+| `0xB00n` | n after the next transfer ends |
+
+Rules:
+- The first end armed in an instruction stands; later loads are ignored
+  until the next opcode is read.
+- A flush clears it, so arm the end after the jump request (0x12B0 does
+  "end at the first new byte").
+- Without bit 13 the value is the old core-clock count.
+
+**Register strobe 11** codes, pc10-iii additions (MCL86 used 0-5):
+- **6, request release:** the BIU holds the EU's next bus request until n
+  cycles after the base (DATAOUT 14:13: 00 last queue read, 01 transfer
+  end, 10 opcode read).
+- **14:** adds to the pending release.
+- **7, scheduled read:** the BIU reads the next queue byte (S) at a time from
+  the same bases; bit 12 = two bytes.
+- Unused releases and schedules are dropped at the next opcode read.
+
+**Request codes** added: `0x1E` = SUSP. It is done at once if no code fetch
+runs or the fetch is in its T4; otherwise at its T4.
+
+**Queue reads:**
+- The EU's first use of the queue top is the read (`EU_QREAD`); MCL86's
+  pops are only bookkeeping.
+- Fetch procedures:
+  - 0x02A0 (byte after the opcode): SYNC 2;
+  - 0x02E0 (word): SYNC 2, then the high byte 1 after the low;
+  - 0x02A5/0x02E5 (subsequent): 1 after the last read;
+  - ModR/M entries (0x1018, armed variants 0x1060, 0x14A0, 0x1500-0x1540):
+    SYNC 1.
+
+**Microcode conventions:**
+- Patch area 0x1000-0x1FFF, each block commented "pc10-iii". The original
+  routines jump or call there.
+- Free words below 0x1000 (unused NOP slots) are reused where they exist.
+- MCL86's call stack is 4 deep: count the nesting when wrapping procedures.
+- eu.v compares the microcode addresses 0x09C9, 0x0A03, 0x0E76, 0x0F02 and
+  0x0F11: never move code there.
+- r2 is free scratch around CALC_EA; wrappers pass end values in it.
+
+**Measuring:**
+- `tools/sst_sched.py` (schedule per opcode) and `tools/sst_modes.py` (per
+  addressing mode) give the target;
+- scan the one or two free parameters with the dev build, then write the
+  measured values into the listing with comments.
+
