@@ -1,3 +1,4 @@
+#include <unistd.h>
 // sys_run.cpp - Verilator driver for the pc_system simulation.
 //   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-i itrace.txt from_ms] [-q]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
@@ -82,6 +83,7 @@ int main(int argc, char **argv) {
     tb->kbd_valid = 0;
     tb->reset = 1;
     for (int i = 0; i < 200; i++) { tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval(); }
+    if (!trace) unlink(hex.c_str());       // the ROM is loaded (initial block ran)
     tb->reset = 0;
 
     unsigned long long total = (unsigned long long)(secs * CLK_HZ), cyc = 0;
@@ -121,8 +123,17 @@ int main(int argc, char **argv) {
             if (tf) {
                 static const char *tn[] = {"Ti", "T1", "T2", "T3", "Tw", "T4", "?6", "T0"};
                 static const char *bt[] = {"INTA", "IOR", "IOW", "HALT", "CODE", "MEMR", "MEMW", "-"};
-                fprintf(tf, "%llu %s %s %05X %02X qs%d %04X:%04X\n", steps, tn[tb->bus_t & 7],
-                        bt[tb->bus_type & 7], tb->bus_addr, tb->bus_data, tb->qs, tb->cs, tb->ip);
+                // DMA markers: R = DRQ0, H = HRQ, A = AEN, K = DACK0
+                auto *rp = tb->rootp;
+                char dm[8]; int dn = 0;
+                if (rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__drq0) dm[dn++] = 'R';
+                if (rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__hold_request) dm[dn++] = 'H';
+                if (rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__aen) dm[dn++] = 'A';
+                if (!(rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__dack_n & 1)) dm[dn++] = 'K';
+                dm[dn] = 0;
+                fprintf(tf, "%llu %s %s %05X %02X qs%d %04X:%04X%s%s\n", steps, tn[tb->bus_t & 7],
+                        bt[tb->bus_type & 7], tb->bus_addr, tb->bus_data, tb->qs, tb->cs, tb->ip,
+                        dn ? " dma=" : "", dm);
             }
         }
         // instruction log: at the EU's dispatch of an instruction's first
