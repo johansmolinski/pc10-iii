@@ -14,7 +14,7 @@
 static const double CLK_HZ = 100227272.7;
 
 int main(int argc, char **argv) {
-    const char *bios = nullptr, *trace = nullptr, *itrace = nullptr;
+    const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
     double itrace_from = 0.0;
     double secs = 1.0;
     bool quiet = false;
@@ -25,6 +25,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-t") && i + 1 < argc) trace = argv[++i];
         else if (!strcmp(argv[i], "-d") && i + 1 < argc) dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-q")) quiet = true;
+        else if (!strcmp(argv[i], "-a") && i + 1 < argc) fdimg = argv[++i];
         else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
     }
     if (!bios) { fprintf(stderr, "usage: sys_run -b bios.rom [-s secs] [-t trace]\n"); return 1; }
@@ -52,6 +53,31 @@ int main(int argc, char **argv) {
     unsigned long long itrace_cyc = (unsigned long long)(itrace_from * 1e-3 * CLK_HZ);
 
     tb->dip_sw1 = dip;
+
+    // floppy A: from an image file (geometry from its size)
+    std::vector<unsigned char> disk;
+    if (fdimg) {
+        FILE *d = fopen(fdimg, "rb");
+        if (!d) { perror(fdimg); return 1; }
+        fseek(d, 0, SEEK_END); disk.resize(ftell(d)); fseek(d, 0, SEEK_SET);
+        if (fread(disk.data(), 1, disk.size(), d) != disk.size()) { perror(fdimg); return 1; }
+        fclose(d);
+        unsigned tr = 40, hd = 2, spt = 9;
+        switch (disk.size()) {
+            case 163840: hd = 1; spt = 8; break;
+            case 184320: hd = 1; spt = 9; break;
+            case 327680: spt = 8; break;
+            case 368640: break;
+            case 737280: tr = 80; break;
+            default: fprintf(stderr, "%s: unknown floppy size %zu\n", fdimg, disk.size()); return 1;
+        }
+        tb->img_present = 1;
+        tb->img_tracks = tr;
+        tb->img_heads = hd;
+        tb->img_spt = spt;
+    } else
+        tb->img_present = 0;
+    int sp_state = 0, sp_n = 0;     // 0 idle, 1 reading, 2 writing, 3 done pulse
     tb->kbd_valid = 0;
     tb->reset = 1;
     for (int i = 0; i < 200; i++) { tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval(); }
@@ -62,7 +88,32 @@ int main(int argc, char **argv) {
     unsigned long long steps = 0;
     unsigned last_t = 0;
     for (cyc = 0; cyc < total; cyc++) {
-        tb->clk = 0; tb->eval();
+        tb->clk = 0;
+        // the sector port backend: inputs for the coming edge
+        tb->sp_rd_valid = 0; tb->sp_wr_ready = 0; tb->sp_done = 0; tb->sp_err = 0;
+        if (sp_state == 0 && tb->sp_req) {
+            sp_state = tb->sp_write ? 2 : 1; sp_n = 0;
+            if (!quiet) printf("[%9.3f ms] FDC %s drive %d C%d H%d S%d lba %d\n", cyc / CLK_HZ * 1e3,
+                               tb->sp_write ? "write" : "read", tb->sp_drive, tb->sp_cyl, tb->sp_head,
+                               tb->sp_sector, tb->sp_lba);
+        }
+        size_t base = (size_t)tb->sp_lba * 512;
+        bool bad = tb->sp_drive != 0 || base + 512 > disk.size();
+        if (sp_state == 1) {
+            if (bad) { tb->sp_done = 1; tb->sp_err = 1; sp_state = 3; }
+            else {
+                tb->sp_rd_valid = 1; tb->sp_rd_data = disk[base + sp_n];
+                if (++sp_n == 512) { tb->sp_done = 1; sp_state = 3; }
+            }
+        } else if (sp_state == 2) {
+            tb->sp_wr_ready = 1;
+            if (tb->sp_wr_valid) {
+                if (!bad) disk[base + sp_n] = tb->sp_wr_data;
+                if (++sp_n == 512) { tb->sp_done = 1; tb->sp_err = bad; sp_state = 3; }
+            }
+        } else if (sp_state == 3 && !tb->sp_req)
+            sp_state = 0;
+        tb->eval();
         // sample before the edge (the BIU changes its pins on the edge)
         if (tb->cpu_step) {
             steps++;

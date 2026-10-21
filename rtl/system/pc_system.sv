@@ -32,6 +32,31 @@ module pc_system #(
     input  logic [7:0]  font_data,
     input  logic        font_thin,
 
+    // floppy drives A: and B: (rtl/fdc, doc/fdc.md): image geometry from the
+    // glue, the sector port to the image backend
+    input  logic [1:0]       drv_80trk,
+    input  logic [1:0]       img_present,
+    input  logic [1:0]       img_wp,
+    input  logic [1:0][7:0]  img_tracks,
+    input  logic [1:0][1:0]  img_heads,
+    input  logic [1:0][5:0]  img_spt,
+    output logic [1:0]       drv_motor,
+    output logic             fdc_active,
+    output logic        sp_req,
+    output logic        sp_write,
+    output logic        sp_drive,
+    output logic [7:0]  sp_cyl,
+    output logic        sp_head,
+    output logic [7:0]  sp_sector,
+    output logic [15:0] sp_lba,
+    input  logic        sp_rd_valid,
+    input  logic [7:0]  sp_rd_data,
+    output logic        sp_wr_valid,
+    output logic [7:0]  sp_wr_data,
+    input  logic        sp_wr_ready,
+    input  logic        sp_done,
+    input  logic        sp_err,
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -172,10 +197,54 @@ cga_card u_cga (
     .comp_mode  ()
 );
 
-assign isa_din   = cga_dsel ? cga_din : 8'h00;
-assign isa_dsel  = cga_dsel;
-assign isa_ready = cga_ready;
-assign isa_irq   = 6'b000000;
-assign isa_drq   = 3'b000;
+logic [7:0] fdc_din;
+logic       fdc_dsel, fdc_ready;
+logic [7:2] fdc_irq;
+logic [3:1] fdc_drq;
+
+fdc_card u_fdc (
+    .clk         (clk),
+    .reset       (reset),
+    .isa_addr    (isa_addr),
+    .isa_dout    (isa_dout),
+    .isa_din     (fdc_din),
+    .isa_dsel    (fdc_dsel),
+    .isa_ior_n   (isa_ior_n),
+    .isa_iow_n   (isa_iow_n),
+    .isa_aen     (isa_aen),
+    .isa_ready   (fdc_ready),
+    .isa_irq     (fdc_irq),
+    .isa_drq     (fdc_drq),
+    .isa_dack_n  (isa_dack_n),
+    .isa_tc      (isa_tc),
+    .drv_80trk   (drv_80trk),
+    .img_present (img_present),
+    .img_wp      (img_wp),
+    .img_tracks  (img_tracks),
+    .img_heads   (img_heads),
+    .img_spt     (img_spt),
+    .drv_motor   (drv_motor),
+    .fdc_active  (fdc_active),
+    .sp_req      (sp_req),
+    .sp_write    (sp_write),
+    .sp_drive    (sp_drive),
+    .sp_cyl      (sp_cyl),
+    .sp_head     (sp_head),
+    .sp_sector   (sp_sector),
+    .sp_lba      (sp_lba),
+    .sp_rd_valid (sp_rd_valid),
+    .sp_rd_data  (sp_rd_data),
+    .sp_wr_valid (sp_wr_valid),
+    .sp_wr_data  (sp_wr_data),
+    .sp_wr_ready (sp_wr_ready),
+    .sp_done     (sp_done),
+    .sp_err      (sp_err)
+);
+
+assign isa_din   = (cga_dsel ? cga_din : 8'h00) | (fdc_dsel ? fdc_din : 8'h00);
+assign isa_dsel  = cga_dsel | fdc_dsel;
+assign isa_ready = cga_ready & fdc_ready;
+assign isa_irq   = fdc_irq;
+assign isa_drq   = fdc_drq;
 
 endmodule

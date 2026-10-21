@@ -11,7 +11,7 @@ SRC  = $(CPU)/eu.v $(CPU)/biu88.v $(CPU)/eu_rom.v $(RTL)/cpu/cpu8088.sv \
        $(wildcard $(KF)/KF8237/*.sv) $(wildcard $(KF)/KF8253/*.sv) \
        $(wildcard $(KF)/KF8255/*.sv) $(wildcard $(KF)/KF8259/*.sv) \
        $(RTL)/system/pc_clocks.sv $(RTL)/system/xt_board.sv $(RTL)/system/pc_system.sv \
-       $(CGA) tb_sys.sv
+       $(CGA) $(RTL)/fdc/upd765.sv $(RTL)/fdc/fdc_secbuf.sv $(RTL)/fdc/fdc_card.sv tb_sys.sv
 INC  = -I$(KF)/KF8237 -I$(KF)/KF8253 -I$(KF)/KF8255 -I$(KF)/KF8259
 OBJ ?= obj
 
