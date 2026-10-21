@@ -119,7 +119,10 @@ always_ff @(posedge clk) begin
     end else begin
         if (cpu_step) begin
             hrq_ff1  <= cpu_passive & cpu_lock_n & hold_request;
-            aen      <= hold_ack;
+            // the DMA takes the bus only when the CPU is not inside a
+            // transfer: at its T4 or with an idle bus (the status pins
+            // go passive in T3 already). CAL: against MartyPC's HOLDA.
+            aen      <= hold_ack && (aen || cpu_bus_t == T4 || cpu_bus_t == TI);
             dma_wait <= aen;
         end
         if (cpu_fall)
@@ -159,7 +162,7 @@ KF8237 u_dma (
     .reset                  (reset),
     .chip_select_n          (~cs_dma),
     .ready                  (isa_ready),            // CAL: XT DMA wait state
-    .hold_acknowledge       (hold_ack),
+    .hold_acknowledge       (aen),           // the gated grant (see aen); CAL
     .dma_request            ({isa_drq, drq0}),
     .data_bus_in            (bus_wdata),
     .data_bus_out           (dma_dout),
