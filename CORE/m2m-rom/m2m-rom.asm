@@ -89,6 +89,17 @@ _PCPL_D         MOVE    R8, R0                  ; R0: the file handle
                 RSUB    FD_SEL, 1
                 MOVE    FD_MODE, R2
                 MOVE    0, @R2
+                MOVE    FD_STAT, R2             ; a transfer that was already
+                MOVE    64, R4                  ; past the mode check still uses
+_PCPL_W1        XOR     R3, R3                  ; the old map: wait for its end
+_PCPL_W2        MOVE    @R2, R5                 ; (bounded, ~1 s)
+                AND     1, R5
+                RBRA    _PCPL_W3, Z
+                SUB     1, R3
+                RBRA    _PCPL_W2, !Z
+                SUB     1, R4
+                RBRA    _PCPL_W1, !Z
+_PCPL_W3
 
                 MOVE    R0, R2                  ; the size: one of the formats
                 ADD     FAT32$FDH_SIZE_LO, R2   ; (sectors = size / 512)
@@ -155,6 +166,7 @@ FD_REGWIN       .EQU    0x0000
 FD_MAPWIN       .EQU    0x0001
 FD_MODE         .EQU    0x8000                  ; bit 0 on, bit 1 the card in slot 1
 FD_SECT         .EQU    0x8001                  ; sectors lo, hi; BASE lo, hi; SHIFT
+FD_STAT         .EQU    0x8008                  ; bit 0: a transfer is running
 FD_MAP          .EQU    0x8000
 FD_MAPW         .EQU    2048                    ; map words: 511 extents
 
