@@ -41,6 +41,8 @@ module fdc_card #(
     input  logic [19:0] isa_addr,
     input  logic [19:0] isa_addr_next,  // REG_DECODE: isa_addr of the next clk
     input  logic        isa_aen_next,   // REG_DECODE: isa_aen of the next clk
+    input  logic        isa_ior_n_next, // REG_DECODE: isa_ior_n of the next clk
+    input  logic        isa_iow_n_next, // REG_DECODE: isa_iow_n of the next clk
     input  logic [7:0]  isa_dout,
     output logic [7:0]  isa_din,
     output logic        isa_dsel,       // this card drives isa_din
@@ -119,10 +121,31 @@ always_ff @(posedge clk)
     if (REG_DECODE && (sel_dor_q !== sel_dor_c || sel_fdc_q !== sel_fdc_c))
         $fatal(1, "fdc_card: registered address decode differs from the bus");
 `endif
-wire        ior_fall = !isa_ior_n && ior_d;
-wire        iow_fall = !isa_iow_n && iow_d;
-wire        iow_rise = isa_iow_n && !iow_d;
-wire        ior_rise = isa_ior_n && !ior_d;
+wire        ior_fall_c = !isa_ior_n && ior_d;
+wire        iow_fall_c = !isa_iow_n && iow_d;
+wire        iow_rise_c = isa_iow_n && !iow_d;
+wire        ior_rise_c = isa_ior_n && !ior_d;
+// pc10-iii (timing): the strobe edges one clk ahead into registers
+// (REG_DECODE): an edge in the next clk is the next strobe against this one.
+// The next strobes from the board are exact except in a reset's first clk,
+// where this card is in reset (doc/timing.md 2.11).
+logic       ior_fall_q, iow_fall_q, iow_rise_q, ior_rise_q;
+always_ff @(posedge clk) begin
+    ior_fall_q <= !isa_ior_n_next && isa_ior_n;
+    iow_fall_q <= !isa_iow_n_next && isa_iow_n;
+    iow_rise_q <= isa_iow_n_next && !isa_iow_n;
+    ior_rise_q <= isa_ior_n_next && !isa_ior_n;
+end
+wire        ior_fall = REG_DECODE ? ior_fall_q : ior_fall_c;
+wire        iow_fall = REG_DECODE ? iow_fall_q : iow_fall_c;
+wire        iow_rise = REG_DECODE ? iow_rise_q : iow_rise_c;
+wire        ior_rise = REG_DECODE ? ior_rise_q : ior_rise_c;
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (REG_DECODE && !reset && (ior_fall_q !== ior_fall_c || iow_fall_q !== iow_fall_c ||
+                                 iow_rise_q !== iow_rise_c || ior_rise_q !== ior_rise_c))
+        $fatal(1, "fdc_card: registered strobe edges differ from the bus");
+`endif
 
 always_ff @(posedge clk) begin
     ior_d <= isa_ior_n;

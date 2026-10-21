@@ -53,6 +53,8 @@ module xt_board #(
     output logic [19:0] isa_addr,
     output logic [19:0] isa_addr_next,  // pc10-iii: isa_addr of the next clk (registered decodes)
     output logic        isa_aen_next,   // pc10-iii: isa_aen of the next clk
+    output logic        isa_ior_n_next, // pc10-iii: isa_ior_n of the next clk (not in a reset's first clk)
+    output logic        isa_iow_n_next, // pc10-iii: isa_iow_n of the next clk (not in a reset's first clk)
     output logic [7:0]  isa_dout,
     input  logic [7:0]  isa_din,
     input  logic        isa_dsel,       // a card drives isa_din
@@ -197,6 +199,7 @@ wire  cs_nmi   = board_io && bus_addr[7:5] == 3'd5;   // A0-BF
 // ------------------------------------------------------------ 8237
 logic [7:0]  dma_dout;
 logic        dma_ior_n, dma_iow_n, dma_memr_n, dma_memw_n, dma_eop;
+logic        dma_ior_n_next, dma_iow_n_next;
 logic [15:0] dma_addr, dma_addr_next;
 logic [3:0]  dack_n, dack_n_next;
 logic        drq0;
@@ -235,7 +238,9 @@ KF8237 u_dma (
     .address_enable         (),
     .address_strobe         (),
     .memory_read_n          (dma_memr_n),
-    .memory_write_n         (dma_memw_n)
+    .memory_write_n         (dma_memw_n),
+    .io_read_n_next         (dma_ior_n_next),   // pc10-iii
+    .io_write_n_next        (dma_iow_n_next)
 );
 
 // 74LS670 page registers: 81 = ch2, 82 = ch3, 83 = ch1 (and ch0)
@@ -490,6 +495,36 @@ assign isa_iow_n  = io_wr_n;
 assign isa_aen    = aen;
 assign isa_addr_next = bus_addr_next;
 assign isa_aen_next  = aen_next;
+
+// pc10-iii (timing): the I/O strobes' values in the next clk, from the D
+// inputs of the command registers, AEN and the 8237's strobe registers, for
+// cards that register their strobe edges (the FDC). Equal to the next clk's
+// strobes except in the first clk of a PC reset (the 8237's asynchronous
+// clear), where such a card is in reset itself (doc/timing.md 2.11).
+logic cmd_ior_next, cmd_iow_next;
+always_comb begin
+    cmd_ior_next = cmd_ior;
+    cmd_iow_next = cmd_iow;
+    if (reset || !in_cycle) begin
+        cmd_ior_next = 1'b0;
+        cmd_iow_next = 1'b0;
+    end else if (cpu_fall) begin
+        if (cpu_bus_t == T1 && cpu_bus_type == ST_IOR) cmd_ior_next = 1'b1;
+        if (cpu_bus_t == T2 && cpu_bus_type == ST_IOW) cmd_iow_next = 1'b1;
+    end
+end
+assign isa_ior_n_next = ~(cmd_ior_next && !aen_next) & dma_ior_n_next;
+assign isa_iow_n_next = ~(cmd_iow_next && !aen_next) & dma_iow_n_next;
+`ifndef SYNTHESIS
+logic ior_n_pred, iow_n_pred;
+always_ff @(posedge clk) begin
+    ior_n_pred <= isa_ior_n_next;
+    iow_n_pred <= isa_iow_n_next;
+end
+always_ff @(posedge clk)
+    if (!reset && (ior_n_pred != io_rd_n || iow_n_pred != io_wr_n))
+        $fatal(1, "xt_board: next I/O strobes mispredicted");
+`endif
 assign isa_ale    = cpu_bus_t == T1;
 assign isa_dack_n = dack_n;
 assign isa_tc     = !dma_eop;              // the 8237's EOP is active low
