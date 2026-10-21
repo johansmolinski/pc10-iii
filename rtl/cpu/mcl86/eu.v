@@ -25,6 +25,18 @@
 // Revision 3.0 9/29/2025 
 // For DIV overflow AX and DX are restored to initial values
 //
+// pc10-iii (2026-10-21): 8K-word microcode ROM (EU8Kx32, read enable) and the
+// SYNC microinstruction for cycle-exact timing: type 0 with a non-zero
+// immediate stalls the microsequencer until
+//   bit 15 = 0: the instruction has run n 8088 clocks (n = bits 11:0, counted
+//               by the BIU from the cycle in which it read the opcode, input
+//               EU_CYC; the EU's own dispatch may come later), or
+//   bit 15 = 1: n 8088 clocks have passed since the SYNC started waiting
+//               (input EU_STEP marks every 8088 clock).
+// Type 0 with immediate 0 stays a NOP. Note that the microcode addresses
+// 0x09C9, 0x0A03, 0x0E76, 0x0F02 and 0x0F11 are compared below; code there
+// must not move.
+//
 //
 //------------------------------------------------------------------------
 //
@@ -56,6 +68,9 @@ module mcl86_eu_core
     input               CORE_CLK_INT,           // Core Clock
     input               RESET_INT,              // Pipelined 8088 RESET pin
     input               TEST_N_INT,             // Pipelined 8088 TEST_n pin
+    input               EU_STEP,                // pc10-iii: one CORE_CLK per 8088 clock
+    input      [11:0]   EU_CYC,                 // pc10-iii: 8088 clocks since the opcode read (BIU)
+    output     [1:0]    EU_QREAD,               // pc10-iii: the EU uses the queue top: 01 opcode, 11 other
 
     
     output [15:0]       EU_BIU_COMMAND,         // EU to BIU Signals
@@ -128,6 +143,10 @@ wire eu_opcode_jump_call;
 wire intr_asserted;
 wire eu_jump_boolean;
 reg  [12:0] eu_rom_address;
+reg  [11:0] eu_sync_rel;            // pc10-iii: relative SYNC countdown
+reg         eu_sync_armed;
+reg         new_instruction_d1;
+wire        eu_sync_wait;
 reg  [51:0] eu_calling_address;
 reg  [15:0] eu_register_ax;
 reg  [15:0] initial_ax;
@@ -181,10 +200,11 @@ wire [15:0] sbb_total;
 //
 //------------------------------------------------------------------------                                    
 
-EU4Kx32      EU4Kx32_i (
+EU8Kx32      EU8Kx32_i (
   
   .clka     (CORE_CLK_INT),
-  .addra    (eu_rom_address[11:0]),
+  .ena      (~eu_sync_wait),
+  .addra    (eu_rom_address[12:0]),
   .douta    (eu_rom_data)
   
   );
@@ -348,6 +368,27 @@ assign intr_asserted = BIU_INTR & intr_enable_delayed;
 
 assign new_instruction = (eu_rom_address[12:8]==5'h01) ? 1'b1 : 1'b0;   
 
+// pc10-iii: SYNC - a type 0 microinstruction with a non-zero immediate waits
+wire eu_is_sync   = eu_opcode_type==3'h0 && eu_rom_data[31]==1'b0 &&
+                    eu_opcode_immediate!=16'h0 && eu_stall_pipeline==1'b0;
+wire eu_sync_done = eu_opcode_immediate[15] ?
+                        (eu_sync_armed && eu_sync_rel==12'h0) :
+                        (EU_CYC >= eu_opcode_immediate[11:0]);
+assign eu_sync_wait = eu_is_sync && !eu_sync_done;
+
+// pc10-iii: the EU uses the byte on top of the queue. The first use of a byte
+// is the real chip's queue read (the BIU reports it on QS): a jump through the
+// opcode table (source 1) reads an opcode or prefix; the ModR/M jump (source 2)
+// or any operand from PFQ_TOP_BYTE reads a subsequent byte.
+wire eu_uop_live = eu_stall_pipeline==1'b0 && eu_sync_wait==1'b0;
+assign EU_QREAD = (eu_uop_live && eu_opcode_type==3'h1 && eu_jump_boolean &&
+                   eu_opcode_jump_src==3'h1)                              ? 2'b01 :
+                  (eu_uop_live && eu_opcode_type==3'h1 && eu_jump_boolean &&
+                   eu_opcode_jump_src==3'h2)                              ? 2'b11 :
+                  (eu_uop_live && eu_opcode_type!=3'h0 && eu_opcode_type!=3'h1 &&
+                   eu_opcode_op1_sel==4'h4)                               ? 2'b11 :
+                                                                            2'b00 ;
+
         
 assign add_total = eu_register_r0 + eu_register_r1;
 assign adc_total = eu_register_r0 + eu_register_r1 + eu_flag_c;
@@ -396,6 +437,9 @@ begin : EU_MICROSEQUENCER
       eu_stall_pipeline <= 'h0;
       eu_rom_address <= 13'h0020;
       eu_calling_address <= 'h0;
+      eu_sync_rel <= 'h0;
+      eu_sync_armed <= 1'b0;
+      new_instruction_d1 <= 1'b0;
       intr_enable_delayed <= 1'b0;
 	  idiv_opcode <= 'h0;
     end
@@ -403,6 +447,18 @@ begin : EU_MICROSEQUENCER
 else    
   begin     
   
+    // pc10-iii: relative SYNC
+    new_instruction_d1 <= new_instruction;
+    if (eu_is_sync==1'b1 && eu_opcode_immediate[15]==1'b1 && eu_sync_armed==1'b0)
+      begin
+        eu_sync_armed <= 1'b1;
+        eu_sync_rel   <= eu_opcode_immediate[11:0];
+      end
+    else if (eu_is_sync==1'b1 && eu_sync_done==1'b1)
+      eu_sync_armed <= 1'b0;
+    else if (EU_STEP==1'b1 && eu_sync_rel!=12'h0)
+      eu_sync_rel <= eu_sync_rel - 1'b1;
+
     // Delay the INTR enable flag until after the next instruction begins.
     // No delay when it is disabled.
     if (eu_flag_i==1'b0)
@@ -665,7 +721,7 @@ else
         endcase 
       end
                 
-    else
+    else if (eu_sync_wait==1'b0)   // pc10-iii: SYNC holds address and ROM output
       begin
         eu_stall_pipeline <= 1'b0; // Debounce the pipeline stall
         eu_rom_address <= eu_rom_address + 1'b1; 

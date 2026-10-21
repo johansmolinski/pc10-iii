@@ -41,6 +41,8 @@ mcl86_eu_core eu (
     .CORE_CLK_INT         (core_clk),
     .RESET_INT            (reset),
     .TEST_N_INT           (1'b1),
+    .EU_STEP              (1'b0),
+    .EU_CYC               (12'd0),
     .EU_BIU_COMMAND       (eu_biu_command),
     .EU_BIU_DATAOUT       (eu_biu_dataout),
     .EU_REGISTER_R3       (eu_register_r3),

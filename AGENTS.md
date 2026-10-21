@@ -30,12 +30,17 @@ why, test numbers).
 
 ## Layout
 
-- `rtl/cpu/mcl86/`: eu.v (microsequencer), biu_max.v (maximum-mode bus
-  unit), eu4kx32.v (ROM model), microcode.txt / .hex.
+- `rtl/cpu/mcl86/`:
+  - eu.v (microsequencer);
+  - biu88.v (our cycle-stepped BIU) and biu_max.v (the original, for
+    comparison);
+  - eu4kx32.v (ROM model);
+  - microcode.txt / .hex.
 - `tb/sst/`: `sst2txt.py` (JSON -> line format), `sst_run.cpp` (Verilator
   harness), `tb_mcl86.v` (wrapper; debug outputs via hierarchical
   references).
-- `tools/mcasm.py`: microcode assembler.
+- `tools/mcasm.py`: microcode assembler; `tools/mcset.py`: change words in
+  the listing in place.
 
 ## Harness facts
 
@@ -44,13 +49,32 @@ why, test numbers).
   ratio.
 - **Loader:** the CPU's registers come from a program served on the bus
   (POPF, MOV r16,imm, MOV sreg,AX, JMP FAR).
-  - Prefetched tests (initial queue non-empty) can't be set up this way, so
-    they get the state verdict only.
+  - Prefetched tests (initial queue non-empty): with `biu88`, a test-only
+    port installs the queue when the loader's JMP FAR flushes it, and leaves
+    the bus idle. With `BIU=max` they get the state verdict only.
 - **Trace window:** a test's trace runs from the cycle that reports the
   first-byte queue read (QS=F, reported one cycle after the read) to the
   cycle in which the next instruction's first byte is read.
-- **Queue status:** MCL86 has no QS pins. The harness takes the queue
-  operations from the EU's fetch strobe (EU_BIU_COMMAND[13:12] = 01) and
-  the QS code in bits 3:2.
+- **Queue status:**
+  - `biu88` has QS pins; the harness samples them.
+  - `BIU=max` has none: the harness takes the opcode dispatch as F, and
+    strobes with QS code 11 as S.
+- **Sampling:** pins are sampled on the core clock before each CLK rising
+  edge, because `biu88` changes them on the edge clock itself.
+- **Dev loop for microcode:**
+  - copy `microcode.txt`, change words with `tools/mcset.py`, assemble with
+    `tools/mcasm.py`;
+  - build once with
+    `make OBJ=obj_dev ROMHEX=<abs path>/dev.hex obj_dev/sst_run` (the path is
+    compiled in, so `rm -rf obj_dev` when it changes);
+  - run single files, e.g. `./obj_dev/sst_run -f <file>`;
+  - `-d` dumps every cycle with the EU events, numbered by cycle.
+
+  A full `make run` reads the committed `microcode.hex` at each process
+  start, so don't regenerate it while a full run is going.
+- **Cycle counter modes** (biu88): bit 13 of the loaded value = 8088 clocks;
+  bit 12 = 0 is absolute (cycle n of the instruction, 0 = the dispatch
+  cycle), bit 12 = 1 is relative (n cycles from now). Without bit 13 the
+  value is in 100 MHz core clocks (legacy).
 - **Flags:** MCL86 keeps prefix state in flag bits 15..12, 5, 3 and 1. The
   harness maps them: `(flags & 0x0FD5) | 0xF002`.

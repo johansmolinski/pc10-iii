@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the MCL86 microcode listing into a 4K x 32 ROM image.
+"""Assemble the MCL86 microcode listing into an 8K x 32 ROM image.
 
 The listing (rtl/cpu/mcl86/microcode.txt) is MicroCore Labs' programming
 script: "p 00 00000 00001 AAAA" sets the word address, the next two
@@ -14,7 +14,7 @@ import sys
 
 
 def assemble(path):
-    words = [0] * 4096
+    words = [0] * 8192
     addr = None
     halves = []
     for line in open(path):
@@ -36,7 +36,8 @@ def read_coe(path):
     if 'memory_initialization_vector' in text:
         text = text.split('memory_initialization_vector', 1)[1].split('=', 1)[1]
     vals = [v for v in text.replace(',', ' ').replace(';', ' ').split() if v]
-    return [int(v, 16) for v in vals][:4096]
+    vals = [int(v, 16) for v in vals][:8192]
+    return vals + [0] * (8192 - len(vals))
 
 
 def main():
@@ -45,7 +46,7 @@ def main():
     words = assemble(sys.argv[1])
     if sys.argv[2] == '--check':
         coe = read_coe(sys.argv[3])
-        diffs = [i for i in range(4096) if coe[i] != words[i]]
+        diffs = [i for i in range(8192) if coe[i] != words[i]]
         for i in diffs[:20]:
             print(f'{i:03X}: coe {coe[i]:08X} listing {words[i]:08X}')
         print(f'{len(diffs)} differences')

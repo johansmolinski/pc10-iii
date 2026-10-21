@@ -113,6 +113,9 @@ struct Sim {
         phase = next;
         double frac = phase - (int)phase;
         top->clk = frac < (1.0 / 3.0);
+#ifdef BIU88
+        top->step = rose;           // biu88 advances at the CLK rising edge
+#endif
         top->core_clk = 0; top->eval();
         top->core_clk = 1; top->eval();
         core_clocks++;
@@ -158,10 +161,12 @@ static int prefix_count(const Test &t) {
 }
 
 static bool g_dump = false;   // -d: print every bus cycle of the test
+static long g_cyc = 0;        // 8088 cycle number (for -d)
 
 static Result run_test(Sim &sim, const Test &t) {
     Result r;
     r.prefetched = !t.queue.empty();
+    if (g_dump) printf("=== test %d\n", t.idx);
     auto &top = sim.top;
 
     static std::vector<int> mem(1 << 20);
@@ -186,6 +191,10 @@ static Result run_test(Sim &sim, const Test &t) {
     unsigned latched = 0;
     int read_val = 0x90;
     int prev_jump = 0, prev_strobe = 0, prev_dispatch = 0;
+    int preload_at = 0;
+    int snap_st = 7, snap_qs = 0, snap_qb = 0;
+    bool cycle_of_test = true;
+    unsigned snap_ad = 0;
 
     // queue events of the current 8088 cycle (reported in the next one)
     struct QEv { char op; int byte; };
@@ -200,17 +209,38 @@ static Result run_test(Sim &sim, const Test &t) {
     // MCL86 can start the next instruction while a write is still queued in
     // the BIU; let the bus drain so that the state verdict sees the memory
     int drain = 40;
-    while ((!done || drain-- > 0) && budget-- > 0) {
+#ifdef BIU88
+    bool tstarted = false, tdone = false;
+    int tf_seen = 0;
+#else
+    const bool tdone = true;
+#endif
+    while ((!done || !tdone || drain-- > 0) && budget-- > 0) {
         const bool was_done = done;   // the cycle that ends the test is kept
         // run core clocks until the next CLK rising edge
         bool rose = false;
         while (!rose) {
+            // the pins as they were during the cycle that is ending: biu88
+            // changes them on the very clock where CLK rises
+            snap_st = top->s2_s0; snap_ad = top->ad_out;
+#ifdef BIU88
+            snap_qs = top->qs; snap_qb = top->qs_byte;
+#endif
             rose = sim.step();
+            if (rose) g_cyc++;
+#ifdef BIU88
+            if (g_dump && top->qs != snap_qs)
+                printf("      qs c%ld%s %d -> %d\n", g_cyc, rose ? "(edge)" : "", snap_qs, (int)top->qs);
+#endif
             int st = top->s2_s0;
             // the 8288 latches the address when the status leaves passive
             if (status_core_prev == 7 && st != 7) {
                 latched = top->ad_out & 0xFFFFF;
                 bus_type = st;
+                // a bus cycle that starts after the EU dispatched the next
+                // instruction is not the test's (the drain runs the code after
+                // it, which the test may have just overwritten)
+                cycle_of_test = !done;
                 if (st == 4) {                       // code fetch
                     if (!test_mode)
                         read_val = lptr < loader.size() ? loader[lptr++] : 0x90;
@@ -230,8 +260,27 @@ static Result run_test(Sim &sim, const Test &t) {
 
             unsigned cmd = top->dbg_eu_cmd;
             int jump = ((cmd >> 9) & 1) && (((cmd >> 4) & 0x1F) == 0x19);
+#ifdef BIU88
+            top->tb_preload = 0;
+            if (preload_at > 0 && --preload_at == 0) top->tb_preload = 1;
+#endif
             if (jump && !prev_jump) {
-                if (!test_mode && lptr >= loader.size()) test_mode = true;
+                if (!test_mode && lptr >= loader.size()) {
+                    test_mode = true;
+#ifdef BIU88
+                    // the BIU flushes on the next clock; install the queue
+                    // right after that
+                    if (!t.queue.empty()) {
+                        uint32_t qw = 0;
+                        for (size_t i = 0; i < t.queue.size() && i < 4; i++)
+                            qw |= (uint32_t)t.queue[i] << (8 * i);
+                        top->tb_queue = qw;
+                        top->tb_queue_len = t.queue.size();
+                        top->tb_ip = t.init[IP];
+                        preload_at = 2;
+                    }
+#endif
+                }
                 if (test_mode && started) qev_cur.push_back({'E', 0});
             }
             prev_jump = jump;
@@ -242,6 +291,15 @@ static Result run_test(Sim &sim, const Test &t) {
             // strobes with QS code 11 are subsequent-byte reads.
             int strobe = ((cmd >> 12) & 3) == 1;
             int dispatch = top->dbg_dispatch;
+#ifdef BIU88
+            if (g_dump && ((dispatch && !prev_dispatch) || (strobe && !prev_strobe) ||
+                           (jump && !prev_jump)))
+                printf("      ev c%ld%s rom=%03X cmd=%04X top=%02X empty=%d hold=%d qlen=%d pc=%04X %s%s%s\n",
+                       g_cyc, rose ? "(edge)" : "", (unsigned)top->dbg_rom_addr, cmd, (unsigned)top->dbg_pfq_top,
+                       (int)top->dbg_pfq_empty, (int)top->dbg_holding, (int)top->dbg_qlen,
+                       (unsigned)top->dbg_pc, dispatch && !prev_dispatch ? "DISPATCH " : "",
+                       strobe && !prev_strobe ? "STROBE " : "", jump && !prev_jump ? "JUMP" : "");
+#endif
             if (dispatch && !prev_dispatch && test_mode) {
                 int byte = top->dbg_pfq_top;
                 if (g_dump) printf("    dispatch top=%02X\n", byte);
@@ -276,7 +334,7 @@ static Result run_test(Sim &sim, const Test &t) {
         }
 
         // close the 8088 cycle that just ended
-        int st = top->s2_s0;
+        int st = snap_st;
         Cycle c;
         if (prev_status == 7 && st != 7) {
             tcount = 1; c.ale = 1; c.addr = latched;
@@ -289,8 +347,8 @@ static Result run_test(Sim &sim, const Test &t) {
         c.bus = BUSN[st];
         if (tcount == 3) {
             if (bus_type == 6 || bus_type == 2) {        // write
-                c.data = top->ad_out & 0xFF;
-                if (bus_type == 6 && test_mode && started) {
+                c.data = snap_ad & 0xFF;
+                if (bus_type == 6 && test_mode && started && cycle_of_test) {
                     mem[latched] = c.data;
                     writes.push_back({latched, c.data});
                 }
@@ -299,19 +357,42 @@ static Result run_test(Sim &sim, const Test &t) {
             }
         }
         prev_status = st;
-        if (g_dump && test_mode)
-            printf("    dump %s %-4s %c%05X d=%02X q=%s ip=%04X sp=%04X ss=%04X%s\n",
-                   c.t.c_str(), c.bus.c_str(), c.ale ? 'A' : ' ', latched,
-                   c.data, qev_cur.empty() ? "-" : std::string(1, qev_cur[0].op).c_str(),
+        if (g_dump)
+            printf("    dump c%ld %s %-4s %c%05X d=%02X q=%s ip=%04X sp=%04X ss=%04X%s\n",
+                   g_cyc - 1, c.t.c_str(), c.bus.c_str(), c.ale ? 'A' : ' ', latched,
+                   c.data, c.qop.c_str(),
                    (unsigned)top->dbg_ip, (unsigned)top->dbg_sp,
-                   (unsigned)top->dbg_ss, done ? " (drain)" : "");
+                   (unsigned)top->dbg_ss, done ? " (drain)" : !test_mode ? " (load)" : "");
 
+#ifdef BIU88
+        {
+            static const char *QSN[4] = {"-", "F", "E", "S"};
+            c.qop = QSN[snap_qs & 3];
+            c.qbyte = snap_qs ? snap_qb : 0;
+        }
+#else
         if (started && !qev_prev.empty()) {
             c.qop = std::string(1, qev_prev[0].op);
             c.qbyte = qev_prev[0].byte;
         } else {
             c.qop = "-";
         }
+#endif
+#ifdef BIU88
+        // the trace window comes from the QS pins: from the cycle that reports
+        // the test's first byte (F) up to the cycle before the F of the next
+        // instruction. The BIU may read that opcode before the EU dispatches
+        // on it; the registers are taken at the EU's dispatch (above).
+        if (!tdone && test_mode) {
+            if (!tstarted) {
+                if (c.qop == "F") { tstarted = true; tf_seen = 1; r.got.push_back(c); }
+            } else {
+                if (c.qop == "F" && ++tf_seen > want_f) tdone = true;
+                else r.got.push_back(c);
+            }
+        }
+        (void)was_done;
+#else
         if (started && !was_done) {
             // a cycle belongs to the test from the one reporting the first F
             if (cycle_no > 0 || !qev_prev.empty()) {
@@ -319,6 +400,7 @@ static Result run_test(Sim &sim, const Test &t) {
                 cycle_no++;
             }
         }
+#endif
         qev_prev = qev_cur;
         qev_cur.clear();
     }
@@ -364,7 +446,12 @@ static Result run_test(Sim &sim, const Test &t) {
     r.state_ok = why.empty();
     r.why = why;
 
-    if (!r.prefetched) {
+#ifdef BIU88
+    const bool graded = true;          // the queue was installed
+#else
+    const bool graded = !r.prefetched;
+#endif
+    if (graded) {
         r.len_ok = r.got.size() == t.cycles.size();
         bool ok = r.len_ok;
         for (size_t i = 0; ok && i < t.cycles.size(); i++) {
@@ -433,12 +520,16 @@ int main(int argc, char **argv) {
             n++;
             if (!r.ran) tmo++;
             if (r.state_ok) st++;
+#ifdef BIU88
+            if (true) {
+#else
             if (!r.prefetched) {
+#endif
                 plain++;
                 if (r.len_ok) len++;
                 if (r.trace_ok) tr++;
             }
-            bool fail = !r.state_ok || (!r.prefetched && !r.trace_ok);
+            bool fail = !r.state_ok || !r.trace_ok;
             if (t.idx == verbose_idx || (first_fail && fail && !shown)) {
                 print_trace(t, r);
                 shown = true;

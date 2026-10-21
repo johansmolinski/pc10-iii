@@ -29,6 +29,9 @@
 // Revision 4.0 12/2/2022
 // Assigned values to unused flags[1,3,5] for opcode LAHF
 //
+// pc10-iii changes (2026-10-21 on): retimed for the cycle-stepped BIU biu88.
+// Every change is marked "pc10-iii" at its line; see doc/history.md.
+//
 //
 //------------------------------------------------------------------------
 //
@@ -253,42 +256,52 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 0000
 #
 #
-# Poll for Interrupts
+# pc10-iii: the main loop, shortened so that the end of an instruction reaches
+# the next dispatch within one 8088 clock:
+#  - one test for NMI, INTR and single step together; the three separate polls
+#    of the original moved to the patch at 0x1010;
+#  - the wait for the end of the instruction (cycle counter zero) is here,
+#    right before the dispatch, instead of in each routine's ending (see
+#    WAIT_CLOCKS at 0x03F2, which no longer waits);
+#  - the queue test and the dispatch follow directly (MCL86 had five NOPs
+#    here for its old BIU).
+# Entries from elsewhere: 0x0004 (main loop), 0x0006 (after the queue test at
+# 0x0013), 0x0011 (after prefixes; unchanged below).
 #
-# Isolate System Signals[3] - nmi_caught
+# Isolate System Signals NMI (bit 3), INTR (bit 1) and single step (bit 8)
 p 00 00000 00001 0006
-p 01 00000 00001 4CEF
-p 01 00000 00001 0008
+p 01 00000 00001 4EEF
+p 01 00000 00001 010A
 #
-# Jump to NMI Processing Routine if last ALU is non zero
+# Jump to the interrupt polls at 0x1010 if any is set
 p 00 00000 00001 0007
 p 01 00000 00001 1001
-p 01 00000 00001 053A
+p 01 00000 00001 1010
 #
-# Isolate System Signals[1] - intr_asserted
+# Isolate System Signals clock counter zero bit into Dummy
 p 00 00000 00001 0008
-p 01 00000 00001 4CEF
-p 01 00000 00001 0002
+p 01 00000 00001 4EEF
+p 01 00000 00001 1000
 #
-# Jump to Interrupt vector fetch Processing Routine if last ALU is non zero
+# Jump to retest if last ALU is zero (the instruction has not ended yet)
 p 00 00000 00001 0009
-p 01 00000 00001 1001
-p 01 00000 00001 0562
+p 01 00000 00001 1002
+p 01 00000 00001 0008
 #
-# Isolate System Signals[8] - eu_tf_pending
+# Isolate the Prefetch Queue EMPTY bit into Dummy
 p 00 00000 00001 000A
-p 01 00000 00001 4CEF
-p 01 00000 00001 0100
+p 01 00000 00001 4EEF
+p 01 00000 00001 0080
 #
-# Jump to Single Step Processing Routine if last ALU is non zero
+# Jump Type-1 to the Initial Opcode Jump Table - if last result is not zero
 p 00 00000 00001 000B
-p 01 00000 00001 1001
-p 01 00000 00001 0545
+p 01 00000 00001 1011
+p 01 00000 00001 0001
 #
-# NOP
+# Unconditional Jump to Interrupts check
 p 00 00000 00001 000C
-p 01 00000 00001 0000
-p 01 00000 00001 0000
+p 01 00000 00001 1000
+p 01 00000 00001 0006
 #
 # NOP
 p 00 00000 00001 000D
@@ -310,7 +323,6 @@ p 00 00000 00001 0010
 p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
-# 
 # Fetch initial opcode when available
 #
 # Isolate the Prefetch Queue EMPTY bit by ANDing system_signals register with immedaite into Dummy
@@ -429,9 +441,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode (bit 13), absolute: the next opcode is read in cycle 3
 p 00 00000 00001 0040
 p 01 00000 00001 5FFF
-p 01 00000 00001 C025
+p 01 00000 00001 E003
 #
 # Strobe BIU - Set clock counter
 p 00 00000 00001 0041
@@ -559,9 +572,10 @@ p 01 00000 00001 005C
 # Common Flag setting code - Sets clocks to 2 and jumps to remaining NOP code.  
 #
 # Write clock count=2 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: the next opcode is read in cycle 2
 p 00 00000 00001 005C
 p 01 00000 00001 5FFF
-p 01 00000 00001 C00C
+p 01 00000 00001 E002
 #
 # Jump unconditional to NOP Microcode since it is identical
 p 00 00000 00001 005D
@@ -1347,9 +1361,10 @@ p 01 00000 00001 00DE
 # -----------------------------------------------------
 #
 # Write clock count=2 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: a prefix takes 2 cycles
 p 00 00000 00001 00DE
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01C
+p 01 00000 00001 E002
 #
 # Strobe BIU - Set clock counter
 p 00 00000 00001 00DF
@@ -2313,9 +2328,10 @@ p 01 00000 00001 1002
 p 01 00000 00001 02A2
 #
 # Unconditional Jump over next opcode fetch
+# pc10-iii: via the patch at 0x1000 (SYNC to cycle 2)
 p 00 00000 00001 02A4
 p 01 00000 00001 1000
-p 01 00000 00001 02A9
+p 01 00000 00001 1000
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode 
 p 00 00000 00001 02A5
@@ -2605,9 +2621,10 @@ p 01 00000 00001 1002
 p 01 00000 00001 02E2
 #
 # Unconditional Jump over next opcode fetch
+# pc10-iii: via the patch at 0x1002 (SYNC to cycle 2)
 p 00 00000 00001 02E4
 p 01 00000 00001 1000
-p 01 00000 00001 02E9
+p 01 00000 00001 1002
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode
 p 00 00000 00001 02E5
@@ -2635,9 +2652,10 @@ p 01 00000 00001 2CF4
 p 01 00000 00001 0000
 #
 # Swap bytes of r3
+# pc10-iii: done in the patch at 0x1004 (SYNC 1 cycle, then the swap)
 p 00 00000 00001 02EA
-p 01 00000 00001 3CCF
-p 01 00000 00001 0000
+p 01 00000 00001 1000
+p 01 00000 00001 1004
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode 
 p 00 00000 00001 02EB
@@ -2912,9 +2930,10 @@ p 01 00000 00001 0000
 #
 #
 # Common code to write clock count=4 to the BIU Dataout register  
+# pc10-iii: cycle mode, absolute: MOV r8/r16,imm read the next opcode in cycle 4
 p 00 00000 00001 031C
 p 01 00000 00001 5FFF
-p 01 00000 00001 C027
+p 01 00000 00001 E004
 #
 # Jump unconditional to Multibyte ending
 p 00 00000 00001 031D
@@ -3941,9 +3960,11 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 0000
 #
 # Write clock count=15 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute (not yet exact: the operand reads and the
+# flush still need their own sync points)
 p 00 00000 00001 03CF
 p 01 00000 00001 5FFF
-p 01 00000 00001 C0FA
+p 01 00000 00001 E00F
 #
 # Jump unconditional to Multibyte Ending except dont assert the QS as it has already been done.
 p 00 00000 00001 03D0
@@ -4100,10 +4121,12 @@ p 00 00000 00001 03F3
 p 01 00000 00001 4DDF
 p 01 00000 00001 CFFF
 #
-# Isolate System Signals clock counter zero bit into Dummy
+# pc10-iii: WAIT_CLOCKS no longer waits; it loads the counter and returns.
+# The main loop waits for zero right before the next dispatch.
+# Jump unconditional to calling address
 p 00 00000 00001 03F4
-p 01 00000 00001 4EEF
-p 01 00000 00001 1000
+p 01 00000 00001 1030
+p 01 00000 00001 0000
 #
 # Jump to retest if last ALU is zero
 p 00 00000 00001 03F5
@@ -8354,9 +8377,10 @@ p 01 00000 00001 3FFF
 #
 # Fetch the addressing byte from the prefetch queue.
 # Call procedure to fetch next byte from prefetch queue into r3
+# pc10-iii: through the ModR/M entry at 0x1018 (read in cycle 1)
 p 00 00000 00001 0764
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1018
 #
 # Save a copy of the addressing byte in r1 = r3  since r3 is reused frequently.
 p 00 00000 00001 0765
@@ -10413,9 +10437,10 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 0940
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # AX <= AX OR r3
 p 00 00000 00001 0941
@@ -10433,9 +10458,11 @@ p 01 00000 00001 488F
 p 01 00000 00001 F7FE
 #
 # Write to clock counter to equal 4 clocks for this instruction
+# pc10-iii: cycle mode, absolute: the ALU AL/AX,imm forms read the next opcode
+# in cycle 4
 p 00 00000 00001 0944
 p 01 00000 00001 5FFF
-p 01 00000 00001 C020
+p 01 00000 00001 E004
 #
 # CALL WAIT_CLOCKS
 p 00 00000 00001 0945
@@ -10455,9 +10482,10 @@ p 01 00000 00001 093B
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 0947
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # AX <= AX OR r3
 p 00 00000 00001 0948
@@ -10647,9 +10675,10 @@ p 01 00000 00001 0938
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 0968
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # AX <= AX XOR r3
 p 00 00000 00001 0969
@@ -10670,9 +10699,10 @@ p 01 00000 00001 0942
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 096B
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # AX <= AX XOR r3
 p 00 00000 00001 096C
@@ -10859,9 +10889,10 @@ p 01 00000 00001 0938
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 098B
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # AX <= AX AND r3
 p 00 00000 00001 098C
@@ -11163,9 +11194,10 @@ p 01 00000 00001 093A
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 09BE
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # r0 <= AX + r3
 p 00 00000 00001 09BF
@@ -11191,9 +11223,10 @@ p 01 00000 00001 09EE
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 09C2
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # AX <= AX + r3
 p 00 00000 00001 09C3
@@ -11434,9 +11467,10 @@ p 01 00000 00001 093A
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 09EA
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # r0 = AX
 p 00 00000 00001 09EB
@@ -11481,9 +11515,10 @@ p 01 00000 00001 0944
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 09F4
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # r0 = AX
 p 00 00000 00001 09F5
@@ -11518,9 +11553,10 @@ p 01 00000 00001 0944
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 09FD
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # r3 <= r3 or FF00 - Fill the upper byte with 1's so the following AND will have no affect
 p 00 00000 00001 09FE
@@ -11813,9 +11849,10 @@ p 01 00000 00001 093A
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 0A38
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # r0 = AX
 p 00 00000 00001 0A39
@@ -11860,9 +11897,10 @@ p 01 00000 00001 0944
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 0A40
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # r0 = AX
 p 00 00000 00001 0A41
@@ -12173,9 +12211,10 @@ p 01 00000 00001 093B
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 0A78
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # r0 = AX
 p 00 00000 00001 0A79
@@ -12206,9 +12245,10 @@ p 01 00000 00001 0944
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 0A7D
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # r0 = AX
 p 00 00000 00001 0A7E
@@ -12404,9 +12444,10 @@ p 01 00000 00001 093A
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 0AA0
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # r0 = AX
 p 00 00000 00001 0AA1
@@ -12452,9 +12493,10 @@ p 01 00000 00001 0944
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 0AA8
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # r0 = AX
 p 00 00000 00001 0AA9
@@ -15541,9 +15583,10 @@ p 01 00000 00001 093A
 # -----------------------------------------------------
 #
 # CALL Fetch byte from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1020 (arms the end)
 p 00 00000 00001 0D02
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # NOP
 p 00 00000 00001 0D03
@@ -15568,9 +15611,10 @@ p 01 00000 00001 0942
 # -----------------------------------------------------
 #
 # CALL Fetch word from prefetch queue with QS=Initial opcode byte into r3
+# pc10-iii: through the fetch wrapper at 0x1026 (arms the end)
 p 00 00000 00001 0D06
 p 01 00000 00001 1100
-p 01 00000 00001 02E0
+p 01 00000 00001 1026
 #
 # Dummy <= AX AND r3
 p 00 00000 00001 0D07
@@ -20007,7 +20051,196 @@ d 1000
 x
 #
 
-
-
-
-
+#
+# ====================================================================
+# pc10-iii patch area (0x1000-0x1FFF, the upper half of the 8K ROM)
+# ====================================================================
+#
+# SYNC = type 0 with a non-zero immediate (see eu.v): 0x0000nnnn waits until
+# cycle n of the instruction (0 = the cycle of the opcode read), 0x00008nnn
+# waits n cycles from the moment the SYNC starts. A routine is retimed by
+# jumping from one of its words to a patch here that does the SYNC, the
+# replaced word, and jumps back.
+#
+# --------------------------------------------------------------------
+# Fetch byte procedure (0x02A0 entry, right after the opcode): the 8088 reads
+# the operand in cycle 2. From 0x02A4.
+#
+# SYNC to cycle 2
+p 00 00000 00001 1000
+p 01 00000 00001 0000
+p 01 00000 00001 0002
+#
+# Jump unconditional to the peek at 0x02A9
+p 00 00000 00001 1001
+p 01 00000 00001 1000
+p 01 00000 00001 02A9
+#
+# --------------------------------------------------------------------
+# Fetch word procedure (0x02E0 entry, right after the opcode): the low byte
+# is read in cycle 2. From 0x02E4.
+#
+# SYNC to cycle 2
+p 00 00000 00001 1002
+p 01 00000 00001 0000
+p 01 00000 00001 0002
+#
+# Jump unconditional to the peek at 0x02E9
+p 00 00000 00001 1003
+p 01 00000 00001 1000
+p 01 00000 00001 02E9
+#
+# --------------------------------------------------------------------
+# Fetch word procedure, both entries: the high byte is read one cycle after
+# the low byte. From 0x02EA, before the queue-empty wait, so that a byte that
+# arrives late is not delayed again.
+#
+# SYNC 1 cycle from now
+p 00 00000 00001 1004
+p 01 00000 00001 0000
+p 01 00000 00001 8001
+#
+# Swap bytes of r3 (the word replaced at 0x02EA)
+p 00 00000 00001 1005
+p 01 00000 00001 3CCF
+p 01 00000 00001 0000
+#
+# Jump unconditional back to 0x02EB
+p 00 00000 00001 1006
+p 01 00000 00001 1000
+p 01 00000 00001 02EB
+#
+# --------------------------------------------------------------------
+# Main loop interrupt polls (from 0x0007, when NMI, INTR or single step is
+# set): the three polls of the original main loop, then back to the wait for
+# the end of the instruction.
+#
+# Isolate System Signals[3] - nmi_caught
+p 00 00000 00001 1010
+p 01 00000 00001 4CEF
+p 01 00000 00001 0008
+#
+# Jump to NMI Processing Routine if last ALU is non zero
+p 00 00000 00001 1011
+p 01 00000 00001 1001
+p 01 00000 00001 053A
+#
+# Isolate System Signals[1] - intr_asserted
+p 00 00000 00001 1012
+p 01 00000 00001 4CEF
+p 01 00000 00001 0002
+#
+# Jump to Interrupt vector fetch Processing Routine if last ALU is non zero
+p 00 00000 00001 1013
+p 01 00000 00001 1001
+p 01 00000 00001 0562
+#
+# Isolate System Signals[8] - eu_tf_pending
+p 00 00000 00001 1014
+p 01 00000 00001 4CEF
+p 01 00000 00001 0100
+#
+# Jump to Single Step Processing Routine if last ALU is non zero
+p 00 00000 00001 1015
+p 01 00000 00001 1001
+p 01 00000 00001 0545
+#
+# Jump unconditional back to the main loop's wait for the end
+p 00 00000 00001 1016
+p 01 00000 00001 1000
+p 01 00000 00001 0008
+#
+# --------------------------------------------------------------------
+# ModR/M entry of the fetch byte procedure (CALL from CALC_EA at 0x0764):
+# the 8088 reads a ModR/M byte in cycle 1, an immediate operand in cycle 2
+# (0x02A0 entry, patch at 0x1000). Same as 0x02A0-0x02A3, then SYNC to cycle
+# 1, then the peek at 0x02A9 and its return.
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1018
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1019
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 101A
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 101B
+p 01 00000 00001 1002
+p 01 00000 00001 101A
+#
+# SYNC to cycle 1
+p 00 00000 00001 101C
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# Jump unconditional to the peek at 0x02A9
+p 00 00000 00001 101D
+p 01 00000 00001 1000
+p 01 00000 00001 02A9
+#
+# --------------------------------------------------------------------
+# Fetch wrappers that arm the end of the instruction after its last operand
+# read (CALL instead of the fetch procedure; the ALU AL/AX,imm routines). The
+# 8088 reads the next opcode 2 cycles after an immediate byte, 1 cycle after
+# the high byte of an immediate word, also when the operand came late from an
+# empty queue. The end counter is relative and loaded right after the read;
+# the BIU then reads the next opcode at that cycle (see biu88.v), however
+# long the EU still needs for the ALU and the flags.
+#
+# Wrapper byte: CALL Fetch byte (0x02A0 entry)
+p 00 00000 00001 1020
+p 01 00000 00001 1100
+p 01 00000 00001 02A0
+#
+# BIU dataout = end in 2 cycles (cycle mode, relative)
+p 00 00000 00001 1021
+p 01 00000 00001 5FFF
+p 01 00000 00001 F002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1022
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1023
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1024
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Wrapper word: CALL Fetch word (0x02E0 entry)
+p 00 00000 00001 1026
+p 01 00000 00001 1100
+p 01 00000 00001 02E0
+#
+# BIU dataout = end in 1 cycle (cycle mode, relative)
+p 00 00000 00001 1027
+p 01 00000 00001 5FFF
+p 01 00000 00001 F001
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1028
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1029
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 102A
+p 01 00000 00001 1030
+p 01 00000 00001 0000
