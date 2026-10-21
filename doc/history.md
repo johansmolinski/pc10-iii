@@ -573,3 +573,25 @@ gating) are each caught.
 Found while wiring: `xt_board.sv` drives `isa_tc` active low (the 8237's
 EOP_n) and gives DMA memory-to-I/O cycles the card's own `isa_din` on
 `isa_dout` instead of the memory data (doc/fdc.md section 6).
+
+## 2026-10-21 - String instructions, ESC, MOV sreg (runs q, r)
+
+- **String instructions** (tools/gen_strings.py, 0x1720-0x18D7): per op a
+  START routine (release of the first transfer: non-REP 3 cycles after the
+  opcode read, CMPS 4, SCAS 5; first REP iteration 10, CMPS 11, SCAS 12;
+  later iterations n after the previous iteration's last transfer: STOS/MOVS
+  5, LODS 7, CMPS 8, SCAS 9), MID (MOVS write 1 after the read, 2 with a
+  segment prefix and no REP; CMPS second read 2 after the first), END (SYNC
+  to n after the last transfer, then the end: non-REP 3 (CMPS/SCAS 4), CX
+  exhausted 4/6, CMPS/SCAS Z condition 5). Iterations after the first carry
+  flag bit 1 (cleared at 0x0004); the harness skips their re-dispatch.
+  The MartyPC single-test tracer (tools/martypc/sst_trace.sh) showed the
+  non-REP request comes 3 cycles after the opcode read, not 4: with an empty
+  queue it aborts a prefetch whose address cycle has begun.
+  All ten (A4-A7, AA-AF) are 100% trace-exact.
+- **ESC (D8-DF)** through the MOV r16,r/m16 wrapper: 100%.
+- **MOV r/m16,sreg (8C)** through the MOV r/m,r wrapper, write released 2
+  after the 8088's read point (89 has 4): 71%. **MOV sreg,r/m16 (8E)**: the
+  memory forms end one cycle late in ~75% (open).
+- Run q: trace 2,338,519 (77.8%); run r: 2,419,649 (80.5%), length
+  2,424,870, state 2,942,050 (97.8%). No file worse.

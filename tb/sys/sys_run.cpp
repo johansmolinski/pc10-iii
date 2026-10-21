@@ -14,6 +14,7 @@
 static const double CLK_HZ = 100227272.7;
 
 int main(int argc, char **argv) {
+    setvbuf(stdout, nullptr, _IOLBF, 0);
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
     double itrace_from = 0.0;
     double secs = 1.0;
