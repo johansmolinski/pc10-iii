@@ -13047,9 +13047,10 @@ p 01 00000 00001 0AE3
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0AF7
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 19E8
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0AF8
@@ -13268,9 +13269,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B10
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B1F
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -13281,14 +13283,16 @@ p 01 00000 00001 090D
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B20
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B21
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0B22
@@ -13296,9 +13300,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B23
 p 01 00000 00001 1002
-p 01 00000 00001 090D
+p 01 00000 00001 1698
 #
 # CALL ROL8,1
 p 00 00000 00001 0B24
@@ -13414,9 +13419,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B30
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B3E
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -13427,14 +13433,16 @@ p 01 00000 00001 090D
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B3F
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B40
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0B41
@@ -13442,9 +13450,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B42
 p 01 00000 00001 1002
-p 01 00000 00001 090D
+p 01 00000 00001 1698
 #
 # CALL ROR8,1
 p 00 00000 00001 0B43
@@ -13552,9 +13561,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B50
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B5C
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -13565,14 +13575,16 @@ p 01 00000 00001 090D
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B5D
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B5E
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0B5F
@@ -13580,9 +13592,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B60
 p 01 00000 00001 1002
-p 01 00000 00001 090D
+p 01 00000 00001 1698
 #
 # CALL RCL8,1
 p 00 00000 00001 0B61
@@ -13709,9 +13722,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B6A
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7A
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -13722,14 +13736,16 @@ p 01 00000 00001 090D
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7B
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7C
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0B7D
@@ -13737,9 +13753,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7E
 p 01 00000 00001 1002
-p 01 00000 00001 090D
+p 01 00000 00001 1698
 #
 # CALL RCR8,1
 p 00 00000 00001 0B7F
@@ -13852,9 +13869,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B88
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B95
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -13865,14 +13883,16 @@ p 01 00000 00001 090D
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B96
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B97
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r1 <= CX AND 00FF - Isolate the iteration counter into r1
 p 00 00000 00001 0B98
@@ -13880,9 +13900,10 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B99
 p 01 00000 00001 1002
-p 01 00000 00001 090D
+p 01 00000 00001 1698
 #
 # CALL SAL8,1
 p 00 00000 00001 0B9A
@@ -14017,9 +14038,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0BA4
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB5
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -14030,14 +14052,16 @@ p 01 00000 00001 090D
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB6
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB7
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r1 <= CX AND 00FF - Isolate the iteration counter into r1
 p 00 00000 00001 0BB8
@@ -14045,9 +14069,10 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB9
 p 01 00000 00001 1002
-p 01 00000 00001 090D
+p 01 00000 00001 1698
 #
 # CALL SHR8,1
 p 00 00000 00001 0BBA
@@ -14179,9 +14204,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0BC4
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BD8
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -14192,14 +14218,16 @@ p 01 00000 00001 090D
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BD9
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BDA
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r1 <= CX AND 00FF - Isolate the iteration counter into r1
 p 00 00000 00001 0BDB
@@ -14207,9 +14235,10 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BDC
 p 01 00000 00001 1002
-p 01 00000 00001 090D
+p 01 00000 00001 1698
 #
 # CALL SAR8,1
 p 00 00000 00001 0BDD
@@ -14254,9 +14283,10 @@ p 01 00000 00001 0BDC
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BE6
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1088
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0BE7
@@ -14474,9 +14504,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C00
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C0D
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -14487,14 +14518,16 @@ p 01 00000 00001 091C
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C0E
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C0F
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0C10
@@ -14502,9 +14535,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C11
 p 01 00000 00001 1002
-p 01 00000 00001 091C
+p 01 00000 00001 16A8
 #
 # CALL ROL16,1
 p 00 00000 00001 0C12
@@ -14545,9 +14579,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0F46
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C19
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -14558,14 +14593,16 @@ p 01 00000 00001 091C
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C1A
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C1B
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0C1C
@@ -14573,9 +14610,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C1D
 p 01 00000 00001 1002
-p 01 00000 00001 091C
+p 01 00000 00001 16A8
 #
 # CALL ROR16,1
 p 00 00000 00001 0C1E
@@ -14678,9 +14716,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C27
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C33
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -14691,14 +14730,16 @@ p 01 00000 00001 091C
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C34
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C35
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0C36
@@ -14706,9 +14747,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C37
 p 01 00000 00001 1002
-p 01 00000 00001 091C
+p 01 00000 00001 16A8
 #
 # CALL RCL16,1
 p 00 00000 00001 0C38
@@ -14830,9 +14872,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C40
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C50
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -14843,14 +14886,16 @@ p 01 00000 00001 091C
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C51
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C52
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r3 <= CX AND 00FF - Isolate the iteration counter into r3
 p 00 00000 00001 0C53
@@ -14858,9 +14903,10 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C54
 p 01 00000 00001 1002
-p 01 00000 00001 091C
+p 01 00000 00001 16A8
 #
 # CALL RCR16,1
 p 00 00000 00001 0C55
@@ -14968,9 +15014,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C60
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C6D
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -14981,14 +15028,16 @@ p 01 00000 00001 091C
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C6E
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C6F
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r1 <= CX AND 00FF - Isolate the iteration counter into r1
 p 00 00000 00001 0C70
@@ -14996,9 +15045,10 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C71
 p 01 00000 00001 1002
-p 01 00000 00001 091C
+p 01 00000 00001 16A8
 #
 # CALL SAL16,1
 p 00 00000 00001 0C72
@@ -15140,9 +15190,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C7B
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C8E
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -15153,14 +15204,16 @@ p 01 00000 00001 091C
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C8F
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C90
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r1 <= CX AND 00FF - Isolate the iteration counter into r1
 p 00 00000 00001 0C91
@@ -15168,9 +15221,10 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C92
 p 01 00000 00001 1002
-p 01 00000 00001 091C
+p 01 00000 00001 16A8
 #
 # CALL SHR16,1
 p 00 00000 00001 0C93
@@ -15297,9 +15351,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C9A
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAB
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -15310,14 +15365,16 @@ p 01 00000 00001 091C
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAC
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAD
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # r1 <= CX AND 00FF - Isolate the iteration counter into r1
 p 00 00000 00001 0CAE
@@ -15325,9 +15382,10 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
+# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAF
 p 01 00000 00001 1002
-p 01 00000 00001 091C
+p 01 00000 00001 16A8
 #
 # CALL SAR16,1
 p 00 00000 00001 0CB0
@@ -15451,7 +15509,6 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 CC0F
 #
 # CALL FETCH_EA_WORD into r0
-# pc10-iii: LES second word: release 4 after the first, end at its end (0x1900)
 p 00 00000 00001 0CCD
 p 01 00000 00001 1100
 p 01 00000 00001 1900
@@ -15529,7 +15586,6 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 CC0F
 #
 # CALL FETCH_EA_WORD into r0
-# pc10-iii: LDS second word: release 4 after the first, end at its end (0x1900)
 p 00 00000 00001 0CDD
 p 01 00000 00001 1100
 p 01 00000 00001 1900
@@ -15732,7 +15788,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0762
 #
 # Copy biu_register_rm value to r0
-# pc10-iii: LEA end (0x18F8: r2 + 2 after the last queue read, r2 = the EA release)
 p 00 00000 00001 0CFE
 p 01 00000 00001 1100
 p 01 00000 00001 18F8
@@ -15906,7 +15961,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 07D4
 #
 # CALL WRITEBACK_EA_BYTE
-# pc10-iii: XCHG r/m8 writeback (0x1908: memory write 6 after the read, end at the write)
 p 00 00000 00001 0D1C
 p 01 00000 00001 1100
 p 01 00000 00001 1908
@@ -15950,7 +16004,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 07D4
 #
 # CALL WRITEBACK_EA_WORD
-# pc10-iii: XCHG r/m16 writeback (0x1918)
 p 00 00000 00001 0D23
 p 01 00000 00001 1100
 p 01 00000 00001 1918
@@ -16130,13 +16183,11 @@ p 01 00000 00001 0D2F
 # -----------------------------------------------------
 #
 # Write 5 clocks to clock counter
-# pc10-iii: POP r/m: no legacy wait (was 5 clocks)
 p 00 00000 00001 0D44
 p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: (was CALL WAIT_CLOCKS)
 p 00 00000 00001 0D45
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -16147,7 +16198,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0762
 #
 # CALL POP Procedure
-# pc10-iii: POP r/m stack read released r2 + 3 (0x1928)
 p 00 00000 00001 0D47
 p 01 00000 00001 1100
 p 01 00000 00001 1928
@@ -16163,7 +16213,6 @@ p 01 00000 00001 5DDF
 p 01 00000 00001 0C00
 #
 # Jump unconditional to common code to writeback_ea
-# pc10-iii: POP r/m writeback (0x1930: write 3 after the stack read, end at the write)
 p 00 00000 00001 0D4A
 p 01 00000 00001 1000
 p 01 00000 00001 1930
@@ -16547,13 +16596,11 @@ p 01 00000 00001 1000
 p 01 00000 00001 0DA6
 #
 # CALL REG16/MEM16 (intrasegment)
-# pc10-iii: CALL r/m near rewritten at 0x1958 (flush first, then the push)
 p 00 00000 00001 0D9A
 p 01 00000 00001 1000
 p 01 00000 00001 1958
 #
 # CALL REG16/MEM16 (intersegment)
-# pc10-iii: CALL FAR m rewritten at 0x19B0 (read, SUSP, push CS, flush, push IP)
 p 00 00000 00001 0D9B
 p 01 00000 00001 1000
 p 01 00000 00001 19B0
@@ -16749,7 +16796,6 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 C003
 #
 # CALL FETCH_EA_WORD into r0 - Fetch the CS
-# pc10-iii: JMP FAR m: SUSP, the segment read and the jump inline at 0x1990
 p 00 00000 00001 0DC7
 p 01 00000 00001 1000
 p 01 00000 00001 1990
@@ -16806,7 +16852,6 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 C003
 #
 # Jump unconditional to main microcode loop
-# pc10-iii: end at the first new byte (0x12B0)
 p 00 00000 00001 0DD2
 p 01 00000 00001 1000
 p 01 00000 00001 12B0
@@ -16850,7 +16895,6 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 C003
 #
 # r3 <= r1
-# pc10-iii: JMP r/m near timing (0x1940: SUSP, flush 1 after it)
 p 00 00000 00001 0DDE
 p 01 00000 00001 1100
 p 01 00000 00001 1940
@@ -16876,7 +16920,6 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 4003
 #
 # Jump unconditional to main microcode loop
-# pc10-iii: end at the first new byte (0x12B0)
 p 00 00000 00001 0DE3
 p 01 00000 00001 1000
 p 01 00000 00001 12B0
@@ -16888,13 +16931,11 @@ p 01 00000 00001 12B0
 # -----------------------------------------------------
 #
 # Write clock count=3 to the BIU Dataout register
-# pc10-iii: PUSH r/m release (0x1978; register 4 after the ModR/M byte, memory 5 after the read; PUSH SP pushes SP-2)
 p 00 00000 00001 0DE6
 p 01 00000 00001 1100
 p 01 00000 00001 1978
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: (was CALL WAIT_CLOCKS)
 p 00 00000 00001 0DE7
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -26766,12 +26807,6 @@ p 00 00000 00001 18E9
 p 01 00000 00001 1000
 p 01 00000 00001 091D
 #
-# --------------------------------------------------------------------
-# pc10-iii, 2026-10-21: LEA (0x18F8), LES/LDS (0x1900), XCHG (0x1908/0x1918),
-# POP r/m (0x1928/0x1930), JMP r/m (0x1940), CALL r/m (0x1958), PUSH r/m
-# (0x1978), JMP FAR m (0x1990), CALL FAR m (0x19B0). Schedules from the
-# suite and MartyPC's single-test traces (tools/martypc/sst_trace.sh).
-#
 p 00 00000 00001 18F8
 p 01 00000 00001 2FBF
 p 01 00000 00001 A002
@@ -27463,3 +27498,95 @@ p 01 00000 00001 0400
 p 00 00000 00001 19DC
 p 01 00000 00001 1000
 p 01 00000 00001 0004
+#
+# --------------------------------------------------------------------
+# pc10-iii: shifts and rotates. By 1 (D0/D1): register end 1 after the ModR/M
+# byte (byte wrapper 0x19E8, word 0x1088), memory through the NOT/NEG
+# writebacks (write 4 after the read). By CL (D2/D3): 0x19F0 arms, at the
+# start of each routine, the register end 7 + 4*CL after the ModR/M byte or
+# the memory write release 9 + 4*CL after the read (end at the write); the
+# routines then leave through the plain writebacks (0x1698/0x16A8).
+#
+p 00 00000 00001 19E8
+p 01 00000 00001 5BFF
+p 01 00000 00001 A001
+#
+p 00 00000 00001 19E9
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+p 00 00000 00001 19EA
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+p 00 00000 00001 19EB
+p 01 00000 00001 1100
+p 01 00000 00001 1060
+#
+p 00 00000 00001 19EC
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+p 00 00000 00001 19F0
+p 01 00000 00001 4C2F
+p 01 00000 00001 00FF
+#
+p 00 00000 00001 19F1
+p 01 00000 00001 2CCC
+p 01 00000 00001 0000
+#
+p 00 00000 00001 19F2
+p 01 00000 00001 2CCC
+p 01 00000 00001 0000
+#
+p 00 00000 00001 19F3
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+p 00 00000 00001 19F4
+p 01 00000 00001 1001
+p 01 00000 00001 19FC
+#
+p 00 00000 00001 19F5
+p 01 00000 00001 2FCF
+p 01 00000 00001 2009
+#
+p 00 00000 00001 19F6
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 19F7
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 19F8
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+p 00 00000 00001 19F9
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+p 00 00000 00001 19FA
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+p 00 00000 00001 19FB
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+p 00 00000 00001 19FC
+p 01 00000 00001 2FCF
+p 01 00000 00001 A007
+#
+p 00 00000 00001 19FD
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+p 00 00000 00001 19FE
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+p 00 00000 00001 19FF
+p 01 00000 00001 1030
+p 01 00000 00001 0000

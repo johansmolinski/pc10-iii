@@ -619,3 +619,21 @@ request, SUSP and FLUSH):
   the read; PUSH SP through FF F4 pushes SP - 2 (state fix).
 - Run s: trace 2,534,445 (84.3%), state 2,942,637. No file worse. 8D, C4,
   C5, 86, 87, 8F and FF.0-FF.7 are 100%.
+
+## 2026-10-21 - Shifts and rotates (run t)
+
+- **By 1 (D0/D1):** register end 1 after the ModR/M byte (wrappers 0x19E8
+  byte, 0x1088 word), memory through the NOT/NEG writebacks (write released
+  4 after the read, end at the write).
+- **By CL (D2/D3):** the suite shows register end = ModR/M + 7 + 4*CL and
+  memory write = read + 15 + 4*CL (CL is not masked on the 8088). 0x19F0 arms
+  either at the start of every CL routine (A007 + 4*CL, or release
+  2009 + 4*CL with the end at the write); the routines leave through the plain
+  writebacks so the ALU writeback's release does not override it.
+- Run t: trace 2,742,721 (91.2%), length 2,764,984. No file worse. All of
+  D0-D3 except the undocumented SETMO/SETMOC (D0.6/D1.6/D2.6/D3.6) are 100%.
+
+System: the 8237 got the hold acknowledge while the CPU was still inside a
+bus cycle (the status pins go passive in T3), which broke GLaBIOS's PIC and
+RAM tests; AEN and the 8237's HLDA now come only at the CPU's T4 or an idle
+bus (b292ea6).
