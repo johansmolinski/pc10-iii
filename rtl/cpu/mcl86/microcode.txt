@@ -2478,14 +2478,16 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C492
 #
 # Dummy = AX OR 0x0000 to populate last_alu for flags processing
+# pc10-iii: flags from AL (All_Flags_BYTE), as the 8088
 p 00 00000 00001 02BF
-p 01 00000 00001 5E0F
-p 01 00000 00001 0000
+p 01 00000 00001 4E0F
+p 01 00000 00001 00FF
 #
 # Call All_Flags_WORD
+# pc10-iii: flags from AL (All_Flags_BYTE), as the 8088
 p 00 00000 00001 02C0
 p 01 00000 00001 1100
-p 01 00000 00001 03D3
+p 01 00000 00001 0990
 #
 # Jump unconditional to Multibyte ending
 p 00 00000 00001 02C1
@@ -2510,9 +2512,10 @@ p 01 00000 00001 59F4
 p 01 00000 00001 0000
 #
 # Isolate AL into r1
+# pc10-iii: through 0x1AE8 (a zero immediate is a divide error)
 p 00 00000 00001 02C9
-p 01 00000 00001 4A0F
-p 01 00000 00001 00FF
+p 01 00000 00001 1000
+p 01 00000 00001 1AE8
 #
 # Zero out r2
 p 00 00000 00001 02CA
@@ -2581,14 +2584,16 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 C675
 #
 # Dummy = AX OR 0x0000 to populate last_alu for flags processing
+# pc10-iii: flags from AL (All_Flags_BYTE), as the 8088
 p 00 00000 00001 02D7
-p 01 00000 00001 5E0F
-p 01 00000 00001 0000
+p 01 00000 00001 4E0F
+p 01 00000 00001 00FF
 #
 # Call All_Flags_WORD
+# pc10-iii: flags from AL (All_Flags_BYTE), as the 8088
 p 00 00000 00001 02D8
 p 01 00000 00001 1100
-p 01 00000 00001 03D3
+p 01 00000 00001 0990
 #
 # Jump unconditional to Multibyte ending
 p 00 00000 00001 02D9
@@ -13146,9 +13151,10 @@ p 01 00000 00001 1000
 p 01 00000 00001 0BB4
 #
 # SHR REG8/MEM8,1 - unused
+# pc10-iii: /6 = SETMO(C) at 0x1AC0
 p 00 00000 00001 0B06
 p 01 00000 00001 1000
-p 01 00000 00001 0BB4
+p 01 00000 00001 1AC0
 #
 # SAR REG8/MEM8,1
 p 00 00000 00001 0B07
@@ -13189,9 +13195,10 @@ p 01 00000 00001 1000
 p 01 00000 00001 0BB6
 #
 # SHR REG8/MEM8,CL - unused
+# pc10-iii: /6 = SETMO(C) at 0x1AC8
 p 00 00000 00001 0B0E
 p 01 00000 00001 1000
-p 01 00000 00001 0BB6
+p 01 00000 00001 1AC8
 #
 # SAR REG8/MEM8,CL
 p 00 00000 00001 0B0F
@@ -14353,9 +14360,10 @@ p 01 00000 00001 1000
 p 01 00000 00001 0C8D
 #
 # SHR REG16/MEM16,1 - unused
+# pc10-iii: /6 = SETMO(C) at 0x1AD0
 p 00 00000 00001 0BF6
 p 01 00000 00001 1000
-p 01 00000 00001 0C8D
+p 01 00000 00001 1AD0
 #
 # SAR REG16/MEM16,1
 p 00 00000 00001 0BF7
@@ -14396,9 +14404,10 @@ p 01 00000 00001 1000
 p 01 00000 00001 0C8F
 #
 # SHR REG16/MEM16,CL - unused
+# pc10-iii: /6 = SETMO(C) at 0x1AD8
 p 00 00000 00001 0BFE
 p 01 00000 00001 1000
-p 01 00000 00001 0C8F
+p 01 00000 00001 1AD8
 #
 # SAR REG16/MEM16,CL
 p 00 00000 00001 0BFF
@@ -15406,9 +15415,10 @@ p 01 00000 00001 4E8F
 p 01 00000 00001 0001
 #
 # Jump if zero over next instruction
+# pc10-iii: CF clear ends at cycle 3 (0x1AB0)
 p 00 00000 00001 0CC0
 p 01 00000 00001 1002
-p 01 00000 00001 0CC2
+p 01 00000 00001 1AB0
 #
 # Set AL to FF
 # pc10-iii: SALC with CF set ends a cycle later (0x1A98)
@@ -17225,9 +17235,10 @@ p 01 00000 00001 1690
 # -----------------------------------------------------
 #
 # r1 = r0
+# pc10-iii: NEG r/m8 at 0x1AF0
 p 00 00000 00001 0E28
-p 01 00000 00001 5A9F
-p 01 00000 00001 0000
+p 01 00000 00001 1000
+p 01 00000 00001 1AF0
 #
 # r0 = 0x0000
 p 00 00000 00001 0E29
@@ -28065,3 +28076,222 @@ p 01 00000 00001 4003
 p 00 00000 00001 1AA9
 p 01 00000 00001 1000
 p 01 00000 00001 12A9
+#
+# pc10-iii: SALC with CF clear also spends a cycle before its end; the
+# next opcode is read at cycle 3 (CF set: 4, 0x1A98).
+#
+# SALC, CF clear: end at cycle 3 (MartyPC: microcode 0x0A0, then RNI)
+p 00 00000 00001 1AB0
+p 01 00000 00001 5FFF
+p 01 00000 00001 E003
+#
+# Strobe the end counter (as 0x1A9A)
+p 00 00000 00001 1AB1
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1AB2
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to common code (as 0x0CC2)
+p 00 00000 00001 1AB3
+p 01 00000 00001 1000
+p 01 00000 00001 005C
+#
+# pc10-iii: SETMO / SETMOC, the 8088's undocumented /6 of D0-D3 (MCL86
+# ran SHR there). The result is all ones; CF, AF, OF and ZF are cleared, SF
+# and PF set (MartyPC alu.rs). SETMOC does nothing when CL = 0. Timing as
+# SHR (the same 8088 microcode path).
+#
+# SETMO r/m8,1: r0 = FF
+p 00 00000 00001 1AC0
+p 01 00000 00001 59FF
+p 01 00000 00001 00FF
+#
+# Flags: clear CF, PF, AF, ZF, SF, OF
+p 00 00000 00001 1AC1
+p 01 00000 00001 488F
+p 01 00000 00001 F72A
+#
+# Flags: set SF and PF (the result is FF)
+p 00 00000 00001 1AC2
+p 01 00000 00001 588F
+p 01 00000 00001 0084
+#
+# Jump to the shift-by-1 byte writeback (as SHR r/m8,1)
+p 00 00000 00001 1AC3
+p 01 00000 00001 1000
+p 01 00000 00001 1690
+#
+# SETMOC r/m8,CL: CALL the shift-by-CL timing (as SHR r/m8,CL)
+p 00 00000 00001 1AC8
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
+#
+# NOP (as 0x0BB7)
+p 00 00000 00001 1AC9
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# r1 <= CX AND 00FF - the count
+p 00 00000 00001 1ACA
+p 01 00000 00001 4A2F
+p 01 00000 00001 00FF
+#
+# CL = 0: write back the operand unchanged, flags unchanged
+p 00 00000 00001 1ACB
+p 01 00000 00001 1002
+p 01 00000 00001 1698
+#
+# r0 = FF
+p 00 00000 00001 1ACC
+p 01 00000 00001 59FF
+p 01 00000 00001 00FF
+#
+# Flags: clear CF, PF, AF, ZF, SF, OF
+p 00 00000 00001 1ACD
+p 01 00000 00001 488F
+p 01 00000 00001 F72A
+#
+# Flags: set SF and PF
+p 00 00000 00001 1ACE
+p 01 00000 00001 588F
+p 01 00000 00001 0084
+#
+# Jump to the byte writeback
+p 00 00000 00001 1ACF
+p 01 00000 00001 1000
+p 01 00000 00001 1698
+#
+# SETMO r/m16,1: r0 = FFFF
+p 00 00000 00001 1AD0
+p 01 00000 00001 59FF
+p 01 00000 00001 FFFF
+#
+# Flags: clear CF, PF, AF, ZF, SF, OF
+p 00 00000 00001 1AD1
+p 01 00000 00001 488F
+p 01 00000 00001 F72A
+#
+# Flags: set SF and PF
+p 00 00000 00001 1AD2
+p 01 00000 00001 588F
+p 01 00000 00001 0084
+#
+# Jump to the shift-by-1 word writeback (as SHR r/m16,1)
+p 00 00000 00001 1AD3
+p 01 00000 00001 1000
+p 01 00000 00001 16A0
+#
+# SETMOC r/m16,CL: CALL the shift-by-CL timing (as SHR r/m16,CL)
+p 00 00000 00001 1AD8
+p 01 00000 00001 1100
+p 01 00000 00001 19F0
+#
+# NOP (as 0x0C90)
+p 00 00000 00001 1AD9
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# r1 <= CX AND 00FF - the count
+p 00 00000 00001 1ADA
+p 01 00000 00001 4A2F
+p 01 00000 00001 00FF
+#
+# CL = 0: write back the operand unchanged, flags unchanged
+p 00 00000 00001 1ADB
+p 01 00000 00001 1002
+p 01 00000 00001 16A8
+#
+# r0 = FFFF
+p 00 00000 00001 1ADC
+p 01 00000 00001 59FF
+p 01 00000 00001 FFFF
+#
+# Flags: clear CF, PF, AF, ZF, SF, OF
+p 00 00000 00001 1ADD
+p 01 00000 00001 488F
+p 01 00000 00001 F72A
+#
+# Flags: set SF and PF
+p 00 00000 00001 1ADE
+p 01 00000 00001 588F
+p 01 00000 00001 0084
+#
+# Jump to the word writeback
+p 00 00000 00001 1ADF
+p 01 00000 00001 1000
+p 01 00000 00001 16A8
+#
+# pc10-iii: AAM with a zero immediate is a divide error (INT 0). The
+# 8088 leaves AX alone and sets the flags of a zero result first.
+#
+# AAM: Dummy = r0 (the immediate) OR 0
+p 00 00000 00001 1AE8
+p 01 00000 00001 5E9F
+p 01 00000 00001 0000
+#
+# Jump if zero to the divide error
+p 00 00000 00001 1AE9
+p 01 00000 00001 1002
+p 01 00000 00001 1AEC
+#
+# Isolate AL into r1 (the word replaced at 0x02C9)
+p 00 00000 00001 1AEA
+p 01 00000 00001 4A0F
+p 01 00000 00001 00FF
+#
+# Jump back into AAM
+p 00 00000 00001 1AEB
+p 01 00000 00001 1000
+p 01 00000 00001 02CA
+#
+# AAM 0: clear CF, PF, AF, ZF, SF, OF (AX is unchanged)
+p 00 00000 00001 1AEC
+p 01 00000 00001 488F
+p 01 00000 00001 F72A
+#
+# set ZF and PF (flags of a zero result, MartyPC)
+p 00 00000 00001 1AED
+p 01 00000 00001 588F
+p 01 00000 00001 0044
+#
+# r0 = 0 - Interrupt Type 0 (as 0x0F10)
+p 00 00000 00001 1AEE
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Jump to the interrupt processing (as 0x0F11)
+p 00 00000 00001 1AEF
+p 01 00000 00001 1000
+p 01 00000 00001 055C
+#
+# pc10-iii: NEG r/m8 as (x XOR FF) + 1 with one flag pass. MCL86 ran
+# SUB_BYTE (two additions, flags twice) and the write came a cycle late.
+#
+# NEG r/m8: r0 = r0 XOR 00FF
+p 00 00000 00001 1AF0
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# r0 = r0 + 1 = -x (Carry8/Overflow8/AF of this add)
+p 00 00000 00001 1AF1
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# CALL CALCULATE_FLAGS_BYTE (one pass)
+p 00 00000 00001 1AF2
+p 01 00000 00001 1100
+p 01 00000 00001 0990
+#
+# Invert CF and AF: NEG borrows where ~x + 1 does not carry
+p 00 00000 00001 1AF3
+p 01 00000 00001 688F
+p 01 00000 00001 0011
+#
+# Jump to the NOT/NEG byte writeback
+p 00 00000 00001 1AF4
+p 01 00000 00001 1000
+p 01 00000 00001 1690

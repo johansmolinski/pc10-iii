@@ -690,3 +690,23 @@ bus (b292ea6).
   length, and `SST_UC=1` every microcode address the EU visits.
 - Run w: trace 2,798,156 (93.05%), +7,442 (69, 6B-6F to 100%). No file
   worse.
+
+## 2026-10-22 - SALC, SETMO, AAM/AAD state, NEG r/m8 (run x)
+
+- **SALC** with CF clear also spends a cycle before its end (MartyPC 0x0A0,
+  then RNI): the next opcode at cycle 3 (0x1AB0). D6 100%.
+- **SETMO / SETMOC** (/6 of D0-D3, MCL86 ran SHR there): all ones, CF AF OF
+  ZF cleared, SF PF set; SETMOC does nothing with CL = 0. Timing as SHR
+  (0x1AC0-0x1ADF). All four files 100%.
+- **AAM/AAD:** S, Z and P from AL (All_Flags_BYTE), not from AX. AAM with a
+  zero immediate is a divide error: AX unchanged, flags of a zero result,
+  INT 0 (0x1AE8). States 100%; their timing (the 8088's division loop) is
+  still open.
+- **NEG r/m8:** (x XOR FF) + 1 with one flag pass and CF/AF inverted
+  (0x1AF0); MCL86's SUB_BYTE (two additions, flags twice) made the write a
+  cycle late. F6.3 100%.
+- Run x: state 2,978,782 (99.06%), trace 2,830,340 (94.13%), +32,184. No
+  file worse.
+- Left: MUL/DIV/AAM/AAD timing, ADC/SBB/SUB imm to memory, C6/C7 to memory.
+  All three need EU or BIU changes (a cycle counter, a carry-in add, queue
+  strobes for bytes the BIU has already read that complete in the same clk).
