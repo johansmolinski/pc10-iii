@@ -140,7 +140,7 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-j | + JMP/CALL FAR, loops, one read per cycle, idle start | 96.7% | 65.2% | 1,713,805 (57.0%) |
 | biu88-k | + direct moves, port I/O, XLAT, LAHF, CWD, BCD adjusts | 96.7% | 71.3% | 1,897,857 (63.1%) |
 | biu88-l | + ALU groups 80-83, ModR/M memory ends by class, MOV [m],r | 96.7% | 74.1% | 2,206,857 (73.4%) |
-| biu88-m | + MOV r/m,imm, TEST imm, NOT/NEG, writeback fix | see below | | |
+| biu88-m | + MOV r/m,imm, TEST imm, NOT/NEG, writeback fix | 96.7% | 76.3% | 2,288,302 (76.1%) |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
@@ -455,4 +455,13 @@ l to m:
   - memory write released 4 cycles after the read ended.
   - NEG r/m16 exact. Known: NOT to memory 1 cycle early in ~20%; NEG r/m8
     1 cycle late in ~75% (MCL86's byte SUB is slow).
+
+Run m against l:
+- Gains in C6/C7, F6/F7 and the shift files: the register-form writeback
+  stall is gone.
+- Losses in 83.2/83.5 (ADC/SUB r/m16,imm8 to memory, 5,973 -> 2,534 and
+  4,371 -> 2,458). The writeback's new register test adds microinstructions
+  to a path where MCL86 was already at the limit of the 8088's timing.
+  These belong to the known limit (slow ADC/SBB/SUB microcode) and come back
+  when that microcode is sped up.
 
