@@ -270,8 +270,16 @@ static Result run_test(Sim &sim, const Test &t) {
             unsigned cmd = top->dbg_eu_cmd;
             int jump = ((cmd >> 9) & 1) && (((cmd >> 4) & 0x1F) == 0x19);
 #ifdef BIU88
+            // install the prefetched queue once the loader's JMP FAR has
+            // flushed (preload_at counted down) and the EU waits in its main
+            // loop (0x0006-0x000C): the test then starts from an idle CPU, as
+            // the suite's generator starts it
             top->tb_preload = 0;
-            if (preload_at > 0 && --preload_at == 0) top->tb_preload = 1;
+            if (preload_at > 1) preload_at--;
+            else if (preload_at == 1 && top->dbg_rom_addr >= 0x0006 && top->dbg_rom_addr <= 0x000C) {
+                top->tb_preload = 1;
+                preload_at = 0;
+            }
 #endif
             if (jump && !prev_jump) {
                 if (!test_mode && lptr >= loader.size()) {

@@ -2339,9 +2339,10 @@ p 01 00000 00001 5DDF
 p 01 00000 00001 100C
 #
 # Debounce BIU Strobe
+# pc10-iii: CALL 0x133C (debounce, then at most one queue read per cycle)
 p 00 00000 00001 02A6
-p 01 00000 00001 4DDF
-p 01 00000 00001 CFF3
+p 01 00000 00001 1100
+p 01 00000 00001 133C
 #
 # Isolate the Prefetch Queue EMPTY bit into r3
 p 00 00000 00001 02A7
@@ -2632,9 +2633,10 @@ p 01 00000 00001 5DDF
 p 01 00000 00001 100C
 #
 # Debounce BIU Strobe
+# pc10-iii: CALL 0x1338 (debounce, then at most one queue read per cycle)
 p 00 00000 00001 02E6
-p 01 00000 00001 4DDF
-p 01 00000 00001 CFF3
+p 01 00000 00001 1100
+p 01 00000 00001 1338
 #
 # Isolate the Prefetch Queue EMPTY bit into Dummy
 p 00 00000 00001 02E7
@@ -3720,14 +3722,16 @@ p 01 00000 00001 5E2F
 p 01 00000 00001 0000
 #
 # Jump if last_alu is zero to JUMP_TAKEN8
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03A0
 p 01 00000 00001 1002
-p 01 00000 00001 0343
+p 01 00000 00001 1388
 #
 # Jump unconditional to JUMP_NOT_TAKEN
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03A1
 p 01 00000 00001 1000
-p 01 00000 00001 0340
+p 01 00000 00001 1398
 #
 #
 # -----------------------------------------------------
@@ -3753,14 +3757,16 @@ p 01 00000 00001 222F
 p 01 00000 00001 FFFF
 #
 # Jump if last_alu is non-zero to JUMP_TAKEN8
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03A5
 p 01 00000 00001 1001
-p 01 00000 00001 0343
+p 01 00000 00001 1388
 #
 # Jump unconditional to JUMP_NOT_TAKEN
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03A6
 p 01 00000 00001 1000
-p 01 00000 00001 0340
+p 01 00000 00001 1398
 #
 #
 # -----------------------------------------------------
@@ -3786,9 +3792,10 @@ p 01 00000 00001 222F
 p 01 00000 00001 FFFF
 #
 # Jump if last_alu is zero to JUMP_NOT_TAKEN
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03AB
 p 01 00000 00001 1002
-p 01 00000 00001 0340
+p 01 00000 00001 1398
 #
 # Isolate the Z Flag bit into Dummy
 p 00 00000 00001 03AC
@@ -3796,14 +3803,16 @@ p 01 00000 00001 4E8F
 p 01 00000 00001 0040
 #
 # Jump if last_alu is non-zero to JUMP_TAKEN8
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03AD
 p 01 00000 00001 1001
-p 01 00000 00001 0343
+p 01 00000 00001 13A8
 #
 # Jump unconditional to JUMP_NOT_TAKEN
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03AE
 p 01 00000 00001 1000
-p 01 00000 00001 0340
+p 01 00000 00001 1398
 #
 #
 # -----------------------------------------------------
@@ -3924,9 +3933,10 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 0000
 #
 # NOP
+# pc10-iii: CALL the JMP FAR timing at 0x1340 (was a NOP)
 p 00 00000 00001 03C7
-p 01 00000 00001 0000
-p 01 00000 00001 0000
+p 01 00000 00001 1100
+p 01 00000 00001 1340
 #
 # NOP
 p 00 00000 00001 03C8
@@ -3971,9 +3981,10 @@ p 01 00000 00001 5FFF
 p 01 00000 00001 E00F
 #
 # Jump unconditional to Multibyte Ending except dont assert the QS as it has already been done.
+# pc10-iii: to 0x12B0 (end at the first byte from the new address)
 p 00 00000 00001 03D0
 p 01 00000 00001 1000
-p 01 00000 00001 0352
+p 01 00000 00001 12B0
 #
 #
 # -----------------------------------------------------
@@ -4077,9 +4088,10 @@ p 01 00000 00001 222F
 p 01 00000 00001 FFFF
 #
 # Jump if last_alu is zero to JUMP_NOT_TAKEN
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03E8
 p 01 00000 00001 1002
-p 01 00000 00001 0340
+p 01 00000 00001 1398
 #
 # Isolate the Z Flag bit into Dummy
 p 00 00000 00001 03E9
@@ -4087,9 +4099,10 @@ p 01 00000 00001 4E8F
 p 01 00000 00001 0040
 #
 # Jump if last_alu is non-zero to JUMP_NOT_TAKEN
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03EA
 p 01 00000 00001 1001
-p 01 00000 00001 0340
+p 01 00000 00001 1398
 #
 # Add 2 clocks to clock counter for this Jump type
 p 00 00000 00001 03EB
@@ -4102,9 +4115,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 03F2
 #
 # Jump unconditional to JUMP_TAKEN8
+# pc10-iii: to the loop paths at 0x1388-0x13B2 (displacement in cycle 4)
 p 00 00000 00001 03ED
 p 01 00000 00001 1000
-p 01 00000 00001 0343
+p 01 00000 00001 13A8
 #
 #
 # -----------------------------------------------------
@@ -5081,9 +5095,10 @@ p 01 00000 00001 03B6
 # -----------------------------------------------------
 #
 # Copy the current CS into biu_dataout for the address to push to the stack
+# pc10-iii: CALL FAR is done by the routine at 0x1350; the words below are unused
 p 00 00000 00001 04A6
-p 01 00000 00001 5FF2
-p 01 00000 00001 0000
+p 01 00000 00001 1000
+p 01 00000 00001 1350
 #
 # CALL PUSH Procedure
 p 00 00000 00001 04A7
@@ -21844,3 +21859,506 @@ p 01 00000 00001 0000
 p 00 00000 00001 1333
 p 01 00000 00001 1000
 p 01 00000 00001 12E2
+#
+# --------------------------------------------------------------------
+# One queue read per cycle: the 8088's EU reads at most one byte per cycle.
+# The "subsequent byte/word" entries of the fetch procedures (0x02A5,
+# 0x02E5) wait until the cycle after the last read before they look at
+# the queue (from their debounce words 0x02A6, 0x02E6).
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1338
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# SYNC: 1 cycle after the last queue read
+p 00 00000 00001 1339
+p 01 00000 00001 0000
+p 01 00000 00001 4001
+#
+# Return to calling code
+p 00 00000 00001 133A
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 133C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# SYNC: 1 cycle after the last queue read
+p 00 00000 00001 133D
+p 01 00000 00001 0000
+p 01 00000 00001 4001
+#
+# Return to calling code
+p 00 00000 00001 133E
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# --------------------------------------------------------------------
+# JMP FAR (0xEA, from 0x03C7): MartyPC mc_0e0: SUSP after the operand
+# reads, 2 cycles, flush; the end at the first byte from the new address.
+#
+# SYNC: 1 cycle after the last queue read
+p 00 00000 00001 1340
+p 01 00000 00001 0000
+p 01 00000 00001 4001
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 1341
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 1342
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 1343
+p 01 00000 00001 1002
+p 01 00000 00001 1342
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1344
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 2 cycles from now
+p 00 00000 00001 1345
+p 01 00000 00001 0000
+p 01 00000 00001 8002
+#
+# Return to calling code
+p 00 00000 00001 1346
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# --------------------------------------------------------------------
+# CALL FAR (0x9A, from 0x04A6). MartyPC farcall: the far pointer first, SUSP
+# 1 cycle after its last byte, push CS 3 cycles after the EU resumes, new
+# CS, flush 4 cycles after the push, push IP 3 cycles after the flush; the
+# end in the T3 of the last write. (MCL86 pushed before it read the pointer.)
+#
+# CALL Fetch word (the new IP) into r3
+p 00 00000 00001 1350
+p 01 00000 00001 1100
+p 01 00000 00001 02E0
+#
+# r2 = r3
+p 00 00000 00001 1351
+p 01 00000 00001 5BFC
+p 01 00000 00001 0000
+#
+# CALL Fetch word (the new CS) into r3
+p 00 00000 00001 1352
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+#
+# r1 = r3
+p 00 00000 00001 1353
+p 01 00000 00001 5AFC
+p 01 00000 00001 0000
+#
+# r0 = prefetch_queue_address (the high byte of the new CS)
+p 00 00000 00001 1354
+p 01 00000 00001 29F8
+p 01 00000 00001 0000
+#
+# r0 = r0 + 1 (the return address)
+p 00 00000 00001 1355
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# SYNC: 1 cycle after the last queue read
+p 00 00000 00001 1356
+p 01 00000 00001 0000
+p 01 00000 00001 4001
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 1357
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 1358
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 1359
+p 01 00000 00001 1002
+p 01 00000 00001 1358
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 135A
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 3 cycles from now
+p 00 00000 00001 135B
+p 01 00000 00001 0000
+p 01 00000 00001 8003
+#
+# biu_dataout = CS
+p 00 00000 00001 135C
+p 01 00000 00001 5FF2
+p 01 00000 00001 0000
+#
+# CALL PUSH Procedure (push CS)
+p 00 00000 00001 135D
+p 01 00000 00001 1100
+p 01 00000 00001 0400
+#
+# biu_dataout = r1 (the new CS)
+p 00 00000 00001 135E
+p 01 00000 00001 5FFA
+p 01 00000 00001 0000
+#
+# Strobe BIU - Set new CS Segment
+p 00 00000 00001 135F
+p 01 00000 00001 5DDF
+p 01 00000 00001 3020
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1360
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFD3
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1361
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 4 cycles from now
+p 00 00000 00001 1362
+p 01 00000 00001 0000
+p 01 00000 00001 8004
+#
+# r3 = r2 (the new IP)
+p 00 00000 00001 1363
+p 01 00000 00001 5CFB
+p 01 00000 00001 0000
+#
+# Set the BIU Command fields - Jump Request
+p 00 00000 00001 1364
+p 01 00000 00001 5DDF
+p 01 00000 00001 0398
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 1365
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 1366
+p 01 00000 00001 1002
+p 01 00000 00001 1365
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1367
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 3 cycles from now
+p 00 00000 00001 1368
+p 01 00000 00001 0000
+p 01 00000 00001 8003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 1369
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 136A
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 136B
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# biu_dataout = r0 (the return address)
+p 00 00000 00001 136C
+p 01 00000 00001 5FF9
+p 01 00000 00001 0000
+#
+# CALL PUSH Procedure (push IP)
+p 00 00000 00001 136D
+p 01 00000 00001 1100
+p 01 00000 00001 0400
+#
+# Jump unconditional to main microcode loop
+p 00 00000 00001 136E
+p 01 00000 00001 1000
+p 01 00000 00001 0004
+#
+# --------------------------------------------------------------------
+# Loops: JCXZ, LOOP, LOOPE, LOOPNE (from their jumps into JUMP_TAKEN8 and
+# JUMP_NOT_TAKEN). The 8088 reads their displacement in cycle 4 (after the
+# CX update); not taken, the next opcode 2 cycles after it. Taken: JCXZ
+# and LOOP suspend 1 cycle after the displacement and flush 4 cycles after
+# the EU resumes; LOOPE/LOOPNE suspend 3 cycles after it (one more
+# prefetch starts) and flush 4 cycles after resuming.
+#
+# Fetch byte, opcode entry, displacement read in cycle 4
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1370
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1371
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 1372
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 1373
+p 01 00000 00001 1002
+p 01 00000 00001 1372
+#
+# SYNC to cycle 4
+p 00 00000 00001 1374
+p 01 00000 00001 0000
+p 01 00000 00001 0004
+#
+# Jump unconditional to the peek at 0x02A9 (returns to the caller)
+p 00 00000 00001 1375
+p 01 00000 00001 1000
+p 01 00000 00001 02A9
+#
+# Wrapper: fetch in cycle 4, end 2 cycles after the read
+#
+# CALL fetch byte in cycle 4
+p 00 00000 00001 1378
+p 01 00000 00001 1100
+p 01 00000 00001 1370
+#
+# biu_dataout = F002 (end in 2 cycles)
+p 00 00000 00001 1379
+p 01 00000 00001 5FFF
+p 01 00000 00001 F002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 137A
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 137B
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 137C
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# SUSP timing, JCXZ, LOOP
+#
+# SYNC: 1 cycle(s) after the last queue read
+p 00 00000 00001 1380
+p 01 00000 00001 0000
+p 01 00000 00001 4001
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 1381
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 1382
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 1383
+p 01 00000 00001 1002
+p 01 00000 00001 1382
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1384
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 4 cycles from now
+p 00 00000 00001 1385
+p 01 00000 00001 0000
+p 01 00000 00001 8004
+#
+# Return to calling code
+p 00 00000 00001 1386
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Taken, JCXZ, LOOP (as JUMP_TAKEN8)
+#
+# CALL fetch byte in cycle 4
+p 00 00000 00001 1388
+p 01 00000 00001 1100
+p 01 00000 00001 1370
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode
+p 00 00000 00001 1389
+p 01 00000 00001 5DDF
+p 01 00000 00001 100C
+#
+# Debounce BIU Strobe
+p 00 00000 00001 138A
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# CALL Sign Extend r3
+p 00 00000 00001 138B
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+#
+# r3 = r3 + prefetch_queue_address -- This is the new IP
+p 00 00000 00001 138C
+p 01 00000 00001 2CC8
+p 01 00000 00001 0000
+#
+# CALL the SUSP timing
+p 00 00000 00001 138D
+p 01 00000 00001 1100
+p 01 00000 00001 1380
+#
+# Set the BIU Command fields - Jump Request
+p 00 00000 00001 138E
+p 01 00000 00001 5DDF
+p 01 00000 00001 0398
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 138F
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 1390
+p 01 00000 00001 1002
+p 01 00000 00001 138F
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 1391
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# Jump unconditional to the end at the next byte (0x12B0)
+p 00 00000 00001 1392
+p 01 00000 00001 1000
+p 01 00000 00001 12B0
+#
+# SUSP timing, LOOPE, LOOPNE
+#
+# SYNC: 3 cycle(s) after the last queue read
+p 00 00000 00001 13A0
+p 01 00000 00001 0000
+p 01 00000 00001 4003
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 13A1
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 13A2
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 13A3
+p 01 00000 00001 1002
+p 01 00000 00001 13A2
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 13A4
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 4 cycles from now
+p 00 00000 00001 13A5
+p 01 00000 00001 0000
+p 01 00000 00001 8004
+#
+# Return to calling code
+p 00 00000 00001 13A6
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Taken, LOOPE, LOOPNE (as JUMP_TAKEN8)
+#
+# CALL fetch byte in cycle 4
+p 00 00000 00001 13A8
+p 01 00000 00001 1100
+p 01 00000 00001 1370
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode
+p 00 00000 00001 13A9
+p 01 00000 00001 5DDF
+p 01 00000 00001 100C
+#
+# Debounce BIU Strobe
+p 00 00000 00001 13AA
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# CALL Sign Extend r3
+p 00 00000 00001 13AB
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+#
+# r3 = r3 + prefetch_queue_address -- This is the new IP
+p 00 00000 00001 13AC
+p 01 00000 00001 2CC8
+p 01 00000 00001 0000
+#
+# CALL the SUSP timing
+p 00 00000 00001 13AD
+p 01 00000 00001 1100
+p 01 00000 00001 13A0
+#
+# Set the BIU Command fields - Jump Request
+p 00 00000 00001 13AE
+p 01 00000 00001 5DDF
+p 01 00000 00001 0398
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 13AF
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 13B0
+p 01 00000 00001 1002
+p 01 00000 00001 13AF
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 13B1
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# Jump unconditional to the end at the next byte (0x12B0)
+p 00 00000 00001 13B2
+p 01 00000 00001 1000
+p 01 00000 00001 12B0
+#
+# Not taken (as JUMP_NOT_TAKEN)
+#
+# CALL the wrapper (fetch in cycle 4, end 2 cycles later)
+p 00 00000 00001 1398
+p 01 00000 00001 1100
+p 01 00000 00001 1378
+#
+# Jump unconditional to JUMP_NOT_TAKEN after its fetch
+p 00 00000 00001 1399
+p 01 00000 00001 1000
+p 01 00000 00001 0341

@@ -136,7 +136,8 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-f | + register-form ends at the ModR/M read | 96.4% | 35.3% | 900,920 (30.0%) |
 | biu88-g | + EA timing (displacement SYNC, request release), ALU writebacks | 96.4% | 47.0% | 1,071,852 (35.6%) |
 | biu88-h | + PUSH/POP, PUSHF fix, conditional jumps | 96.7% | 60.4% | 1,570,430 (52.2%) |
-| biu88-i | + JMP/CALL near, RET/RETF (+imm), harness NOP fetches, SUSP fix | see below | | |
+| biu88-i | + JMP/CALL near, RET/RETF (+imm), harness NOP fetches, SUSP fix | 96.7% | 63.6% | 1,674,263 (55.7%) |
+| biu88-j | + JMP/CALL FAR, loops, one read per cycle, idle start | see below | | |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
@@ -325,4 +326,40 @@ h to i:
   flush. **RETF imm16** (0x1320): immediate first, then the same, with SP
   adjusted after both pops.
 - Sampled: E8, E9, EB, C2, C3, CA, CB and every Jcc exact on all cycles.
+
+**Known risk: the EU lagging across instruction boundaries.**
+- The BIU reads the next opcode at the scheduled cycle even when the EU
+  still finishes the last instruction. If the next instruction's first timed
+  event is soon (a ModR/M byte at cycle 1), an EU that dispatched late misses
+  it.
+- The suite cannot show this: every test starts from an idle CPU after the
+  loader. The harness now installs the prefetched queue only once the EU
+  waits in its main loop, as the generator's CPU is idle; before that, the
+  loader's own JMP FAR tail made the EU late.
+- Real programs need sequence tests: run longer code in the simulation and
+  compare the bus trace with MartyPC's.
+
+## 2026-10-21 - Far jump and call, loops
+
+i to j:
+- **One queue read per cycle:** the "subsequent byte/word" entries of the
+  fetch procedures wait until the cycle after the last read (0x1338/0x133C).
+  JMP FAR's second word needed it.
+- **JMP FAR** (0x1340 from 0x03C7, a former NOP): SUSP 1 cycle after the last
+  pointer byte, flush 2 cycles after resuming, end at the first new byte.
+- **CALL FAR** (0x1350): MCL86 pushed first. The 8088 (MartyPC farcall)
+  reads the pointer, suspends, pushes CS 3 cycles after resuming, flushes
+  4 cycles after that, pushes IP 3 cycles after the flush.
+- **Loops** (0x1370-0x13B2): the displacement is read in cycle 4 (after the
+  CX update).
+  - Not taken: the end 2 cycles after the read.
+  - Taken JCXZ/LOOP: SUSP 1 cycle after the displacement.
+  - Taken LOOPE/LOOPNE: SUSP 3 cycles after it, so one more prefetch
+    starts.
+  - Taken, all: the flush 4 cycles after resuming.
+- **Harness:** the prefetched queue is installed only once the EU waits in
+  its main loop. The retimed JMP FAR made the loader's last instruction end
+  at the BIU's schedule while the EU was still finishing it, and the test's
+  first ModR/M read then came a cycle late (see the EU-lag risk above).
+- Sampled: E0-E3, 9A, EA exact on all cycles.
 
