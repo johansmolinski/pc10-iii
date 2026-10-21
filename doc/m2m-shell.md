@@ -215,7 +215,7 @@ file with the FAT32 write layer, which is included flat
 Budget (`make_rom.sh` prints it; check `HEAP` and `VAR$STACK_START` in
 `m2m-rom.lis`):
 
-- ROM: **31786 of 32768 words** (982 free); the Shell plus the FAT32 write
+- ROM: **31804 of 32768 words** (964 free); the Shell plus the FAT32 write
   layer fill almost all of it. When it runs out: move the write layer into code banks
   (Megamiga does: banks 1 and 2) or long texts into a read-only data device.
 - RAM: `HEAP` = 0xA515, `MENU_HEAP_SIZE` 1024 (the 31-line menu needs about
@@ -268,17 +268,62 @@ $R wait <name>
 $R fetch <name> R6                                   # -> ~/pcxt-work/builds/<name>/
 ```
 
-`build_bitstream.tcl` fails the run unless WNS/WHS >= 0, `main_clk` has the
-9.977 ns period and `pc_ram` still has its 160 block RAMs.
+`build_bitstream.tcl` writes the bitstream in any case and prints one
+`RESULT` line: `SIGNOFF-FAILED` (a gate), `TIMING-FAILED` (WNS or WHS < 0)
+or `OK`. Gates: synthesis read the MCL86 microcode image (`... microcode.hex'
+is read successfully` in its log; a missing image is only a warning and a dead
+CPU), `main_clk` 9.977 ns and `video_clk` 34.921 ns, the multicycle target of
+the floppy geometry exists, `pc_ram` has its 160 block RAMs. It also writes
+`utilization_hierarchical.rpt` and `worst_paths.rpt` (50 paths, one per
+group) next to the bitstream; `rbuild.sh fetch` copies them.
 
-Tests: `tb/shell/run.sh` (ghdl: keyboard codes and the Fn layer, the BIOS
-right alignment and gate, RAM latency and size limit; Verilator: the stub's
-raster periods, RAM test passes, ROM reader, keyboard strobe). Three mutants
-(no right alignment, no break bit, a 1-clock RAM ack) are all caught.
+**Reference builds:** `REF=<earlier build> rbuild.sh start ...` (build_all.sh
+`REF_DIR`) runs incremental synthesis and implementation from that build's
+checkpoints (keep its tree on the host). Vivado only does it when the
+reference is close to timing: with a reference at WNS < -1.0 ns it falls back
+to a normal run (`Reference DCP WNS -6.415 ns is less than the threshold
+value -1.000 ns`, build `pc10-real-c`). So the first build with the CPU
+timing fix is a full one, later ones can use it as their reference.
+
+**Microcode image:** `eu_rom.v` takes its path from the `MCL86_ROM` define,
+which the project sets to `../../../rtl/cpu/mcl86/microcode.hex` (relative to
+the synthesis run directory `CORE/CORE-R6.runs/synth_1`, which is where
+Vivado resolves `$readmemh` paths); the gate above catches a wrong path.
+The KF chips' `.svh` includes come from the project's Verilog include
+directories (`rtl/system/kf/KF82xx`).
+
+Tests (`tb/shell/run.sh`, about a minute):
+- `tb_glue.vhd` (ghdl): keyboard codes and the Fn layer; the BIOS window
+  (1:1, 0xFF while the gate is closed); RAM ack after 4 clocks and the size
+  limit; the CGA font: the default copied after the reset (8192 writes, a
+  glyph and its thin copy), a 2 KB font from QNICE copied to 0x1800 and 0x1000;
+- `tb_fdd.vhd` (ghdl): `pc_fdd_sd` against a model of the engine port (READY,
+  START, RDWE/RDIDX/RDDATA, WRIDX with the data one clock later, BLK, DONE,
+  ERROR, a DONE without BLK) and a sector-port driver that follows doc/fdc.md
+  section 5: block translation in both extents of a fragmented image, read
+  data, a write and its read-back, `sp_wr_ready`, beyond the file, drive off,
+  write protection, preemption, two errors with recovery and three without,
+  the geometry of 360K/720K and of an unknown size;
+- `tb_stub.sv` (Verilator): the stand-in's raster, RAM test, ROM reader.
+
+Mutants: 3 of the first round (no right alignment, no break bit, 1-clock
+ack); `pc_fdd_sd` 5 of 5 caught (no sector offset in the cluster, extent walk
+stops after the first, no re-issue after preemption, no retry, no write
+protection check); `pc_font` 3 of 4 (the survivor, no copy at power-up, is
+equivalent in the bench: the reset copies too).
+
+The system simulation `tb/sys` (main's bench, not changed) was run with
+GLaBIOS 0.4.2 and a RAM model answering after 1 and 4 clocks: the whole
+output (CS:IP every 50 ms for the first 1.6 s, still in GLaBIOS's memory test,
+and the screen) is identical, as for 3 clocks over 0.8 s (the board waits
+for `ram_ack`, so the longer latency changes nothing the CPU sees). The bench
+has no font, floppy backend or keyboard glue; the shell's own pieces are
+covered by `tb/shell`.
 
 The project file is generated from Megamiga's (framework file list):
-`tools/gen_xpr.py <Megamiga>/CORE/CORE-R6.xpr CORE/CORE-R6.xpr`. Only
-`VHDL2008` and `SVerilog` file types (Megamiga hard rule 2).
+`tools/gen_xpr.py <Megamiga>/CORE/CORE-R6.xpr CORE/CORE-R6.xpr` (the PC from
+`rtl/`), or `--stub` for the stand-in. Only `VHDL2008`, `SVerilog` or no file
+type (`.v`) (Megamiga hard rule 2).
 
 ## 11. Results
 
@@ -304,6 +349,62 @@ The CPU does **not** meet 100 MHz: it needs about 16.5 ns, i.e. ~60 MHz.
 
 217 failing endpoints are in biu88, 151 in the EU. Reports:
 `~/pcxt-work/ooc/cpu-ooc-a/`.
+
+### The real PC (builds `pc10-real-a` .. `pc10-real-d`, R6)
+
+`rtl/` as merged into main at `e0c7b34` (CPU before the cpu-timing branch).
+The bitstream is written although timing fails; it was not loaded on a MEGA65.
+
+| Build | Change | WNS | Failing endpoints |
+|---|---|---|---|
+| `pc10-real-a` | first build (video on main_clk, 2-clock RAM) | -6.189 | 831 |
+| `pc10-real-b` | 28.6 MHz video clock, RAM banks, keyboard pipeline, BIOS without adder | -5.756 | 599 |
+| `pc10-real-c` | RAM input register (4-clock ack), PC reset replicated | -5.710 | 582 |
+| `pc10-real-d` | = c plus a firmware change (same netlist) | -5.710 | 582 |
+
+WHS +0.018 ns. Per clock (d): main_clk -5.710, video_clk +1.492,
+qnice_clk +0.676, hdmi_clk +2.187, hr_clk +0.074.
+
+What still fails (d), all inside or out of `pc_system`:
+
+| From -> to | Endpoints | Worst |
+|---|---|---|
+| CPU -> CPU | 261 | -5.710 |
+| board -> board (e.g. 8237 `dack_sense_active_high` -> word count CE, 15 levels) | 138 | -1.474 |
+| board -> FDC | 108 | -0.982 |
+| CPU -> FDC | 47 | -1.061 |
+| FDC -> FDC | 17 | -1.427 |
+| CPU -> board | 6 | -0.557 |
+| board -> BIOS ROM address (`rom_addr` out of the board's logic, straight into the BRAM) | 3 | -0.112 |
+| `pc_ram` r_addr -> per-bank copies (placement, next to the failing logic) | 2 | -0.750 |
+
+So besides the CPU, the board (8237 DMA logic), the FDC and the paths from
+the board's/CPU's combinational outputs need work; the glue itself closes
+except two register-to-register paths in `pc_ram` that should disappear
+with the congestion.
+
+| | build d |
+|---|---|
+| LUTs | 26381 (19.7 %) |
+| FFs | 18716 (7.0 %) |
+| Block RAM | 238.5 of 365 tiles |
+| DSPs | 63 |
+
+| Part | LUTs | FFs | Block RAM tiles |
+|---|---|---|---|
+| M2M framework | 19329 | 14275 | 43.5 |
+| `pc_system` | 5964 | 2954 | 14.5 |
+| - CPU (cpu8088) | 1902 | 825 | 8 |
+| - board (xt_board, KF chips) | 1894 | 862 | 0 |
+| - FDC | 1628 | 862 | 0.5 |
+| - CGA | 517 | 390 | 6 |
+| `pc_ram` | 63 | 531 | 160 |
+| `pc_bios` | 70 | 57 | 16 |
+| `pc_font` | 54 | 92 | 2 |
+| `pc_fdd_sd` | 645 | 513 | 2.5 |
+| `keyboard` | 290 | 213 | 0 |
+
+R3: 238.5 tiles, 126.5 free; an XTIDE ROM and the rest fit easily.
 
 ### The shell with the stand-in (build `pc10-shell-a`, R6)
 
@@ -346,42 +447,35 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
 
 ## 12. Open issues
 
-- **CPU timing** (section 10): biu88's combinational next-state logic and the
-  unregistered microcode ROM output feeding both the EU and the BIU. Either
-  pipeline (register the ROM output: BRAM output register, one more cycle of
-  latency per microinstruction, which the 21:1 ratio could absorb), or use
-  the fact that the BIU only acts on `step` (every 21st clock) with
-  multicycle constraints - only valid if every path really is gated by
-  `step`, which needs a careful audit (the EU talks to the BIU every clock).
-- **59.92 vs 60 Hz on HDMI:** ascal drops or repeats a frame about every 13 s
-  (no triple buffering in this M2M). A 59.92 Hz HDMI mode (720p with a
-  pixel clock of 74.25 x 59.92/60 MHz) would make it smooth; that is a new
-  M2M video mode (an M2M-UPSTREAM exception).
-- **Keyboard self-test:** the BIOS resets the keyboard (PB6 low ~20 ms) and
-  expects 0xAA. Not in the contract; `xt_board` should answer it, or the
-  contract gets a `kbd_reset` output so the glue can queue 0xAA.
-- **vid_rgbi bit order** (`{I, R, G, B}`) and **dip_sw1 polarity** (bit = 1
-  for an open switch, as the 8255 reads it) are not stated in
-  architecture.md section 4.
-- **The video clock is the 100 MHz PC clock**, so M2M's analog pipeline
-  (scandoubler, OSM overlay) and ascal's input side run at 100 MHz, where
-  they were made for 28-54 MHz. It closes (+0.416 ns on `vga_osm`), but it
-  is the tightest path of the design. The way out if it starts failing: a
-  28.63636 MHz video clock (2 x OSC; the line doubler needs >= 2x the pixel
-  rate) with a CDC of the RGBI stream. It needs a second MMCM or a
-  different VCO: from 1102.5 MHz it is a divide by 38.5, and the only
-  fractional output, CLKOUT0, makes main_clk.
-- **RAM latency:** the glue answers reads after 2 clocks (registered request
-  for the 160-tile fan-out), not 1.
-- **Firmware ROM:** 1463 words free (section 7).
+- **Timing:** see section 11. The CPU (cpu-timing branch), the 8237 path of
+  the board, the FDC, and the paths out of the board's and the CPU's
+  combinational outputs (into the FDC, the BIOS ROM address, `pc_ram`).
+- **Reference builds** need a reference within -1.0 ns WNS (section 10):
+  rebuild in full once the CPU fix is merged, then use that build as `REF=`.
+- **Not on hardware:** nothing of this has run on a MEGA65 (no bitstream was
+  loaded). Untested in simulation: the firmware (QNICE), i.e. BIOS_ALIGN,
+  FONT_START, PREP_LOAD_IMAGE/FD_SETUP, the menu; the M2M CSR handshake of
+  the floppy devices; the SD engine port with the real `sdhost.vhd` (the
+  bench uses a model of its protocol).
+- **Floppy images:** no eject (Megamiga ejects with SPACE in the menu; here a
+  drive keeps its image until another is chosen); the images are not
+  remembered across power-up (Megamiga's profiles keep paths in the settings
+  file text, M2M exception 17); a changed SD card is not noticed (Megamiga
+  re-checks the card generation, `ADF_SD_GEN`); 1.2M/1.44M need the AT
+  controller (doc/fdc.md section 7).
+- **The default font** has only 128 glyphs (80-FF empty).
+- **59.92 vs 60 Hz on HDMI:** ascal drops or repeats a frame about every 13 s.
+  A 59.92 Hz HDMI mode would be a new M2M video mode (an M2M-UPSTREAM
+  exception).
+- **Firmware ROM:** 31804 of 32768 words; the next features need code banks
+  (Megamiga puts the FAT32 write layer into banks 1 and 2).
 - **R3:** this fork's R3 board top was never adapted. It needs:
   - sd-host (exception 18): bidirectional SD pins (CMD, DAT0..3 with output
-    enables) from `framework.vhd`, the engine port `sd_eng_*` to the core,
-    the pull-ups (CORE.xdc names), both slots;
+    enables) from `framework.vhd`, the engine port `sd_eng_*` to the core
+    (the floppy backend uses it), the pull-ups (CORE.xdc names), both slots;
   - the `MEGA65_Core` port list of R4-R6 (floppy pins are routed already;
     SDRAM, PMOD, Ethernet ports left open or tied - R3 has no SDRAM, so the
-    core must not need it, which this shell does not);
+    core must not need it, which this core does not);
   - PMOD (exception 13) only if the serial port is wanted;
   - a `CORE-R3.xpr` (`gen_xpr.py` on Megamiga's R3 project) with `max10.vhdl`
     / `pcm_to_pdm.vhdl` instead of `audio.vhd` (Megamiga hard rule 1).
-- Untested on hardware: everything (no bitstream was loaded).
