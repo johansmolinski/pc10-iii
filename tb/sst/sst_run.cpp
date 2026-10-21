@@ -1,0 +1,454 @@
+// sst_run.cpp - run SingleStepTests 8088 v2 cases against an HDL 8088.
+//
+//   sst_run [options] XX.txt...
+//     -v IDX      print the trace comparison of test IDX (per file)
+//     -n N        run only the first N tests of each file
+//     -f          stop at the first failing test of each file and print it
+//
+// The CPU gets its registers from a loader program served on the bus (POPF,
+// MOV r16,imm, MOV sreg,AX, JMP FAR), the way Arduino8088 sets up the real
+// chip, so no backdoor writes are needed. Final registers are read through
+// the dbg_* outputs when the next instruction's first byte leaves the queue.
+//
+// Three verdicts per test:
+//   state  registers (undefined flags masked) and memory
+//   length number of cycles from the first byte to the next instruction
+//   trace  every cycle: ALE, bus status, T-state, address at T1, data at T3,
+//          queue operation and byte
+// Tests that start with a full queue (half of the suite) cannot be set up
+// through the bus; they get the state verdict only.
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include "Vtb_mcl86.h"
+#include "verilated.h"
+
+enum { AX, BX, CX, DX, CS, SS, DS, ES, SP, BP, SI, DI, IP, FLAGS, NREG };
+static const char *REGN[NREG] = {"ax", "bx", "cx", "dx", "cs", "ss", "ds",
+                                 "es", "sp", "bp", "si", "di", "ip", "flags"};
+static const char *BUSN[8] = {"INTA", "IOR", "IOW", "HALT",
+                              "CODE", "MEMR", "MEMW", "PASV"};
+
+struct Cycle {
+    int ale = 0;
+    unsigned addr = 0;
+    int data = 0;
+    std::string bus, t, qop;
+    int qbyte = 0;
+};
+
+struct Test {
+    int idx = 0;
+    unsigned flagmask = 0xFFFF;
+    std::string name;
+    std::vector<int> bytes;
+    unsigned init[NREG] = {};
+    std::vector<std::pair<unsigned, int>> ram;
+    std::vector<int> queue;
+    unsigned fmask = 0;
+    unsigned fin[NREG] = {};
+    std::vector<std::pair<unsigned, int>> fram;
+    std::vector<Cycle> cycles;
+};
+
+static bool read_test(std::istream &in, Test &t) {
+    std::string line, tag;
+    t = Test();
+    while (std::getline(in, line)) {
+        std::istringstream s(line);
+        s >> tag;
+        if (tag == "T") {
+            s >> t.idx >> t.flagmask;
+            std::getline(s, t.name);
+            if (!t.name.empty() && t.name[0] == ' ') t.name.erase(0, 1);
+        } else if (tag == "B") {
+            int n, v; s >> n;
+            while (n-- && s >> v) t.bytes.push_back(v);
+        } else if (tag == "I") {
+            for (int i = 0; i < NREG; i++) s >> t.init[i];
+        } else if (tag == "M" || tag == "W") {
+            int n; unsigned a; int v; s >> n;
+            auto &dst = tag == "M" ? t.ram : t.fram;
+            while (n-- && s >> a >> v) dst.push_back({a, v});
+        } else if (tag == "Q") {
+            int n, v; s >> n;
+            while (n-- && s >> v) t.queue.push_back(v);
+        } else if (tag == "F") {
+            s >> t.fmask;
+            for (int i = 0; i < NREG; i++)
+                if (t.fmask & (1u << i)) s >> t.fin[i];
+        } else if (tag == "c") {
+            Cycle c; int pins, bhe; std::string seg, mem, io;
+            s >> pins >> c.addr >> seg >> mem >> io >> bhe >> c.data
+              >> c.bus >> c.t >> c.qop >> c.qbyte;
+            c.ale = pins & 1;
+            t.cycles.push_back(c);
+        } else if (tag == "E") {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------- simulation
+
+struct Sim {
+    std::unique_ptr<Vtb_mcl86> top;
+    double phase = 0.0;               // 8088 CLK phase in periods
+    static constexpr double STEP = 4.7727272 / 100.0;  // per 100 MHz core clock
+    uint64_t core_clocks = 0;
+
+    Sim() : top(new Vtb_mcl86) {}
+
+    // One core clock. Returns true when CLK rose (an 8088 cycle boundary).
+    bool step() {
+        double next = phase + STEP;
+        bool rose = (int)next != (int)phase;
+        phase = next;
+        double frac = phase - (int)phase;
+        top->clk = frac < (1.0 / 3.0);
+        top->core_clk = 0; top->eval();
+        top->core_clk = 1; top->eval();
+        core_clocks++;
+        return rose;
+    }
+};
+
+struct Result {
+    bool state_ok = false, len_ok = false, trace_ok = false, ran = false;
+    bool prefetched = false;
+    std::string why;
+    std::vector<Cycle> got;
+    unsigned regs[NREG] = {};
+};
+
+static std::vector<uint8_t> loader_program(const Test &t) {
+    std::vector<uint8_t> p;
+    auto imm = [&](uint8_t op, unsigned v) {
+        p.push_back(op); p.push_back(v & 0xFF); p.push_back(v >> 8);
+    };
+    p.push_back(0x9D);                       // POPF (data served below)
+    imm(0xBB, t.init[BX]); imm(0xB9, t.init[CX]); imm(0xBA, t.init[DX]);
+    imm(0xBE, t.init[SI]); imm(0xBF, t.init[DI]); imm(0xBD, t.init[BP]);
+    imm(0xBC, t.init[SP]);
+    imm(0xB8, t.init[ES]); p.push_back(0x8E); p.push_back(0xC0);
+    imm(0xB8, t.init[SS]); p.push_back(0x8E); p.push_back(0xD0);
+    imm(0xB8, t.init[DS]); p.push_back(0x8E); p.push_back(0xD8);
+    imm(0xB8, t.init[AX]);
+    p.push_back(0xEA);
+    p.push_back(t.init[IP] & 0xFF); p.push_back(t.init[IP] >> 8);
+    p.push_back(t.init[CS] & 0xFF); p.push_back(t.init[CS] >> 8);
+    return p;
+}
+
+static int prefix_count(const Test &t) {
+    int n = 0;
+    for (int b : t.bytes) {
+        if (b == 0x26 || b == 0x2E || b == 0x36 || b == 0x3E ||
+            b == 0xF0 || b == 0xF2 || b == 0xF3) n++;
+        else break;
+    }
+    return n;
+}
+
+static bool g_dump = false;   // -d: print every bus cycle of the test
+
+static Result run_test(Sim &sim, const Test &t) {
+    Result r;
+    r.prefetched = !t.queue.empty();
+    auto &top = sim.top;
+
+    static std::vector<int> mem(1 << 20);
+    std::fill(mem.begin(), mem.end(), 0x90);
+    for (auto &m : t.ram) mem[m.first & 0xFFFFF] = m.second;
+    std::vector<uint8_t> written_mask(0);
+    std::vector<std::pair<unsigned, int>> writes;
+
+    std::vector<uint8_t> loader = loader_program(t);
+    uint8_t flagbytes[2] = {(uint8_t)(t.init[FLAGS] & 0xFF),
+                            (uint8_t)(t.init[FLAGS] >> 8)};
+    size_t lptr = 0; int dptr = 0;
+    bool test_mode = false;
+
+    // reset
+    top->reset = 1; top->ad_in = 0x90;
+    for (int i = 0; i < 64; i++) sim.step();
+    top->reset = 0;
+
+    int prev_status = 7, status_core_prev = 7;
+    int tcount = 0, bus_type = 7;
+    unsigned latched = 0;
+    int read_val = 0x90;
+    int prev_jump = 0, prev_strobe = 0, prev_dispatch = 0;
+
+    // queue events of the current 8088 cycle (reported in the next one)
+    struct QEv { char op; int byte; };
+    std::vector<QEv> qev_cur, qev_prev;
+
+    const int want_f = prefix_count(t) + 1;
+    int f_seen = 0;
+    bool started = false, done = false;
+    int cycle_no = 0;
+    long budget = 400000;  // 8088 cycles for one test, generous for REP
+
+    // MCL86 can start the next instruction while a write is still queued in
+    // the BIU; let the bus drain so that the state verdict sees the memory
+    int drain = 40;
+    while ((!done || drain-- > 0) && budget-- > 0) {
+        const bool was_done = done;   // the cycle that ends the test is kept
+        // run core clocks until the next CLK rising edge
+        bool rose = false;
+        while (!rose) {
+            rose = sim.step();
+            int st = top->s2_s0;
+            // the 8288 latches the address when the status leaves passive
+            if (status_core_prev == 7 && st != 7) {
+                latched = top->ad_out & 0xFFFFF;
+                bus_type = st;
+                if (st == 4) {                       // code fetch
+                    if (!test_mode)
+                        read_val = lptr < loader.size() ? loader[lptr++] : 0x90;
+                    else
+                        read_val = mem[latched];
+                } else if (st == 5) {                // memory read
+                    read_val = test_mode ? mem[latched]
+                                         : flagbytes[dptr++ & 1];
+                } else if (st == 1) {                // I/O read
+                    read_val = 0xFF;
+                } else {
+                    read_val = 0xFF;
+                }
+                top->ad_in = read_val;
+            }
+            status_core_prev = st;
+
+            unsigned cmd = top->dbg_eu_cmd;
+            int jump = ((cmd >> 9) & 1) && (((cmd >> 4) & 0x1F) == 0x19);
+            if (jump && !prev_jump) {
+                if (!test_mode && lptr >= loader.size()) test_mode = true;
+                if (test_mode && started) qev_cur.push_back({'E', 0});
+            }
+            prev_jump = jump;
+
+            // MCL86 dispatches on the opcode at the top of the queue and
+            // removes it only at the end of the instruction (strobe with QS
+            // code 01). The dispatch is the real chip's first-byte read; the
+            // strobes with QS code 11 are subsequent-byte reads.
+            int strobe = ((cmd >> 12) & 3) == 1;
+            int dispatch = top->dbg_dispatch;
+            if (dispatch && !prev_dispatch && test_mode) {
+                int byte = top->dbg_pfq_top;
+                if (g_dump) printf("    dispatch top=%02X\n", byte);
+                if (done) {
+                    // draining: the next instructions are NOPs
+                } else if (!started) {
+                    started = true; f_seen = 1;
+                    qev_cur.push_back({'F', byte});
+                } else if (++f_seen > want_f) {
+                    // first byte of the next instruction: the test ends
+                    r.regs[AX] = top->dbg_ax; r.regs[BX] = top->dbg_bx;
+                    r.regs[CX] = top->dbg_cx; r.regs[DX] = top->dbg_dx;
+                    r.regs[CS] = top->dbg_cs; r.regs[SS] = top->dbg_ss;
+                    r.regs[DS] = top->dbg_ds; r.regs[ES] = top->dbg_es;
+                    r.regs[SP] = top->dbg_sp; r.regs[BP] = top->dbg_bp;
+                    r.regs[SI] = top->dbg_si; r.regs[DI] = top->dbg_di;
+                    r.regs[IP] = top->dbg_ip;
+                    // MCL86 keeps prefix state in flags 15..12, 5, 3, 1
+                    r.regs[FLAGS] = (top->dbg_flags & 0x0FD5) | 0xF002;
+                    done = true;
+                } else {
+                    qev_cur.push_back({'F', byte});
+                }
+            }
+            prev_dispatch = dispatch;
+            if (strobe && !prev_strobe && test_mode && started && !done) {
+                int qs = (cmd >> 2) & 3;
+                if (g_dump) printf("    strobe cmd=%04X top=%02X\n", cmd, (unsigned)top->dbg_pfq_top);
+                if (qs == 3) qev_cur.push_back({'S', (int)top->dbg_pfq_top});
+            }
+            prev_strobe = strobe;
+        }
+
+        // close the 8088 cycle that just ended
+        int st = top->s2_s0;
+        Cycle c;
+        if (prev_status == 7 && st != 7) {
+            tcount = 1; c.ale = 1; c.addr = latched;
+        } else if (tcount >= 1 && tcount < 4) {
+            tcount++;
+        } else {
+            tcount = 0;
+        }
+        c.t = tcount == 0 ? "Ti" : "T" + std::to_string(tcount);
+        c.bus = BUSN[st];
+        if (tcount == 3) {
+            if (bus_type == 6 || bus_type == 2) {        // write
+                c.data = top->ad_out & 0xFF;
+                if (bus_type == 6 && test_mode && started) {
+                    mem[latched] = c.data;
+                    writes.push_back({latched, c.data});
+                }
+            } else if (bus_type != 7) {
+                c.data = read_val;
+            }
+        }
+        prev_status = st;
+        if (g_dump && test_mode)
+            printf("    dump %s %-4s %c%05X d=%02X q=%s ip=%04X sp=%04X ss=%04X%s\n",
+                   c.t.c_str(), c.bus.c_str(), c.ale ? 'A' : ' ', latched,
+                   c.data, qev_cur.empty() ? "-" : std::string(1, qev_cur[0].op).c_str(),
+                   (unsigned)top->dbg_ip, (unsigned)top->dbg_sp,
+                   (unsigned)top->dbg_ss, done ? " (drain)" : "");
+
+        if (started && !qev_prev.empty()) {
+            c.qop = std::string(1, qev_prev[0].op);
+            c.qbyte = qev_prev[0].byte;
+        } else {
+            c.qop = "-";
+        }
+        if (started && !was_done) {
+            // a cycle belongs to the test from the one reporting the first F
+            if (cycle_no > 0 || !qev_prev.empty()) {
+                r.got.push_back(c);
+                cycle_no++;
+            }
+        }
+        qev_prev = qev_cur;
+        qev_cur.clear();
+    }
+
+    r.ran = done;
+    if (!done) { r.why = "timeout"; return r; }
+
+    // the cycle in which the next first byte left the queue belongs to the test
+    // (its F would be reported one cycle later); it was pushed above already
+
+    // state verdict
+    std::string why;
+    for (int i = 0; i < NREG; i++) {
+        unsigned want = (t.fmask & (1u << i)) ? t.fin[i] : t.init[i];
+        unsigned got = r.regs[i];
+        if (i == FLAGS) { want &= t.flagmask; got &= t.flagmask; }
+        if (want != got) {
+            char b[96];
+            snprintf(b, sizeof b, "%s=%04X want %04X ", REGN[i], got, want);
+            why += b;
+        }
+    }
+    for (auto &w : t.fram) {
+        if (mem[w.first & 0xFFFFF] != w.second) {
+            char b[96];
+            snprintf(b, sizeof b, "[%05X]=%02X want %02X ", w.first,
+                     mem[w.first & 0xFFFFF], w.second);
+            why += b;
+        }
+    }
+    for (auto &w : writes) {
+        bool expected = false;
+        for (auto &f : t.fram) expected |= (f.first & 0xFFFFF) == w.first;
+        bool unchanged = false;
+        for (auto &m : t.ram)
+            if ((m.first & 0xFFFFF) == w.first && m.second == w.second) unchanged = true;
+        if (!expected && !unchanged) {
+            char b[96];
+            snprintf(b, sizeof b, "stray write [%05X]=%02X ", w.first, w.second);
+            why += b;
+        }
+    }
+    r.state_ok = why.empty();
+    r.why = why;
+
+    if (!r.prefetched) {
+        r.len_ok = r.got.size() == t.cycles.size();
+        bool ok = r.len_ok;
+        for (size_t i = 0; ok && i < t.cycles.size(); i++) {
+            const Cycle &a = t.cycles[i], &b = r.got[i];
+            if (a.ale != b.ale || a.bus != b.bus || a.t != b.t || a.qop != b.qop)
+                ok = false;
+            if (a.ale && a.addr != b.addr) ok = false;
+            if (a.t == "T3" && a.data != b.data) ok = false;
+            if (a.qop != "-" && a.qbyte != b.qbyte) ok = false;
+        }
+        r.trace_ok = ok;
+    }
+    return r;
+}
+
+static void print_trace(const Test &t, const Result &r) {
+    printf("  test %d \"%s\" bytes", t.idx, t.name.c_str());
+    for (int b : t.bytes) printf(" %02X", b);
+    printf("%s\n", r.prefetched ? " (prefetched)" : "");
+    if (!r.why.empty()) printf("  state: %s\n", r.why.c_str());
+    size_t n = std::max(t.cycles.size(), r.got.size());
+    printf("  %-34s | %s\n", "want", "got");
+    for (size_t i = 0; i < n; i++) {
+        char a[64] = "", b[64] = "";
+        if (i < t.cycles.size()) {
+            const Cycle &c = t.cycles[i];
+            snprintf(a, sizeof a, "%c %05X %-4s %-2s %s %02X", c.ale ? 'A' : ' ',
+                     c.ale ? c.addr : 0, c.bus.c_str(), c.t.c_str(),
+                     c.qop.c_str(), c.qbyte);
+        }
+        if (i < r.got.size()) {
+            const Cycle &c = r.got[i];
+            snprintf(b, sizeof b, "%c %05X %-4s %-2s %s %02X", c.ale ? 'A' : ' ',
+                     c.ale ? c.addr : 0, c.bus.c_str(), c.t.c_str(),
+                     c.qop.c_str(), c.qbyte);
+        }
+        bool same = strcmp(a, b) == 0;
+        printf("  %3zu %-30s %s %s\n", i, a, same ? "|" : "#", b);
+    }
+}
+
+int main(int argc, char **argv) {
+    Verilated::commandArgs(argc, argv);
+    int verbose_idx = -1, limit = -1;
+    bool first_fail = false;
+    std::vector<std::string> files;
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-v") && i + 1 < argc) verbose_idx = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-n") && i + 1 < argc) limit = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-f")) first_fail = true;
+        else if (!strcmp(argv[i], "-d")) g_dump = true;
+        else if (argv[i][0] != '+') files.push_back(argv[i]);
+    }
+    Sim sim;
+    printf("%-10s %6s %6s %6s %6s %6s %6s\n", "file", "tests", "state",
+           "plain", "length", "trace", "tmout");
+    for (auto &fn : files) {
+        std::ifstream in(fn);
+        if (!in) { fprintf(stderr, "cannot open %s\n", fn.c_str()); return 1; }
+        Test t;
+        int n = 0, st = 0, plain = 0, len = 0, tr = 0, tmo = 0;
+        bool shown = false;
+        while (read_test(in, t)) {
+            if (limit >= 0 && n >= limit) break;
+            Result r = run_test(sim, t);
+            n++;
+            if (!r.ran) tmo++;
+            if (r.state_ok) st++;
+            if (!r.prefetched) {
+                plain++;
+                if (r.len_ok) len++;
+                if (r.trace_ok) tr++;
+            }
+            bool fail = !r.state_ok || (!r.prefetched && !r.trace_ok);
+            if (t.idx == verbose_idx || (first_fail && fail && !shown)) {
+                print_trace(t, r);
+                shown = true;
+            }
+        }
+        std::string base = fn.substr(fn.find_last_of('/') + 1);
+        base = base.substr(0, base.rfind(".txt"));
+        printf("%-10s %6d %6d %6d %6d %6d %6d\n", base.c_str(), n, st, plain,
+               len, tr, tmo);
+        fflush(stdout);
+    }
+    return 0;
+}
