@@ -99,23 +99,29 @@ wire [7:0] cpu_dout = cpu_ad[7:0];      // write data from T2 on
 // T1-Tw, so whenever a command register is set the status is the one it was
 // set for (checked in simulation against the original expressions below).
 logic cmd_memr, cmd_memw, cmd_ior, cmd_iow, cmd_inta;
+logic cmd_memr_next, cmd_memw_next, cmd_ior_next, cmd_iow_next, cmd_inta_next;
 wire  in_cycle = cpu_bus_t == T1 || cpu_bus_t == T2 || cpu_bus_t == T3 || cpu_bus_t == TW;
-always_ff @(posedge clk) begin
+always_comb begin
+    {cmd_memr_next, cmd_memw_next, cmd_ior_next, cmd_iow_next, cmd_inta_next} =
+        {cmd_memr, cmd_memw, cmd_ior, cmd_iow, cmd_inta};
     if (reset || !in_cycle) begin
-        cmd_memr <= 1'b0;  cmd_memw <= 1'b0;
-        cmd_ior  <= 1'b0;  cmd_iow  <= 1'b0;  cmd_inta <= 1'b0;
+        cmd_memr_next = 1'b0;  cmd_memw_next = 1'b0;
+        cmd_ior_next  = 1'b0;  cmd_iow_next  = 1'b0;  cmd_inta_next = 1'b0;
     end else if (cpu_fall) begin
         if (cpu_bus_t == T1) begin
-            if (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) cmd_memr <= 1'b1;
-            if (cpu_bus_type == ST_IOR)  cmd_ior  <= 1'b1;
-            if (cpu_bus_type == ST_INTA) cmd_inta <= 1'b1;
+            if (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) cmd_memr_next = 1'b1;
+            if (cpu_bus_type == ST_IOR)  cmd_ior_next  = 1'b1;
+            if (cpu_bus_type == ST_INTA) cmd_inta_next = 1'b1;
         end
         if (cpu_bus_t == T2) begin
-            if (cpu_bus_type == ST_MEMW) cmd_memw <= 1'b1;
-            if (cpu_bus_type == ST_IOW)  cmd_iow  <= 1'b1;
+            if (cpu_bus_type == ST_MEMW) cmd_memw_next = 1'b1;
+            if (cpu_bus_type == ST_IOW)  cmd_iow_next  = 1'b1;
         end
     end
 end
+always_ff @(posedge clk)
+    {cmd_memr, cmd_memw, cmd_ior, cmd_iow, cmd_inta} <=
+        {cmd_memr_next, cmd_memw_next, cmd_ior_next, cmd_iow_next, cmd_inta_next};
 logic aen;                              // DMA owns the bus
 wire  cpu_memr = cmd_memr && !aen;
 wire  cpu_memw = cmd_memw && !aen;
@@ -195,14 +201,36 @@ wire  cs_nmi   = board_io && bus_addr[7:5] == 3'd5;   // A0-BF
 // ------------------------------------------------------------ 8237
 logic [7:0]  dma_dout;
 logic        dma_ior_n, dma_iow_n, dma_memr_n, dma_memw_n, dma_eop;
+logic        dma_ior_n_next, dma_iow_n_next, dma_memr_n_next, dma_memw_n_next;
 logic [15:0] dma_addr, dma_addr_next;
 logic [3:0]  dack_n, dack_n_next;
 logic        drq0;
 logic [7:0]  bus_wdata;                  // data the writing master drives
-wire         io_rd_n    = ~cpu_ior & dma_ior_n;
-wire         io_wr_n    = ~cpu_iow & dma_iow_n;
-wire         mem_rd_n   = ~cpu_memr & dma_memr_n;
-wire         mem_wr_n   = ~cpu_memw & dma_memw_n;
+// Timing (pc10-iii): the four bus strobes are registers (they fan out to
+// every chip and card), loaded with the original expressions on the D inputs
+// of the command registers, AEN and the 8237's strobes, so they hold the
+// original values in every clk (checked in simulation) - except in the first
+// clk of a PC reset, where these go inactive at once (asynchronous reset, as
+// the 8237's strobes do) while a CPU strobe of the original would last one
+// more clk; every reader of the strobes is in reset then (doc/timing.md
+// section 2.11). Originally:
+//   wire         io_rd_n    = ~cpu_ior & dma_ior_n;   (and io_wr_n, mem_rd_n, mem_wr_n)
+logic        io_rd_n, io_wr_n, mem_rd_n, mem_wr_n;
+always_ff @(posedge clk, posedge reset)
+    if (reset) begin
+        io_rd_n <= 1'b1;  io_wr_n <= 1'b1;  mem_rd_n <= 1'b1;  mem_wr_n <= 1'b1;
+    end else begin
+        io_rd_n  <= ~(cmd_ior_next  && !aen_next) & dma_ior_n_next;
+        io_wr_n  <= ~(cmd_iow_next  && !aen_next) & dma_iow_n_next;
+        mem_rd_n <= ~(cmd_memr_next && !aen_next) & dma_memr_n_next;
+        mem_wr_n <= ~(cmd_memw_next && !aen_next) & dma_memw_n_next;
+    end
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (!reset && (io_rd_n  != (~cpu_ior  & dma_ior_n)  || io_wr_n  != (~cpu_iow  & dma_iow_n) ||
+                   mem_rd_n != (~cpu_memr & dma_memr_n) || mem_wr_n != (~cpu_memw & dma_memw_n)))
+        $fatal(1, "xt_board: registered bus strobes differ from the original");
+`endif
 
 KF8237 u_dma (
     .clock                  (clk),
@@ -233,7 +261,11 @@ KF8237 u_dma (
     .address_enable         (),
     .address_strobe         (),
     .memory_read_n          (dma_memr_n),
-    .memory_write_n         (dma_memw_n)
+    .memory_write_n         (dma_memw_n),
+    .memory_read_n_next     (dma_memr_n_next),  // pc10-iii
+    .memory_write_n_next    (dma_memw_n_next),
+    .io_read_n_next         (dma_ior_n_next),
+    .io_write_n_next        (dma_iow_n_next)
 );
 
 // 74LS670 page registers: 81 = ch2, 82 = ch3, 83 = ch1 (and ch0)
