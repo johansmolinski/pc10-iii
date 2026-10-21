@@ -50,6 +50,11 @@ architecture synthesis of pc_ram is
    signal r_wdata  : std_logic_vector(7 downto 0) := (others => '0');
    signal r_en     : std_logic := '0';
    signal r_we     : std_logic := '0';
+   -- timing: replicated by synthesis, one copy per few banks (the banks are spread over the
+   -- die; one register driving all 20 per-bank copies missed by 0.75 ns in pc10-real-d)
+   attribute max_fanout : integer;
+   attribute max_fanout of r_addr  : signal is 5;
+   attribute max_fanout of r_wdata : signal is 5;
 
    -- stage 1: the decoded request, one copy per bank
    signal b_addr   : t_addr := (others => (others => '0'));

@@ -89,8 +89,42 @@ wire [7:0] cpu_dout = cpu_ad[7:0];      // write data from T2 on
 // Read commands and INTA: from the CLK falling edge in T1 to the start of T4.
 // Write commands: from the falling edge in T2 (write data is on the bus from
 // T2). CAL: the exact edges relative to OSC matter for the CGA's wait states.
-logic cmd_rd, cmd_wr;
+//
+// Timing (pc10-iii, doc/timing.md): one command register per bus status
+// instead of cmd_rd/cmd_wr ANDed with the CPU's live bus status, so the
+// strobes are a register (and AEN) away from the cards. The same thing: the
+// status (latch) only changes when a cycle starts (T1 out of Ti/T4/Tinit) or
+// in its T4, and the registers are cleared in any clk whose T-state is not
+// T1-Tw, so whenever a command register is set the status is the one it was
+// set for (checked in simulation against the original expressions below).
+logic cmd_memr, cmd_memw, cmd_ior, cmd_iow, cmd_inta;
 wire  in_cycle = cpu_bus_t == T1 || cpu_bus_t == T2 || cpu_bus_t == T3 || cpu_bus_t == TW;
+always_ff @(posedge clk) begin
+    if (reset || !in_cycle) begin
+        cmd_memr <= 1'b0;  cmd_memw <= 1'b0;
+        cmd_ior  <= 1'b0;  cmd_iow  <= 1'b0;  cmd_inta <= 1'b0;
+    end else if (cpu_fall) begin
+        if (cpu_bus_t == T1) begin
+            if (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) cmd_memr <= 1'b1;
+            if (cpu_bus_type == ST_IOR)  cmd_ior  <= 1'b1;
+            if (cpu_bus_type == ST_INTA) cmd_inta <= 1'b1;
+        end
+        if (cpu_bus_t == T2) begin
+            if (cpu_bus_type == ST_MEMW) cmd_memw <= 1'b1;
+            if (cpu_bus_type == ST_IOW)  cmd_iow  <= 1'b1;
+        end
+    end
+end
+logic aen;                              // DMA owns the bus
+wire  cpu_memr = cmd_memr && !aen;
+wire  cpu_memw = cmd_memw && !aen;
+wire  cpu_ior  = cmd_ior  && !aen;
+wire  cpu_iow  = cmd_iow  && !aen;
+wire  inta     = cmd_inta;
+
+`ifndef SYNTHESIS
+// the original 8288 function, as a reference for the registers above
+logic cmd_rd, cmd_wr;
 wire  is_read  = cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR ||
                  cpu_bus_type == ST_IOR  || cpu_bus_type == ST_INTA;
 wire  is_write = cpu_bus_type == ST_MEMW || cpu_bus_type == ST_IOW;
@@ -103,28 +137,42 @@ always_ff @(posedge clk) begin
         if (cpu_bus_t == T2 && is_write) cmd_wr <= 1'b1;
     end
 end
-logic aen;                              // DMA owns the bus
-wire  cpu_memr = cmd_rd && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) && !aen;
-wire  cpu_memw = cmd_wr && cpu_bus_type == ST_MEMW && !aen;
-wire  cpu_ior  = cmd_rd && cpu_bus_type == ST_IOR && !aen;
-wire  cpu_iow  = cmd_wr && cpu_bus_type == ST_IOW && !aen;
-wire  inta     = cmd_rd && cpu_bus_type == ST_INTA;
+always_ff @(posedge clk)
+    if (!reset && (
+        cpu_memr != (cmd_rd && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) && !aen) ||
+        cpu_memw != (cmd_wr && cpu_bus_type == ST_MEMW && !aen) ||
+        cpu_ior  != (cmd_rd && cpu_bus_type == ST_IOR && !aen) ||
+        cpu_iow  != (cmd_wr && cpu_bus_type == ST_IOW && !aen) ||
+        inta     != (cmd_rd && cpu_bus_type == ST_INTA)))
+        $fatal(1, "xt_board: command registers differ from the 8288 function");
+`endif
 
 // ------------------------------------------------------------ DMA: hold logic
 logic       hold_request, hrq_ff1, hrq_ff2, hold_ack, dma_wait;
+logic       aen_next, dma_wait_next;    // their D inputs (for the bus address register)
 wire        cpu_passive = cpu_s2_s0[1] & cpu_s2_s0[0];       // S1 S0 = 11
-always_ff @(posedge clk) begin
+always_comb begin
+    aen_next      = aen;
+    dma_wait_next = dma_wait;
     if (reset) begin
-        hrq_ff1 <= 1'b0;  hrq_ff2 <= 1'b0;  aen <= 1'b0;  dma_wait <= 1'b0;
+        aen_next      = 1'b0;
+        dma_wait_next = 1'b0;
+    end else if (cpu_step) begin
+        // the DMA takes the bus only when the CPU is not inside a
+        // transfer: at its T4 or with an idle bus (the status pins
+        // go passive in T3 already). CAL: against MartyPC's HOLDA.
+        aen_next      = hold_ack && (aen || cpu_bus_t == T4 || cpu_bus_t == TI);
+        dma_wait_next = aen;
+    end
+end
+always_ff @(posedge clk) begin
+    aen      <= aen_next;
+    dma_wait <= dma_wait_next;
+    if (reset) begin
+        hrq_ff1 <= 1'b0;  hrq_ff2 <= 1'b0;
     end else begin
-        if (cpu_step) begin
+        if (cpu_step)
             hrq_ff1  <= cpu_passive & cpu_lock_n & hold_request;
-            // the DMA takes the bus only when the CPU is not inside a
-            // transfer: at its T4 or with an idle bus (the status pins
-            // go passive in T3 already). CAL: against MartyPC's HOLDA.
-            aen      <= hold_ack && (aen || cpu_bus_t == T4 || cpu_bus_t == TI);
-            dma_wait <= aen;
-        end
         if (cpu_fall)
             hrq_ff2 <= !hold_request ? 1'b0 : hrq_ff2 ? 1'b1 : hrq_ff1;
     end
@@ -147,7 +195,7 @@ wire  cs_nmi   = board_io && bus_addr[7:5] == 3'd5;   // A0-BF
 logic [7:0]  dma_dout;
 logic        dma_ior_n, dma_iow_n, dma_memr_n, dma_memw_n, dma_eop;
 logic [15:0] dma_addr;
-logic [3:0]  dack_n;
+logic [3:0]  dack_n, dack_n_next;
 logic        drq0;
 logic [7:0]  bus_wdata;                  // data the writing master drives
 wire         io_rd_n    = ~cpu_ior & dma_ior_n;
@@ -178,7 +226,8 @@ KF8237 u_dma (
     .address_out            (dma_addr),
     .output_highst_address  (),
     .hold_request           (hold_request),
-    .dma_acknowledge        (dack_n),
+    .dma_acknowledge        (dack_n),           // a register (pc10-iii)
+    .dma_acknowledge_next   (dack_n_next),
     .address_enable         (),
     .address_strobe         (),
     .memory_read_n          (dma_memr_n),
@@ -186,17 +235,38 @@ KF8237 u_dma (
 );
 
 // 74LS670 page registers: 81 = ch2, 82 = ch3, 83 = ch1 (and ch0)
-logic [3:0] page [4];
-always_ff @(posedge clk) begin
+logic [3:0] page [4], page_next [4];
+always_comb begin
+    page_next = page;
     if (reset) begin
-        page[0] <= 4'h0; page[1] <= 4'h0; page[2] <= 4'h0; page[3] <= 4'h0;
+        page_next[0] = 4'h0; page_next[1] = 4'h0; page_next[2] = 4'h0; page_next[3] = 4'h0;
     end else if (cs_page && cpu_iow)
-        page[bus_addr[1:0]] <= bus_wdata[3:0];
+        page_next[bus_addr[1:0]] = bus_wdata[3:0];
 end
-wire [3:0] dma_page = !dack_n[2] ? page[1] : !dack_n[3] ? page[2] : page[3];
+always_ff @(posedge clk) page <= page_next;
 
-// the bus address: the DMA's while it owns the bus, else the CPU's
-assign bus_addr  = dma_owns && !(&dack_n) ? {dma_page, dma_addr} : cpu_addr;
+// the bus address: the DMA's while it owns the bus, else the CPU's.
+// Timing (pc10-iii): the select and the page are registers whose D inputs are
+// the original expressions on the D inputs of the registers they are made of
+// (dma_wait, aen, DACK, the page registers), so they hold the original values
+// in every clk (checked in simulation), and bus_addr is one LUT behind
+// registers. Originally:
+//   wire [3:0] dma_page = !dack_n[2] ? page[1] : !dack_n[3] ? page[2] : page[3];
+//   assign bus_addr  = dma_owns && !(&dack_n) ? {dma_page, dma_addr} : cpu_addr;
+logic       dma_sel_q;
+logic [3:0] dma_page_q;
+always_ff @(posedge clk) begin
+    dma_sel_q  <= dma_wait_next && aen_next && !(&dack_n_next);
+    dma_page_q <= !dack_n_next[2] ? page_next[1] : !dack_n_next[3] ? page_next[2] : page_next[3];
+end
+assign bus_addr  = dma_sel_q ? {dma_page_q, dma_addr} : cpu_addr;
+
+`ifndef SYNTHESIS
+wire [3:0] dma_page_ref = !dack_n[2] ? page[1] : !dack_n[3] ? page[2] : page[3];
+always_ff @(posedge clk)
+    if (!reset && bus_addr != (dma_owns && !(&dack_n) ? {dma_page_ref, dma_addr} : cpu_addr))
+        $fatal(1, "xt_board: registered bus address select differs from the original");
+`endif
 
 // ------------------------------------------------------------ 8253
 logic [7:0] pit_dout;

@@ -29,6 +29,7 @@ module KF8237 (
     output  logic           output_highst_address,
     output  logic           hold_request,
     output  logic   [3:0]   dma_acknowledge,
+    output  logic   [3:0]   dma_acknowledge_next,   // pc10-iii: DACK of the next clk
     output  logic           address_enable,
     output  logic           address_strobe,
     output  logic           memory_read_n,
@@ -223,6 +224,7 @@ module KF8237 (
         .hold_request                       (hold_request),
         .hold_acknowledge                   (hold_acknowledge),
         .dma_acknowledge                    (dma_acknowledge),
+        .dma_acknowledge_next               (dma_acknowledge_next),
         .address_enable                     (address_enable),
         .address_strobe                     (address_strobe),
         .output_highst_address              (output_highst_address),

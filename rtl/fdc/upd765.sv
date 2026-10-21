@@ -187,6 +187,8 @@ wire [7:0]  id_r     = 8'(rsec) + 8'd1;
 ph_t        ph;
 ex_t        ex;
 op_t        op;
+// pc10-iii (timing): decodes of op as registers of their own, loaded with op
+logic       op_rtrk, op_rdany;          // op == OP_RTRK, op == OP_RD || op == OP_RDDEL
 logic [3:0] cmd_len, cmd_n;
 logic [7:0] cmd_buf [9];
 logic       exec_go;
@@ -291,7 +293,7 @@ logic [16:0] pf_tag;
 always_comb begin
     pf_ok  = 1'b0;
     pf_tag = {drv_cyl, hd, r_r + 8'd1};
-    if (op == OP_RD || op == OP_RDDEL) begin
+    if (op_rdany) begin
         if (r_r != eot_r) begin
             pf_ok  = c_r == drv_cyl && h_r == {7'd0, hd} && n_r == 8'd2 &&
                      r_r + 8'd1 <= {2'b00, geo_spt};
@@ -302,7 +304,7 @@ always_comb begin
     end
 end
 
-wire [16:0] cur_tag  = {drv_cyl, hd, (op == OP_RTRK) ? id_r : r_r};
+wire [16:0] cur_tag  = {drv_cyl, hd, op_rtrk ? id_r : r_r};
 wire        slot_free = slot_st[xslot] != SL_DIRTY && slot_st[xslot] != SL_BUSYW;
 wire        wslot     = slot_st[0] != SL_DIRTY;    // slot to commit next
 wire        drain_ok  = !dir_wr || (slot_st[0] != SL_DIRTY && slot_st[0] != SL_BUSYW &&
@@ -393,6 +395,7 @@ always_ff @(posedge clk) begin
 
     if (reset) begin
         ph <= PH_RESET;  ex <= EX_IDLE;  op <= OP_INV;
+        op_rtrk <= 1'b0;  op_rdany <= 1'b0;
         rst_cnt <= 11'(RESET_US);
         cmd_n <= 4'd0;  cmd_len <= 4'd1;  res_i <= 3'd0;  res_n <= 3'd0;
         rqm_dly <= 5'd0;
@@ -492,6 +495,8 @@ always_ff @(posedge clk) begin
             cmd_buf[cmd_n] <= cpu_wdata;
             if (cmd_n == 4'd0) begin
                 op <= dec_op;  cmd_len <= dec_len;
+                op_rtrk  <= dec_op == OP_RTRK;
+                op_rdany <= dec_op == OP_RD || dec_op == OP_RDDEL;
                 mt <= cpu_wdata[7];  mf <= cpu_wdata[6];  sk <= cpu_wdata[5];
                 if (dec_op == OP_INV) begin
                     res[0] <= 8'h80;  res_n <= 3'd1;  res_i <= 3'd0;
@@ -775,6 +780,12 @@ always_ff @(posedge clk) begin
         end
     end
 end
+
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (!reset && (op_rtrk != (op == OP_RTRK) || op_rdany != (op == OP_RD || op == OP_RDDEL)))
+        $fatal(1, "upd765: registered op decodes differ from op");
+`endif
 
 // ======================================================================
 // seeks: one step engine per unit (overlapped seeks), all step pulses go to

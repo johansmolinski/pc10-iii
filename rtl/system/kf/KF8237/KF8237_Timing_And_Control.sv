@@ -55,6 +55,7 @@ module KF8237_Timing_And_Control (
     output  logic           hold_request,
     input   logic           hold_acknowledge,
     output  logic   [3:0]   dma_acknowledge,
+    output  logic   [3:0]   dma_acknowledge_next,   // pc10-iii: the value of the next clk
     output  logic           address_enable,
     output  logic           address_strobe,
     output  logic           output_highst_address,
@@ -282,7 +283,17 @@ module KF8237_Timing_And_Control (
     always_comb begin
         address_hold_config         = ((4'b0001 == dma_acknowledge_internal) & (chanel_0_address_hold_enable));
         decrement_address_config    = address_decrement_select[dma_select];
-        next_word                   = ((next_state == S4) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ? 1'b1 : 1'b0;
+        // pc10-iii (timing): READY last. next_state is S4 without READY only
+        // from S1 in cascade mode (no next_word) and from S4 in cascade mode
+        // (likewise); with READY from S2 (compressed timing, verify), S3
+        // (verify) and SW. So this is the original expression, with READY one
+        // LUT before the address and count registers' clock enables instead of
+        // at the input of the state decoder (checked in simulation below).
+        //   next_word                   = ((next_state == S4) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ? 1'b1 : 1'b0;
+        next_word                   = ready && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE) &&
+                                      (((state == S2) && compressed_timing && (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY)) ||
+                                       ((state == S3) && (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY)) ||
+                                       (state == SW));
         // TODO: output_temporary_data  (Memory-to-Memory)
 
         casez (state)
@@ -426,7 +437,54 @@ module KF8237_Timing_And_Control (
             dma_acknowledge_ff <= dma_acknowledge_ff;
     end
 
-    assign  dma_acknowledge = (dack_sense_active_high) ? dma_acknowledge_ff : ~dma_acknowledge_ff;
+    // pc10-iii (timing): DACK is a register of its own instead of the XOR of the
+    // polarity bit and dma_acknowledge_ff, which the system board decodes into
+    // the bus address. Its D input is the XOR of the two registers' D inputs,
+    // so it equals the original combinational output in every clk (checked in
+    // simulation below). The board also gets that D input
+    // (dma_acknowledge_next) to register what it derives from DACK.
+    //   assign  dma_acknowledge = (dack_sense_active_high) ? dma_acknowledge_ff : ~dma_acknowledge_ff;
+    logic           dack_sense_next;
+    logic   [3:0]   dma_acknowledge_ff_next;
+    logic   [3:0]   dma_acknowledge_q;
+    always_comb begin
+        if (master_clear)
+            dack_sense_next = 1'b0;
+        else if (write_command_register)
+            dack_sense_next = internal_data_bus[7];
+        else
+            dack_sense_next = dack_sense_active_high;
+
+        if (master_clear)
+            dma_acknowledge_ff_next = 0;
+        else if (cpu_clock_negedge)
+            if (next_state == S2)
+                dma_acknowledge_ff_next = dma_acknowledge_internal;
+            else if (next_state == SI)
+                dma_acknowledge_ff_next = 0;
+            else
+                dma_acknowledge_ff_next = dma_acknowledge_ff;
+        else
+            dma_acknowledge_ff_next = dma_acknowledge_ff;
+    end
+    assign  dma_acknowledge_next = (dack_sense_next) ? dma_acknowledge_ff_next : ~dma_acknowledge_ff_next;
+
+    always_ff @(posedge clock, posedge reset) begin
+        if (reset)
+            dma_acknowledge_q <= 4'b1111;       // dack_sense_active_high = 0, ff = 0
+        else
+            dma_acknowledge_q <= dma_acknowledge_next;
+    end
+    assign  dma_acknowledge = dma_acknowledge_q;
+
+`ifndef SYNTHESIS
+    always_ff @(posedge clock)
+        if (!reset && next_word !== (((next_state == S4) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ? 1'b1 : 1'b0))
+            $fatal(1, "KF8237: next_word differs from the original");
+    always_ff @(posedge clock)
+        if (!reset && dma_acknowledge_q !== ((dack_sense_active_high) ? dma_acknowledge_ff : ~dma_acknowledge_ff))
+            $fatal(1, "KF8237: registered DACK differs from the original");
+`endif
 
     //
     // IO Read Signal

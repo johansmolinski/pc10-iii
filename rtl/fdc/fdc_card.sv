@@ -199,7 +199,14 @@ assign fdc_active = active;
 wire [7:0]  g_tracks = img_tracks[pd];
 wire [1:0]  g_heads  = img_heads[pd];
 wire [5:0]  g_spt    = img_spt[pd];
-wire [15:0] x_lba    = 16'(({8'd0, x_cyl} * 16'(g_heads) + 16'(x_head)) * 16'(g_spt) + 16'(x_sec) - 16'd1);
+// Timing (pc10-iii, doc/timing.md): the image address is computed for both
+// drives' geometries and the DOR's drive select picks one at the end, so the
+// DOR is one LUT before the sector port's LBA register instead of in front of
+// the multiplication. The same value in every clk. Originally:
+//   wire [15:0] x_lba    = 16'(({8'd0, x_cyl} * 16'(g_heads) + 16'(x_head)) * 16'(g_spt) + 16'(x_sec) - 16'd1);
+wire [15:0] x_lba_d0 = 16'(({8'd0, x_cyl} * 16'(img_heads[0]) + 16'(x_head)) * 16'(img_spt[0]) + 16'(x_sec) - 16'd1);
+wire [15:0] x_lba_d1 = 16'(({8'd0, x_cyl} * 16'(img_heads[1]) + 16'(x_head)) * 16'(img_spt[1]) + 16'(x_sec) - 16'd1);
+wire [15:0] x_lba    = pd ? x_lba_d1 : x_lba_d0;
 
 upd765 #(
     .TIME_SCALE   (TIME_SCALE),
