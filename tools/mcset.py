@@ -4,7 +4,8 @@
   mcset.py microcode.txt ADDR=HHHHLLLL [ADDR=HHHHLLLL ...]
 
 ADDR and the word are hex. The listing keeps its comments; only the two data
-lines after "p 00 00000 00001 ADDR" change. Prints old -> new for each word.
+lines after "p 00 00000 00001 ADDR" change. An address the listing does not
+have yet is appended at its end. Prints old -> new for each word.
 """
 import sys
 
@@ -38,9 +39,12 @@ def main():
                 i += 3
                 continue
         i += 1
-    missing = set(want) - done
-    if missing:
-        sys.exit('not found: ' + ' '.join(f'{a:04X}' for a in sorted(missing)))
+    for addr in sorted(set(want) - done):
+        new = want[addr]
+        lines.extend(['#', f'p 00 00000 00001 {addr:04X}',
+                      f'p 01 00000 00001 {new >> 16:04X}',
+                      f'p 01 00000 00001 {new & 0xFFFF:04X}'])
+        print(f'{addr:04X}: (new) -> {new:08X}')
     open(path, 'w').write('\n'.join(lines))
 
 

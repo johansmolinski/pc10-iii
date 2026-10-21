@@ -32,7 +32,9 @@
 //               by the BIU from the cycle in which it read the opcode, input
 //               EU_CYC; the EU's own dispatch may come later), or
 //   bit 15 = 1: n 8088 clocks have passed since the SYNC started waiting
-//               (input EU_STEP marks every 8088 clock).
+//               (input EU_STEP marks every 8088 clock), or
+//   bit 14 = 1: n 8088 clocks have passed since the last queue read (input
+//               EU_SINCE_READ; e.g. a displacement after the ModR/M byte).
 // Type 0 with immediate 0 stays a NOP. Note that the microcode addresses
 // 0x09C9, 0x0A03, 0x0E76, 0x0F02 and 0x0F11 are compared below; code there
 // must not move.
@@ -70,6 +72,7 @@ module mcl86_eu_core
     input               TEST_N_INT,             // Pipelined 8088 TEST_n pin
     input               EU_STEP,                // pc10-iii: one CORE_CLK per 8088 clock
     input      [11:0]   EU_CYC,                 // pc10-iii: 8088 clocks since the opcode read (BIU)
+    input      [11:0]   EU_SINCE_READ,          // pc10-iii: 8088 clocks since the last queue read (BIU)
     output     [1:0]    EU_QREAD,               // pc10-iii: the EU uses the queue top: 01 opcode, 11 other
 
     
@@ -373,6 +376,8 @@ wire eu_is_sync   = eu_opcode_type==3'h0 && eu_rom_data[31]==1'b0 &&
                     eu_opcode_immediate!=16'h0 && eu_stall_pipeline==1'b0;
 wire eu_sync_done = eu_opcode_immediate[15] ?
                         (eu_sync_armed && eu_sync_rel==12'h0) :
+                    eu_opcode_immediate[14] ?
+                        (EU_SINCE_READ >= eu_opcode_immediate[11:0]) :
                         (EU_CYC >= eu_opcode_immediate[11:0]);
 assign eu_sync_wait = eu_is_sync && !eu_sync_done;
 

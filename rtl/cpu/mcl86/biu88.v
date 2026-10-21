@@ -38,14 +38,30 @@
 // The MCL86 cycle counter (strobe 10) counts 100 MHz core clocks as before
 // (legacy microcode) unless bit 13 of the loaded value is set. Then it counts
 // 8088 clocks, and the value n (bits 11:0) is
-//   bit 12 = 0: a cycle of the instruction: the counter reaches zero n clocks
-//               after the cycle in which the EU dispatched it (absolute);
-//   bit 12 = 1: n clocks from now (relative; for shared procedures).
+//   bit 12 = 0, bit 14 = 1 (0xE00n): cycle n of the instruction, counted
+//               from the cycle in which its opcode was read (absolute);
+//   bit 12 = 1, bit 14 = 1 (0xF00n): n clocks from now;
+//   bit 12 = 1, bit 14 = 0 (0xB00n): n clocks after the next EU bus transfer
+//               ends (where the EU resumes; e.g. 0 = a write's T3);
+//   bit 12 = 0, bit 14 = 0 (0xA00n): n clocks after the last queue read
+//               (the 8088 reads the next opcode a fixed number of clocks
+//               after an instruction's last operand byte).
 // A cycle-mode load marks the END of the instruction (see below); mid-
 // instruction timing uses the EU's SYNC microinstruction instead.
 //
 // Extra request codes (not in MCL86's BIU):
 //   0x1E  SUSP   suspend prefetching; done when no code fetch is running
+// Extra strobe (register strobe 11, code 6): request release. The next EU bus
+// request is held until n 8088 clocks (n = DATAOUT bits 11:0) after
+//   the last queue read          (bits 14:13 = 00),
+//   the end of the last EU bus transfer, i.e. where the EU resumed
+//                                (bit 13 = 1),
+//   the opcode read              (bit 14 = 1),
+// and then started as if the EU had made it at the start of that cycle. An
+// unused release is dropped at the next opcode read. The EU can
+// compute an effective address faster than the 8088; CALC_EA sets the
+// release to the cycle in which the 8088's EA microcode issues the operand
+// read.
 //
 // Not yet modelled: wait states (READY), DMA/HOLD, LOCK, HALT bus status
 // details, NMI/INTR timing.
@@ -95,6 +111,7 @@ module biu88 (
     output     [15:0]   BIU_REGISTER_REG,
     output     [15:0]   BIU_RETURN_DATA,
     output     [11:0]   BIU_CYC,            // 8088 clocks since the opcode read
+    output     [11:0]   BIU_SINCE_READ,     // 8088 clocks since the last queue read
 
     // test only (SingleStepTests): install a prefetched queue
     input               tb_preload,
@@ -132,7 +149,8 @@ localparam [3:0] RP_IDLE   = 4'd0,  // no request
                  RP_ADDR2  = 4'd4,  // after an abort/delay: the new address cycle
                  RP_T4     = 4'd5,  // run out a T4 before the new T1
                  RP_WAIT   = 4'd6,  // bus cycle running; wait for the resume point
-                 RP_SUSP   = 4'd7;  // SUSP: wait for a running code fetch
+                 RP_SUSP   = 4'd7,  // SUSP: wait for a running code fetch
+                 RP_HOLD   = 4'd8;  // request held until its release cycle
 
 // ------------------------------------------------------------------ state
 
@@ -151,7 +169,8 @@ reg  [15:0] pc;                   // offset of the next code fetch
 reg  [7:0]  taken0, taken1;       // bytes read from the queue, not yet
 reg  [1:0]  ntaken;               // popped by the EU (taken0 = its view's top)
 reg         preread;              // taken1/taken0 holds an opcode the BIU read
-reg         end_armed;            // an absolute end counter is running
+reg         end_armed;            // an end counter is running
+reg         end_after_done;       // the end starts at the next transfer end
 reg  [15:0] eu_ip;                // offset of the EU's current byte
 reg  [1:0]  queue_op;             // queue operation of the running cycle
 reg  [7:0]  queue_byte;
@@ -160,6 +179,13 @@ reg  [15:0] reg_es, reg_ss, reg_cs, reg_ds, reg_rm, reg_reg;
 reg  [12:0] counter;
 reg         counter_cycles;
 reg  [11:0] since_dispatch;       // 8088 clocks since the EU's last dispatch
+reg  [11:0] since_read;           // 8088 clocks since the last queue read
+reg         rel_armed;            // the next EU bus request waits for rel_n
+reg  [11:0] rel_n;
+reg         rel_abs;              // rel_n counts from the opcode read,
+reg         rel_done;             // or from the last EU transfer's end, else
+                                  // from the last queue read
+reg  [11:0] since_done;           // 8088 clocks since an EU transfer ended
 
 // EU request being served
 reg  [3:0]  rphase;
@@ -204,6 +230,7 @@ assign BIU_REGISTER_RM      = reg_rm;
 assign BIU_REGISTER_REG     = reg_reg;
 assign BIU_RETURN_DATA      = return_data;
 assign BIU_CYC              = since_dispatch;
+assign BIU_SINCE_READ       = since_read;
 assign BIU_DONE             = done;
 assign BIU_CLK_COUNTER_ZERO = counter == 13'd0;
 assign BIU_NMI_CAUGHT       = 1'b0;
@@ -228,6 +255,11 @@ assign dbg_queue_len = qlen;
 // All of these work on the state registers with blocking assignments; they
 // are only called from the one clocked block below, which is how the
 // procedural MartyPC model maps onto a single synchronous update.
+
+function rel_due;             // the held request may go
+    input [11:0] n;
+    rel_due = rel_abs ? since_dispatch >= n : rel_done ? since_done >= n : since_read >= n;
+endfunction
 
 function has_room;            // room for a 1-byte fetch
     input [2:0] len;
@@ -424,7 +456,11 @@ task take_byte;
         queue_byte = q0;
         q_pop;
         queue_op   = op;
-        if (op == QO_FIRST) since_dispatch = 12'd0;
+        if (op == QO_FIRST) begin
+            since_dispatch = 12'd0;
+            rel_armed = 1'b0;           // an unused release ends with its instruction
+        end
+        since_read = 12'd0;
         fetch_on_queue_read;
     end
 endtask
@@ -522,12 +558,13 @@ always @(posedge CORE_CLK_INT) begin
         address_latch = 20'h0;  data_bus = 8'h0;  discard = 1'b0;
         q0 = 8'h0; q1 = 8'h0; q2 = 8'h0; q3 = 8'h0;  qlen = 3'd0;
         pc = 16'h0;  taken0 = 8'h0;  taken1 = 8'h0;  ntaken = 2'd0;
-        preread = 1'b0;  end_armed = 1'b0;
+        preread = 1'b0;  end_armed = 1'b0;  end_after_done = 1'b0;
         eu_ip = 16'h0;  queue_op = QO_IDLE;  QS_OUT = QO_IDLE;
         queue_byte = 8'h0;  QS_BYTE = 8'h0;
         reg_es = 16'h0; reg_ss = 16'h0; reg_cs = 16'hFFFF; reg_ds = 16'h0;
         reg_rm = 16'h0; reg_reg = 16'h0;
-        counter = 13'd0;  counter_cycles = 1'b0;  since_dispatch = 12'd0;
+        counter = 13'd0;  counter_cycles = 1'b0;  since_dispatch = 12'd0;  since_read = 12'd0;
+        rel_armed = 1'b0;  rel_n = 12'd0;  rel_abs = 1'b0;  rel_done = 1'b0;  since_done = 12'd0;
         rphase = RP_IDLE;  r_type = ST_PASV;  r_addr0 = 20'h0;  r_addr1 = 20'h0;
         r_data = 16'h0;  r_word = 1'b0;  r_second = 1'b0;
         r_was_delay = 1'b0;  r_abort = 1'b0;  r_delay_cnt = 2'd0;
@@ -552,6 +589,15 @@ always @(posedge CORE_CLK_INT) begin
 
             if (counter_cycles && counter != 13'd0) counter = counter - 13'd1;
             if (since_dispatch != 12'hFFF) since_dispatch = since_dispatch + 12'd1;
+            if (since_read != 12'hFFF) since_read = since_read + 12'd1;
+            if (since_done != 12'hFFF) since_done = since_done + 12'd1;
+
+            // a held request is released at the start of its cycle
+            if (rphase == RP_HOLD && rel_due(rel_n)) begin
+                rel_armed = 1'b0;
+                request_begin;
+                request_advance;
+            end
 
             // request phases that need a whole cycle
             case (rphase)
@@ -576,11 +622,15 @@ always @(posedge CORE_CLK_INT) begin
                         end else begin
                             rphase = RP_IDLE;
                             done = 1'b1;
+                            since_done = 12'd0;
+                            if (end_after_done) begin end_after_done = 1'b0; end_armed = 1'b1; end
                         end
                     end else if (t_cycle == T3 && (r_type == ST_MEMW || r_type == ST_IOW) &&
                                  (!r_word || r_second)) begin
                         rphase = RP_IDLE;
                         done = 1'b1;
+                        since_done = 12'd0;
+                        if (end_after_done) begin end_after_done = 1'b0; end_armed = 1'b1; end
                     end
                 end
                 RP_SUSP:
@@ -609,20 +659,34 @@ always @(posedge CORE_CLK_INT) begin
                 3'h3: reg_ds  = EU_BIU_DATAOUT;
                 3'h4: reg_rm  = EU_BIU_DATAOUT;
                 3'h5: reg_reg = EU_BIU_DATAOUT;
+                3'h6: begin                         // pc10-iii: request release
+                    rel_armed = 1'b1;
+                    rel_n     = EU_BIU_DATAOUT[11:0];
+                    rel_abs   = EU_BIU_DATAOUT[14];
+                    rel_done  = EU_BIU_DATAOUT[13];
+                end
                 default: ;
             endcase
         end
         // the first end armed in an instruction stands: later loads are
         // ignored until it has fired and the EU has dispatched the next opcode
-        if (eu_strobe == 2'b10 && !end_armed && !preread) begin
+        if (eu_strobe == 2'b10 && !end_armed && !preread && !end_after_done) begin
             counter        = EU_BIU_DATAOUT[12:0];
             counter_cycles = EU_BIU_DATAOUT[13];
             // cycle units: bit 12 = 0: zero at cycle n of the instruction
             // (0 = the cycle of its dispatch), wherever in the instruction the
             // load happens; bit 12 = 1: zero n cycles from now
             if (EU_BIU_DATAOUT[13]) begin
-                if (EU_BIU_DATAOUT[12]) begin
+                if (EU_BIU_DATAOUT[12] && EU_BIU_DATAOUT[14]) begin
                     counter = {1'b0, EU_BIU_DATAOUT[11:0]};
+                    end_armed = 1'b1;
+                end else if (EU_BIU_DATAOUT[12]) begin
+                    // n clocks after the next EU transfer ends (0xB00n)
+                    counter = {1'b0, EU_BIU_DATAOUT[11:0]};
+                    end_after_done = 1'b1;
+                end else if (!EU_BIU_DATAOUT[14]) begin
+                    counter = EU_BIU_DATAOUT[11:0] > since_read ?
+                              {1'b0, EU_BIU_DATAOUT[11:0] - since_read} : 13'd0;
                     end_armed = 1'b1;
                 end else begin
                     counter = EU_BIU_DATAOUT[11:0] > since_dispatch ?
@@ -673,6 +737,7 @@ always @(posedge CORE_CLK_INT) begin
             case (eu_req_code)
                 5'h19: begin                        // jump: flush the queue
                     qlen = 3'd0; ntaken = 2'd0; preread = 1'b0; end_armed = 1'b0;
+                    rel_armed = 1'b0; end_after_done = 1'b0;
                     pc = EU_REGISTER_R3; eu_ip = EU_REGISTER_R3;
                     queue_op = QO_FLUSH; queue_byte = 8'h00;
                     if (latch == ST_CODE) discard = 1'b1;
@@ -723,7 +788,10 @@ always @(posedge CORE_CLK_INT) begin
                     end
                     if (r_type == ST_PASV)
                         done = 1'b1;
+                    else if (rel_armed && !rel_due(rel_n))
+                        rphase = RP_HOLD;           // the EU is early: hold it
                     else begin
+                        rel_armed = 1'b0;
                         request_begin;
                         request_advance;
                     end

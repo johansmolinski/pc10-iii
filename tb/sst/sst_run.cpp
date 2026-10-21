@@ -4,6 +4,9 @@
 //     -v IDX      print the trace comparison of test IDX (per file)
 //     -n N        run only the first N tests of each file
 //     -f          stop at the first failing test of each file and print it
+//     -r / -m     only tests without / with a memory operand
+//     -p          compare only up to the first EU bus cycle's T1 (tuning)
+//     -d          dump every cycle with the EU events (debugging)
 //
 // The CPU gets its registers from a loader program served on the bus (POPF,
 // MOV r16,imm, MOV sreg,AX, JMP FAR), the way Arduino8088 sets up the real
@@ -161,6 +164,7 @@ static int prefix_count(const Test &t) {
 }
 
 static bool g_dump = false;   // -d: print every bus cycle of the test
+static bool g_prefix = false; // -p: compare only up to the first EU bus cycle's T1
 static long g_cyc = 0;        // 8088 cycle number (for -d)
 
 static Result run_test(Sim &sim, const Test &t) {
@@ -454,7 +458,14 @@ static Result run_test(Sim &sim, const Test &t) {
     if (graded) {
         r.len_ok = r.got.size() == t.cycles.size();
         bool ok = r.len_ok;
-        for (size_t i = 0; ok && i < t.cycles.size(); i++) {
+        size_t upto = t.cycles.size();
+        if (g_prefix) {
+            // tuning aid: only the cycles up to the first non-code T1
+            for (size_t i = 0; i < t.cycles.size(); i++)
+                if (t.cycles[i].ale && t.cycles[i].bus != "CODE") { upto = i + 1; break; }
+            ok = r.got.size() >= upto;
+        }
+        for (size_t i = 0; ok && i < upto; i++) {
             const Cycle &a = t.cycles[i], &b = r.got[i];
             if (a.ale != b.ale || a.bus != b.bus || a.t != b.t || a.qop != b.qop)
                 ok = false;
@@ -496,13 +507,16 @@ static void print_trace(const Test &t, const Result &r) {
 int main(int argc, char **argv) {
     Verilated::commandArgs(argc, argv);
     int verbose_idx = -1, limit = -1;
-    bool first_fail = false;
+    bool first_fail = false, only_reg = false, only_mem = false;
     std::vector<std::string> files;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-v") && i + 1 < argc) verbose_idx = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-n") && i + 1 < argc) limit = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-f")) first_fail = true;
         else if (!strcmp(argv[i], "-d")) g_dump = true;
+        else if (!strcmp(argv[i], "-r")) only_reg = true;
+        else if (!strcmp(argv[i], "-p")) g_prefix = true;
+        else if (!strcmp(argv[i], "-m")) only_mem = true;
         else if (argv[i][0] != '+') files.push_back(argv[i]);
     }
     Sim sim;
@@ -516,6 +530,9 @@ int main(int argc, char **argv) {
         bool shown = false;
         while (read_test(in, t)) {
             if (limit >= 0 && n >= limit) break;
+            // -r / -m: only tests without / with a memory operand
+            bool mem = t.name.find('[') != std::string::npos;
+            if ((only_reg && mem) || (only_mem && !mem)) continue;
             Result r = run_test(sim, t);
             n++;
             if (!r.ran) tmo++;

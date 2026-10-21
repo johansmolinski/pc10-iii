@@ -8503,20 +8503,21 @@ p 00 00000 00001 0782
 p 01 00000 00001 4DDF
 p 01 00000 00001 C003
 #
-# biu_dataout = r2
+# biu_dataout = r2 (pc10-iii: the request release, see the EA modes at 0x1100)
 p 00 00000 00001 0783
 p 01 00000 00001 5FFB
 p 01 00000 00001 0000
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: Strobe BIU - set the request release (register strobe, code 6),
+# instead of CALL WAIT_CLOCKS
 p 00 00000 00001 0784
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
 #
-# Return to calling code
+# pc10-iii: Debounce BIU Strobe (and its register code)
 p 00 00000 00001 0785
-p 01 00000 00001 1030
-p 01 00000 00001 4000
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
 #
 #
 # --------------------------------------------------------------------
@@ -9075,8 +9076,8 @@ p 01 00000 00001 0000
 #
 # Write 7 clocks to r2
 p 00 00000 00001 0800
-p 01 00000 00001 5BFF
-p 01 00000 00001 C08C
+p 01 00000 00001 1000
+p 01 00000 00001 1100
 #
 # r0 = BX
 p 00 00000 00001 0801
@@ -9100,8 +9101,8 @@ p 01 00000 00001 0780
 #
 # Write 8 clocks to r2
 p 00 00000 00001 0808
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0A0
+p 01 00000 00001 1000
+p 01 00000 00001 1110
 #
 # r0 = BX
 p 00 00000 00001 0809
@@ -9125,8 +9126,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 0810
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 1120
 #
 # Write 8 clocks to r2
 p 00 00000 00001 0811
@@ -9155,8 +9156,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 0818
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 1130
 #
 # Write 7 clocks to r2
 p 00 00000 00001 0819
@@ -9185,8 +9186,8 @@ p 01 00000 00001 0780
 #
 # Write 5 clocks to r2
 p 00 00000 00001 0820
-p 01 00000 00001 5BFF
-p 01 00000 00001 C064
+p 01 00000 00001 1000
+p 01 00000 00001 1140
 #
 # r0 = SI
 p 00 00000 00001 0821
@@ -9205,8 +9206,8 @@ p 01 00000 00001 0780
 #
 # Write 5 clocks to r2
 p 00 00000 00001 0828
-p 01 00000 00001 5BFF
-p 01 00000 00001 C064
+p 01 00000 00001 1000
+p 01 00000 00001 1150
 #
 # r0 = DI
 p 00 00000 00001 0829
@@ -9225,8 +9226,8 @@ p 01 00000 00001 0780
 #
 # Write 6 clocks to r2
 p 00 00000 00001 0830
-p 01 00000 00001 5BFF
-p 01 00000 00001 C078
+p 01 00000 00001 1000
+p 01 00000 00001 1160
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte
 p 00 00000 00001 0831
@@ -9250,8 +9251,8 @@ p 01 00000 00001 0780
 #
 # Write 5 clocks to r2
 p 00 00000 00001 0838
-p 01 00000 00001 5BFF
-p 01 00000 00001 C064
+p 01 00000 00001 1000
+p 01 00000 00001 1170
 #
 # r0 = BX
 p 00 00000 00001 0839
@@ -9270,8 +9271,8 @@ p 01 00000 00001 0780
 #
 # Write 11 clocks to r2
 p 00 00000 00001 0840
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0DC
+p 01 00000 00001 1000
+p 01 00000 00001 1180
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3
 p 00 00000 00001 0841
@@ -9310,8 +9311,8 @@ p 01 00000 00001 0780
 #
 # Write 12 clocks to r2
 p 00 00000 00001 0848
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0F0
+p 01 00000 00001 1000
+p 01 00000 00001 1190
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3
 p 00 00000 00001 0849
@@ -9350,8 +9351,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 0850
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 11A0
 #
 # Write 12 clocks to r2
 p 00 00000 00001 0851
@@ -9395,8 +9396,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 0858
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 11B0
 #
 # Write 11 clocks to r2
 p 00 00000 00001 0859
@@ -9440,8 +9441,8 @@ p 01 00000 00001 0780
 #
 # Write 9 clocks to r2
 p 00 00000 00001 0860
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0B4
+p 01 00000 00001 1000
+p 01 00000 00001 11C0
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3
 p 00 00000 00001 0861
@@ -9475,8 +9476,8 @@ p 01 00000 00001 0780
 #
 # Write 9 clocks to r2
 p 00 00000 00001 0868
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0B4
+p 01 00000 00001 1000
+p 01 00000 00001 11D0
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3
 p 00 00000 00001 0869
@@ -9510,8 +9511,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 0870
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 11E0
 #
 # Write 9 clocks to r2
 p 00 00000 00001 0871
@@ -9550,8 +9551,8 @@ p 01 00000 00001 0780
 #
 # Write 9 clocks to r2
 p 00 00000 00001 0878
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0B4
+p 01 00000 00001 1000
+p 01 00000 00001 11F0
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3
 p 00 00000 00001 0879
@@ -9586,8 +9587,8 @@ p 01 00000 00001 0780
 #
 # Write 11 clocks to r2
 p 00 00000 00001 0880
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0DC
+p 01 00000 00001 1000
+p 01 00000 00001 1200
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte into r3
 p 00 00000 00001 0881
@@ -9621,8 +9622,8 @@ p 01 00000 00001 0780
 #
 # Write 12 clocks to r2
 p 00 00000 00001 0888
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0F0
+p 01 00000 00001 1000
+p 01 00000 00001 1210
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte into r3
 p 00 00000 00001 0889
@@ -9656,8 +9657,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 0890
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 1220
 #
 # Write 12 clocks to r2
 p 00 00000 00001 0891
@@ -9696,8 +9697,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 0898
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 1230
 #
 # Write 11 clocks to r2
 p 00 00000 00001 0899
@@ -9736,8 +9737,8 @@ p 01 00000 00001 0780
 #
 # Write 9 clocks to r2
 p 00 00000 00001 08A0
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0B4
+p 01 00000 00001 1000
+p 01 00000 00001 1240
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte into r3
 p 00 00000 00001 08A1
@@ -9766,8 +9767,8 @@ p 01 00000 00001 0780
 #
 # Write 9 clocks to r2
 p 00 00000 00001 08A8
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0B4
+p 01 00000 00001 1000
+p 01 00000 00001 1250
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte into r3
 p 00 00000 00001 08A9
@@ -9796,8 +9797,8 @@ p 01 00000 00001 0780
 #
 # Set REPNZ to 1 to denote SS should be used
 p 00 00000 00001 08B0
-p 01 00000 00001 588F
-p 01 00000 00001 8000
+p 01 00000 00001 1000
+p 01 00000 00001 1260
 #
 # Write 9 clocks to r2
 p 00 00000 00001 08B1
@@ -9831,8 +9832,8 @@ p 01 00000 00001 0780
 #
 # Write 9 clocks to r2
 p 00 00000 00001 08B8
-p 01 00000 00001 5BFF
-p 01 00000 00001 C0B4
+p 01 00000 00001 1000
+p 01 00000 00001 1270
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte into r3
 p 00 00000 00001 08B9
@@ -10162,9 +10163,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0906
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0907
@@ -10203,9 +10205,10 @@ p 01 00000 00001 F7FE
 # ----------------
 #
 # CALL WRITEBACK_EA_BYTE
+# pc10-iii: through the patch at 0x1280 (times the write and the end)
 p 00 00000 00001 090D
 p 01 00000 00001 1100
-p 01 00000 00001 07E0
+p 01 00000 00001 1280
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode 
 p 00 00000 00001 090E
@@ -10230,9 +10233,10 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0915
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0916
@@ -10271,9 +10275,10 @@ p 01 00000 00001 F7FE
 # ----------------
 #
 # CALL WRITEBACK_EA_WORD
+# pc10-iii: through the patch at 0x1288 (times the write and the end)
 p 00 00000 00001 091C
 p 01 00000 00001 1100
-p 01 00000 00001 07E2
+p 01 00000 00001 1288
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode 
 p 00 00000 00001 091D
@@ -10299,9 +10304,10 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0924
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0925
@@ -10368,9 +10374,10 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0933
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0934
@@ -10511,9 +10518,10 @@ p 01 00000 00001 0943
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0950
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0951
@@ -10552,9 +10560,10 @@ p 01 00000 00001 090B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0956
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0957
@@ -10593,9 +10602,10 @@ p 01 00000 00001 091A
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 095C
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 095D
@@ -10634,9 +10644,10 @@ p 01 00000 00001 0929
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0962
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0963
@@ -10723,9 +10734,10 @@ p 01 00000 00001 0949
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0970
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0971
@@ -10764,9 +10776,10 @@ p 01 00000 00001 090B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0976
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0977
@@ -10805,9 +10818,10 @@ p 01 00000 00001 091A
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 097C
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 097D
@@ -10847,9 +10861,10 @@ p 01 00000 00001 0929
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0982
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0983
@@ -11029,9 +11044,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09A6
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 09A7
@@ -11070,9 +11086,10 @@ p 01 00000 00001 090D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09AC
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 09AD
@@ -11111,9 +11128,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09B2
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 09B3
@@ -11153,9 +11171,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09B8
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 09B9
@@ -11302,9 +11321,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09D2
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 09D3
@@ -11343,9 +11363,10 @@ p 01 00000 00001 090D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09D8
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 09D9
@@ -11384,9 +11405,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09DE
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 09DF
@@ -11426,9 +11448,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 09E4
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 09E5
@@ -11685,9 +11708,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A20
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A21
@@ -11726,9 +11750,10 @@ p 01 00000 00001 090D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A26
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A27
@@ -11767,9 +11792,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A2C
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0A2D
@@ -11808,9 +11834,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A32
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0A33
@@ -12046,9 +12073,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A60
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A61
@@ -12087,9 +12115,10 @@ p 01 00000 00001 090E
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A66
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A67
@@ -12128,9 +12157,10 @@ p 01 00000 00001 091D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A6C
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0A6D
@@ -12170,9 +12200,10 @@ p 01 00000 00001 092C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A72
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0A73
@@ -12279,9 +12310,10 @@ p 01 00000 00001 0944
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A88
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A89
@@ -12320,9 +12352,10 @@ p 01 00000 00001 090D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A8E
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A8F
@@ -12361,9 +12394,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A94
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0A95
@@ -12403,9 +12437,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0A9A
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0A9B
@@ -15470,9 +15505,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1070 (byte, end 1 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0CF0
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1070
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0CF1
@@ -15492,9 +15528,10 @@ p 01 00000 00001 090D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1088 (word, end 1 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0CF3
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1088
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0CF4
@@ -15514,9 +15551,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1070 (byte, end 1 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0CF6
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1070
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0CF7
@@ -15537,9 +15575,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1088 (word, end 1 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0CF9
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1088
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0CFA
@@ -15633,9 +15672,10 @@ p 01 00000 00001 0949
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0D0A
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1078
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0D0B
@@ -15674,9 +15714,10 @@ p 01 00000 00001 0942
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0D10
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1090
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0D11
@@ -15715,9 +15756,10 @@ p 01 00000 00001 0949
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: through the CALC_EA wrapper at 0x1080 (byte, end 3 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0D18
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1080
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0D19
@@ -15757,9 +15799,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: through the CALC_EA wrapper at 0x1098 (word, end 3 cycles after the ModR/M read, register operands)
 p 00 00000 00001 0D1F
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1098
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0D20
@@ -20244,3 +20287,882 @@ p 01 00000 00001 CFFF
 p 00 00000 00001 102A
 p 01 00000 00001 1030
 p 01 00000 00001 0000
+#
+# --------------------------------------------------------------------
+# CALC_EA with the end armed for register operands (mod = 11).
+# The 8088 reads the next opcode a fixed number of cycles after the ModR/M
+# byte when the operand is a register: ALU/TEST 2, MOV 1, XCHG 3. CALC_EA
+# decodes for longer than that, so the end is armed at the ModR/M read
+# itself: the wrappers (CALL instead of CALC_EA, 0x0760/0x0762) put the end
+# value in r2, do CALC_EA's head, read the ModR/M byte through the armed
+# entry at 0x1060 and continue CALC_EA at 0x0765. Memory operands arm
+# nothing here.
+#
+# Armed ModR/M entry: as 0x1018 (pop opcode, wait for the queue, SYNC 1), the
+# peek of 0x02AA/0x02AB, then: if mod = 11, end counter = r2.
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1060
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1061
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 1062
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 1063
+p 01 00000 00001 1002
+p 01 00000 00001 1062
+#
+# SYNC to cycle 1
+p 00 00000 00001 1064
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 1065
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 1066
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00C0 (MOD bits)
+p 00 00000 00001 1067
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11)
+p 00 00000 00001 1068
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero (memory operand) to the return
+p 00 00000 00001 1069
+p 01 00000 00001 1001
+p 01 00000 00001 106D
+#
+# biu_dataout = r2 (the end, cycles after this read)
+p 00 00000 00001 106A
+p 01 00000 00001 5FBF
+p 01 00000 00001 0000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 106B
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 106C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 106D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Wrapper byte, end 1 cycle(s) after the ModR/M read
+#
+# r2 = A001 (end counter: 1 cycle(s) after the last queue read)
+p 00 00000 00001 1070
+p 01 00000 00001 5BFF
+p 01 00000 00001 A001
+#
+# Set r0 to 0x0000 for byte instructions
+p 00 00000 00001 1071
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1072
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 1073
+p 01 00000 00001 1100
+p 01 00000 00001 1060
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1074
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# Wrapper byte, end 2 cycle(s) after the ModR/M read
+#
+# r2 = A002 (end counter: 2 cycle(s) after the last queue read)
+p 00 00000 00001 1078
+p 01 00000 00001 5BFF
+p 01 00000 00001 A002
+#
+# Set r0 to 0x0000 for byte instructions
+p 00 00000 00001 1079
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 107A
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 107B
+p 01 00000 00001 1100
+p 01 00000 00001 1060
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 107C
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# Wrapper byte, end 3 cycle(s) after the ModR/M read
+#
+# r2 = A003 (end counter: 3 cycle(s) after the last queue read)
+p 00 00000 00001 1080
+p 01 00000 00001 5BFF
+p 01 00000 00001 A003
+#
+# Set r0 to 0x0000 for byte instructions
+p 00 00000 00001 1081
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1082
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 1083
+p 01 00000 00001 1100
+p 01 00000 00001 1060
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1084
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# Wrapper word, end 1 cycle(s) after the ModR/M read
+#
+# r2 = A001 (end counter: 1 cycle(s) after the last queue read)
+p 00 00000 00001 1088
+p 01 00000 00001 5BFF
+p 01 00000 00001 A001
+#
+# Set r0 to 0x0008 for word instructions
+p 00 00000 00001 1089
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 108A
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 108B
+p 01 00000 00001 1100
+p 01 00000 00001 1060
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 108C
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# Wrapper word, end 2 cycle(s) after the ModR/M read
+#
+# r2 = A002 (end counter: 2 cycle(s) after the last queue read)
+p 00 00000 00001 1090
+p 01 00000 00001 5BFF
+p 01 00000 00001 A002
+#
+# Set r0 to 0x0008 for word instructions
+p 00 00000 00001 1091
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1092
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 1093
+p 01 00000 00001 1100
+p 01 00000 00001 1060
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1094
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# Wrapper word, end 3 cycle(s) after the ModR/M read
+#
+# r2 = A003 (end counter: 3 cycle(s) after the last queue read)
+p 00 00000 00001 1098
+p 01 00000 00001 5BFF
+p 01 00000 00001 A003
+#
+# Set r0 to 0x0008 for word instructions
+p 00 00000 00001 1099
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 109A
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 109B
+p 01 00000 00001 1100
+p 01 00000 00001 1060
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 109C
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# --------------------------------------------------------------------
+# CALC_EA memory modes, retimed (generated by tools/gen_ea_modes.py from the
+# routines at 0x0800-0x08BF, whose first words now jump here). Each copy
+#  - reads its displacement after a SYNC, 2 + pre cycles after the ModR/M
+#    byte (pre/post: MartyPC's per-mode EA costs);
+#  - puts the request release into r2: the 8088 issues the operand access
+#    2 + pre cycles after the ModR/M byte without displacement, 1 + post
+#    cycles after the last displacement byte with one. 0x0780 hands r2 to the
+#    BIU (register strobe 11, code 6), which holds the EU's next bus request
+#    until then.
+#
+# r2 = release (since the last queue read): 6 cycle(s) after the last queue read
+p 00 00000 00001 1100
+p 01 00000 00001 5BFF
+p 01 00000 00001 0006
+p 00 00000 00001 1101
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1102
+p 01 00000 00001 2969
+p 01 00000 00001 0000
+p 00 00000 00001 1103
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 7 cycle(s) after the last queue read
+p 00 00000 00001 1110
+p 01 00000 00001 5BFF
+p 01 00000 00001 0007
+p 00 00000 00001 1111
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1112
+p 01 00000 00001 2979
+p 01 00000 00001 0000
+p 00 00000 00001 1113
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 1120
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 7 cycle(s) after the last queue read
+p 00 00000 00001 1121
+p 01 00000 00001 5BFF
+p 01 00000 00001 0007
+p 00 00000 00001 1122
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 1123
+p 01 00000 00001 2969
+p 01 00000 00001 0000
+p 00 00000 00001 1124
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 1130
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 6 cycle(s) after the last queue read
+p 00 00000 00001 1131
+p 01 00000 00001 5BFF
+p 01 00000 00001 0006
+p 00 00000 00001 1132
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 1133
+p 01 00000 00001 2979
+p 01 00000 00001 0000
+p 00 00000 00001 1134
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 1140
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+p 00 00000 00001 1141
+p 01 00000 00001 596F
+p 01 00000 00001 0000
+p 00 00000 00001 1142
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 1150
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+p 00 00000 00001 1151
+p 01 00000 00001 597F
+p 01 00000 00001 0000
+p 00 00000 00001 1152
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 2 cycle(s) after the last queue read
+p 00 00000 00001 1160
+p 01 00000 00001 5BFF
+p 01 00000 00001 0002
+#
+# SYNC: the displacement is read 2 cycles after the ModR/M byte
+p 00 00000 00001 1161
+p 01 00000 00001 0000
+p 01 00000 00001 4002
+p 00 00000 00001 1162
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1163
+p 01 00000 00001 59FC
+p 01 00000 00001 0000
+p 00 00000 00001 1164
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 1170
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+p 00 00000 00001 1171
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1172
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 1180
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 6 cycles after the ModR/M byte
+p 00 00000 00001 1181
+p 01 00000 00001 0000
+p 01 00000 00001 4006
+p 00 00000 00001 1182
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 1183
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 1184
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1185
+p 01 00000 00001 2969
+p 01 00000 00001 0000
+p 00 00000 00001 1186
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1187
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 1190
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 7 cycles after the ModR/M byte
+p 00 00000 00001 1191
+p 01 00000 00001 0000
+p 01 00000 00001 4007
+p 00 00000 00001 1192
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 1193
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 1194
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1195
+p 01 00000 00001 2979
+p 01 00000 00001 0000
+p 00 00000 00001 1196
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1197
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 11A0
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 11A1
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 7 cycles after the ModR/M byte
+p 00 00000 00001 11A2
+p 01 00000 00001 0000
+p 01 00000 00001 4007
+p 00 00000 00001 11A3
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 11A4
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 11A5
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 11A6
+p 01 00000 00001 2969
+p 01 00000 00001 0000
+p 00 00000 00001 11A7
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 11A8
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 11B0
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 11B1
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 6 cycles after the ModR/M byte
+p 00 00000 00001 11B2
+p 01 00000 00001 0000
+p 01 00000 00001 4006
+p 00 00000 00001 11B3
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 11B4
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 11B5
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 11B6
+p 01 00000 00001 2979
+p 01 00000 00001 0000
+p 00 00000 00001 11B7
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 11B8
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 11C0
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 11C1
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 11C2
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 11C3
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 11C4
+p 01 00000 00001 596F
+p 01 00000 00001 0000
+p 00 00000 00001 11C5
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 11C6
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 11D0
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 11D1
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 11D2
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 11D3
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 11D4
+p 01 00000 00001 597F
+p 01 00000 00001 0000
+p 00 00000 00001 11D5
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 11D6
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 11E0
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 11E1
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 11E2
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 11E3
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 11E4
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 11E5
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 11E6
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 11E7
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 4 cycle(s) after the last queue read
+p 00 00000 00001 11F0
+p 01 00000 00001 5BFF
+p 01 00000 00001 0004
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 11F1
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 11F2
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+p 00 00000 00001 11F3
+p 01 00000 00001 1100
+p 01 00000 00001 033A
+p 00 00000 00001 11F4
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 11F5
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 11F6
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1200
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 6 cycles after the ModR/M byte
+p 00 00000 00001 1201
+p 01 00000 00001 0000
+p 01 00000 00001 4006
+p 00 00000 00001 1202
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1203
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1204
+p 01 00000 00001 2969
+p 01 00000 00001 0000
+p 00 00000 00001 1205
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1206
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1210
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 7 cycles after the ModR/M byte
+p 00 00000 00001 1211
+p 01 00000 00001 0000
+p 01 00000 00001 4007
+p 00 00000 00001 1212
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1213
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1214
+p 01 00000 00001 2979
+p 01 00000 00001 0000
+p 00 00000 00001 1215
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1216
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 1220
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1221
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 7 cycles after the ModR/M byte
+p 00 00000 00001 1222
+p 01 00000 00001 0000
+p 01 00000 00001 4007
+p 00 00000 00001 1223
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1224
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 1225
+p 01 00000 00001 2969
+p 01 00000 00001 0000
+p 00 00000 00001 1226
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1227
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 1230
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1231
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 6 cycles after the ModR/M byte
+p 00 00000 00001 1232
+p 01 00000 00001 0000
+p 01 00000 00001 4006
+p 00 00000 00001 1233
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1234
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 1235
+p 01 00000 00001 2979
+p 01 00000 00001 0000
+p 00 00000 00001 1236
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1237
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1240
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 1241
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 1242
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1243
+p 01 00000 00001 596F
+p 01 00000 00001 0000
+p 00 00000 00001 1244
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1245
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1250
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 1251
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 1252
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1253
+p 01 00000 00001 597F
+p 01 00000 00001 0000
+p 00 00000 00001 1254
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1255
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+p 00 00000 00001 1260
+p 01 00000 00001 588F
+p 01 00000 00001 8000
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1261
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 1262
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 1263
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1264
+p 01 00000 00001 595F
+p 01 00000 00001 0000
+p 00 00000 00001 1265
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1266
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+# r2 = release (since the last queue read): 3 cycle(s) after the last queue read
+p 00 00000 00001 1270
+p 01 00000 00001 5BFF
+p 01 00000 00001 0003
+#
+# SYNC: the displacement is read 4 cycles after the ModR/M byte
+p 00 00000 00001 1271
+p 01 00000 00001 0000
+p 01 00000 00001 4004
+p 00 00000 00001 1272
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+p 00 00000 00001 1273
+p 01 00000 00001 591F
+p 01 00000 00001 0000
+p 00 00000 00001 1274
+p 01 00000 00001 299C
+p 01 00000 00001 0000
+p 00 00000 00001 1275
+p 01 00000 00001 1000
+p 01 00000 00001 0780
+#
+
+#
+# Return to calling code (pc10-iii: moved from 0x0785)
+p 00 00000 00001 0786
+p 01 00000 00001 1030
+p 01 00000 00001 4000
+#
+# --------------------------------------------------------------------
+# Writeback of the ALU r/m,reg instructions (from 0x090D byte, 0x091C word):
+# for a memory destination the 8088 issues the write 5 cycles after the
+# operand read ended (MartyPC: EALOAD return delay, one ALU cycle, two
+# cycles for the memory destination, then the request at the next
+# boundary) and reads the next opcode in the write's T3, where the EU
+# resumes. Register destinations have their end armed already at the
+# ModR/M read; their release is dropped at the next opcode read and the
+# later end load is ignored by the BIU.
+#
+# Writeback byte
+#
+# biu_dataout = 2005 (release: 5 cycles after the last transfer ended)
+p 00 00000 00001 1280
+p 01 00000 00001 5FFF
+p 01 00000 00001 2005
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1281
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1282
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 1283
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1284
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1285
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to WRITEBACK_EA_BYTE (it returns to the caller)
+p 00 00000 00001 1286
+p 01 00000 00001 1000
+p 01 00000 00001 07E0
+#
+# Writeback word
+#
+# biu_dataout = 2005 (release: 5 cycles after the last transfer ended)
+p 00 00000 00001 1288
+p 01 00000 00001 5FFF
+p 01 00000 00001 2005
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1289
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 128A
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 128B
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 128C
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 128D
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to WRITEBACK_EA_WORD (it returns to the caller)
+p 00 00000 00001 128E
+p 01 00000 00001 1000
+p 01 00000 00001 07E2

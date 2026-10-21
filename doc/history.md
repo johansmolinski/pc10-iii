@@ -132,7 +132,9 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-b | + queue preload, first retimed words | 96.3% | 30.8% | 534,464 (17.8%) |
 | biu88-c | + SYNC, 8K ROM, MOV/ALU immediates | 96.3% | 28.7% | 739,815 (24.6%) |
 | biu88-d | + BIU-timed ends, main loop rework | 96.3% | 31.3% | 782,551 (26.0%) |
-| biu88-e | + ModR/M read at 1, ALU-imm end armed after the read, harness write fix | see below | | |
+| biu88-e | + ModR/M read at 1, ALU-imm end armed after the read, harness write fix | 96.4% | 32.6% | 819,712 (27.3%) |
+| biu88-f | + register-form ends at the ModR/M read | 96.4% | 35.3% | 900,920 (30.0%) |
+| biu88-g | + EA timing (displacement SYNC, request release), ALU writebacks | see below | | |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
@@ -225,4 +227,45 @@ EU, MartyPC-style:
   signals from the EU.
 
 Raised with the user before choosing.
+
+## 2026-10-21 - ModR/M instructions: register forms, EA timing, writebacks
+
+e to f, register operands:
+- The 8088 reads the next opcode a fixed number of cycles after the ModR/M
+  byte: ALU/TEST 2, MOV 1, XCHG 3.
+- MCL86's CALC_EA decodes for longer than that, so the end is armed at the
+  ModR/M read itself.
+- Wrappers (0x1070-0x109C) pass the end value in r2. An armed ModR/M entry
+  (0x1060) loads it into the end counter right after the peek, if mod = 11.
+- End counter mode 0xA00n: n cycles after the last queue read.
+- Result: all register forms of 00-3B, 84-8B exact.
+
+f to g, memory operands:
+- The 8088's schedule per addressing mode is fixed (`tools/sst_modes.py`
+  groups it): e.g. [bx] read T1 at 9, [bx+d8] displacement at 5 and T1 at
+  13, [bx+si+d] displacement at 7, [bx+di+d] at 8.
+- MartyPC's EA costs fit exactly:
+  - the displacement is read 2 + pre cycles after the ModR/M byte;
+  - the operand request goes out 2 + pre cycles after the ModR/M byte
+    without a displacement, 1 + post cycles after the last displacement byte
+    with one.
+- The 24 memory modes of CALC_EA were copied to 0x1100+ by
+  `tools/gen_ea_modes.py`, with a SYNC before the displacement fetch and the
+  release in r2.
+- **Request release** (BIU, register strobe 11 code 6, loaded by the MODxx
+  ending at 0x0780): the EU computes an EA faster than the 8088, so the BIU
+  holds the EU's next bus request until the release cycle. It then starts it
+  as if made at the start of that cycle.
+  - Bases: last queue read, end of the last EU transfer, the opcode read.
+  - An unused release is dropped at the next opcode read.
+- The EU's SYNC got bit 14 = n cycles after the last queue read.
+- **ALU writebacks** (0x090D/0x091C go through 0x1280/0x1288):
+  - release the write 5 cycles after the operand read ended (MartyPC: EALOAD
+    return delay, one ALU cycle, two for a memory destination);
+  - arm the end with the new mode 0xB00n, "n cycles after the next transfer
+    ends": the 8088 reads the next opcode in the write's T3, where the EU
+    resumes, and MCL86 needs more than a cycle from there to its dispatch.
+- Result (sampled 2000 per file): all of 00/01/08/09/10/11/18/19/20/21/28/
+  29/30/31 exact, register and memory forms, byte and word; the read-only
+  memory forms of 03/0B/39/84/8A exact.
 
