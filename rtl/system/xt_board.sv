@@ -372,9 +372,14 @@ wire  sel_ram = bus_addr < RAM_TOP;
 wire  sel_rom = bus_addr[19:16] == 4'hF;
 wire  refresh = !dack_n[0];
 
-// the data a writing master drives: the CPU, or in a DMA I/O-to-memory cycle
-// the card being read
-assign bus_wdata = dma_owns ? isa_din : cpu_dout;
+// the data a writing master drives: the CPU; in a DMA cycle the side being
+// read: the I/O card (I/O-to-memory) or the memory (memory-to-I/O)
+logic [7:0] mem_rdata;
+always_comb begin
+    if (!dma_owns)          bus_wdata = cpu_dout;
+    else if (!dma_memr_n)   bus_wdata = mem_rdata;
+    else                    bus_wdata = isa_din;
+end
 
 // RAM: one request at the start of each read or write strobe
 logic       mem_rd_d, mem_wr_d;
@@ -395,6 +400,7 @@ always_comb begin
     end
 end
 assign rom_addr = bus_addr[15:0];
+assign mem_rdata = sel_ram ? ram_q : sel_rom ? rom_rdata : isa_din;
 
 // ------------------------------------------------------------ card bus
 assign isa_addr   = bus_addr;
@@ -406,7 +412,7 @@ assign isa_iow_n  = io_wr_n;
 assign isa_aen    = aen;
 assign isa_ale    = cpu_bus_t == T1;
 assign isa_dack_n = dack_n;
-assign isa_tc     = dma_eop;
+assign isa_tc     = !dma_eop;              // the 8237's EOP is active low
 
 // ------------------------------------------------------------ CPU read data
 always_comb begin
@@ -415,8 +421,7 @@ always_comb begin
     else if (cpu_ior && cs_pic)            cpu_din = pic_dout;
     else if (cpu_ior && cs_pit)            cpu_din = pit_dout;
     else if (cpu_ior && cs_ppi)            cpu_din = ppi_dout;
-    else if (cpu_memr && sel_ram)          cpu_din = ram_q;
-    else if (cpu_memr && sel_rom)          cpu_din = rom_rdata;
+    else if (cpu_memr && (sel_ram || sel_rom)) cpu_din = mem_rdata;
     else if (isa_dsel)                     cpu_din = isa_din;
     else                                   cpu_din = 8'hFF;
 end
