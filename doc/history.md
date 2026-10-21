@@ -651,3 +651,14 @@ bus (b292ea6).
   calibrated yet (system traces against MartyPC).
 - Run u: trace 2,777,773 (92.4%). F6.7 (IDIV r/m8) lost 1 test through the
   divide-error path (IDIV is untimed).
+
+## 2026-10-21 - Segment loads, MOV r/m,sreg, SALC (run v)
+
+- After a segment register load MCL86 jumps to a main-loop entry that skips
+  the interrupt polls (right: the 8088 inhibits interrupts for one
+  instruction) but also the wait for the end counter, so the next opcode was
+  read early. 0x1A90 waits for the end, then dispatches. 8E 25% -> 100%.
+- MOV r/m16,sreg (8C): write released 3 after the 8088's read point: 100%.
+- SALC (D6): CF set ends a cycle later (0x1A98). Prefixed SALC is still one
+  cycle early.
+- Run v: trace 2,790,714 (92.8%), length 2,813,289. No file worse.
