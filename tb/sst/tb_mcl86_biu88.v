@@ -56,6 +56,7 @@ mcl86_eu_core eu (
     .EU_STEP              (step),
     .EU_CYC               (biu.BIU_CYC),
     .EU_SINCE_READ        (biu.BIU_SINCE_READ),
+    .EU_SINCE_DONE        (biu.BIU_SINCE_DONE),
     .EU_BIU_COMMAND       (eu_biu_command),
     .EU_BIU_DATAOUT       (eu_biu_dataout),
     .EU_REGISTER_R3       (eu_register_r3),

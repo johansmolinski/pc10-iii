@@ -10357,10 +10357,10 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 0924
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0925
@@ -10427,10 +10427,10 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0933
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0934
@@ -10655,10 +10655,10 @@ p 01 00000 00001 091A
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 095C
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 095D
@@ -10697,10 +10697,10 @@ p 01 00000 00001 0929
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0962
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0963
@@ -10871,10 +10871,10 @@ p 01 00000 00001 091A
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 097C
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 097D
@@ -10914,10 +10914,10 @@ p 01 00000 00001 0929
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0982
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0983
@@ -11181,10 +11181,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 09B2
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 09B3
@@ -11224,10 +11224,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 09B8
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 09B9
@@ -11458,10 +11458,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 09DE
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 09DF
@@ -11501,10 +11501,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 09E4
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 09E5
@@ -11845,10 +11845,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 0A2C
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0A2D
@@ -11887,10 +11887,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0A32
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0A33
@@ -12126,10 +12126,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 0A60
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A61
@@ -12168,10 +12168,10 @@ p 01 00000 00001 090E
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0A66
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0A67
@@ -12210,10 +12210,10 @@ p 01 00000 00001 091D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 0A6C
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0A6D
@@ -12253,10 +12253,10 @@ p 01 00000 00001 092C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0A72
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0A73
@@ -12447,10 +12447,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 0A94
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0A95
@@ -12490,10 +12490,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0A9A
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0A9B
@@ -12771,9 +12771,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: CALL the group CALC_EA wrapper at 0x14B0
 p 00 00000 00001 0AD0
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 14B0
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0AD1
@@ -12781,9 +12782,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0790
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3 - Fetch IMM8
+# pc10-iii: CALL the immediate wrapper at 0x14C8
 p 00 00000 00001 0AD2
 p 01 00000 00001 1100
-p 01 00000 00001 02A5 
+p 01 00000 00001 14C8
 #
 # Copy r1 to the biu_dataout register - Store the Addressing Byte for the Jump-6
 p 00 00000 00001 0AD3
@@ -12858,9 +12860,10 @@ p 01 00000 00001 0A64
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: CALL the group CALC_EA wrapper at 0x14B8
 p 00 00000 00001 0AE0
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 14B8
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0AE1
@@ -12868,9 +12871,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0792
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte into r3 - Fetch IMM16
+# pc10-iii: CALL the immediate wrapper at 0x14E0
 p 00 00000 00001 0AE2
 p 01 00000 00001 1100
-p 01 00000 00001 02E5 
+p 01 00000 00001 14E0
 #
 # Copy r1 to the biu_dataout register - Store the Addressing Byte for the Jump-6
 p 00 00000 00001 0AE3
@@ -12944,9 +12948,10 @@ p 01 00000 00001 0A6A
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: CALL the group CALC_EA wrapper at 0x14C0
 p 00 00000 00001 0AF0
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 14C0
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0AF1
@@ -12954,9 +12959,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0792
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3 - Fetch IMM8
+# pc10-iii: CALL the immediate wrapper at 0x14C8
 p 00 00000 00001 0AF2
 p 01 00000 00001 1100
-p 01 00000 00001 02A5 
+p 01 00000 00001 14C8
 #
 # CALL Sign Extend r3
 p 00 00000 00001 0AF3
@@ -15558,10 +15564,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1070 (byte, end 1 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1580 (class ends, register and memory)
 p 00 00000 00001 0CF0
 p 01 00000 00001 1100
-p 01 00000 00001 1070
+p 01 00000 00001 1580
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0CF1
@@ -15569,9 +15575,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 07D4
 #
 # Jump unconditional to common code
+# pc10-iii: to the MOV r/m,r writeback at 0x15A0
 p 00 00000 00001 0CF2
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 15A0
 #
 #
 # -----------------------------------------------------
@@ -15581,10 +15588,10 @@ p 01 00000 00001 090D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1088 (word, end 1 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1588 (class ends, register and memory)
 p 00 00000 00001 0CF3
 p 01 00000 00001 1100
-p 01 00000 00001 1088
+p 01 00000 00001 1588
 #
 # CALL FETCH_REG into r0
 p 00 00000 00001 0CF4
@@ -15592,9 +15599,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 07D4
 #
 # Jump unconditional to common code
+# pc10-iii: to the MOV r/m,r writeback at 0x15B0
 p 00 00000 00001 0CF5
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 15B0
 #
 #
 # -----------------------------------------------------
@@ -15604,10 +15612,10 @@ p 01 00000 00001 091C
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1070 (byte, end 1 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1570 (class ends, register and memory)
 p 00 00000 00001 0CF6
 p 01 00000 00001 1100
-p 01 00000 00001 1070
+p 01 00000 00001 1570
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0CF7
@@ -15628,10 +15636,10 @@ p 01 00000 00001 092B
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1088 (word, end 1 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1578 (class ends, register and memory)
 p 00 00000 00001 0CF9
 p 01 00000 00001 1100
-p 01 00000 00001 1088
+p 01 00000 00001 1578
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0CFA
@@ -15725,10 +15733,10 @@ p 01 00000 00001 0949
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: through the CALC_EA wrapper at 0x1078 (byte, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1560 (class ends, register and memory)
 p 00 00000 00001 0D0A
 p 01 00000 00001 1100
-p 01 00000 00001 1078
+p 01 00000 00001 1560
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0D0B
@@ -15767,10 +15775,10 @@ p 01 00000 00001 0942
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: through the CALC_EA wrapper at 0x1090 (word, end 2 cycles after the ModR/M read, register operands)
+# pc10-iii: through the CALC_EA wrapper at 0x1568 (class ends, register and memory)
 p 00 00000 00001 0D10
 p 01 00000 00001 1100
-p 01 00000 00001 1090
+p 01 00000 00001 1568
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0D11
@@ -20195,10 +20203,11 @@ p 01 00000 00001 02E9
 # the low byte. From 0x02EA, before the queue-empty wait, so that a byte that
 # arrives late is not delayed again.
 #
-# SYNC 1 cycle from now
+# SYNC: 1 cycle after the last queue read (the low byte; pc10-iii: was 1
+# cycle from now, which a late EU stretched)
 p 00 00000 00001 1004
 p 01 00000 00001 0000
-p 01 00000 00001 8001
+p 01 00000 00001 4001
 #
 # Swap bytes of r3 (the word replaced at 0x02EA)
 p 00 00000 00001 1005
@@ -22958,3 +22967,887 @@ p 01 00000 00001 FF0F
 p 00 00000 00001 1447
 p 01 00000 00001 1000
 p 01 00000 00001 0265
+#
+# --------------------------------------------------------------------
+# ALU groups 80/82 (r/m8,imm8), 81 (r/m16,imm16), 83 (r/m16,imm8).
+# Register operand: the 8088 reads the immediate 1 cycle after the ModR/M
+# byte (the second byte of imm16 1 cycle later) and the next opcode 2
+# cycles after imm8, 4 after imm16; MCL86 gets to the immediate later, so
+# the BIU reads it on schedule (register strobe 11 code 7; the group CALC_EA
+# wrappers put the value in r2 and the armed entry at 0x14A0 loads it when
+# mod = 11). Memory operand: the immediate 2 cycles after the operand read
+# ended (SYNC since the transfer end); CMP (reg field 7) ends 3 cycles after
+# imm8, 2 after imm16's high byte; the others end at their write (0x1280).
+# Known limit: ADC/SBB/SUB with a memory operand issue their write 1-2
+# cycles late (MCL86's microcode for them is slower than the 8088).
+#
+# Armed ModR/M entry, group variant (mod = 11: scheduled read = r2)
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 14A0
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 14A1
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 14A2
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 14A3
+p 01 00000 00001 1002
+p 01 00000 00001 14A2
+#
+# SYNC to cycle 1
+p 00 00000 00001 14A4
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 14A5
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 14A6
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00C0 (MOD bits)
+p 00 00000 00001 14A7
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11)
+p 00 00000 00001 14A8
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero (memory operand) to the return
+p 00 00000 00001 14A9
+p 01 00000 00001 1001
+p 01 00000 00001 14AD
+#
+# biu_dataout = r2 (the scheduled read)
+p 00 00000 00001 14AA
+p 01 00000 00001 5FBF
+p 01 00000 00001 0000
+#
+# Strobe BIU - schedule the read (register strobe, code 7)
+p 00 00000 00001 14AB
+p 01 00000 00001 5DDF
+p 01 00000 00001 3070
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 14AC
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Return to calling code
+p 00 00000 00001 14AD
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# CALC_EA wrapper, 80/82 (byte, one immediate byte)
+#
+# r2 = 0001 (scheduled read 1 cycle after the ModR/M byte)
+p 00 00000 00001 14B0
+p 01 00000 00001 5BFF
+p 01 00000 00001 0001
+#
+# Set r0 to 0x0000 (byte)
+p 00 00000 00001 14B1
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 14B2
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry (group variant)
+p 00 00000 00001 14B3
+p 01 00000 00001 1100
+p 01 00000 00001 14A0
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 14B4
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper, 81 (word, two immediate bytes)
+#
+# r2 = 1001 (scheduled read 1 cycle after the ModR/M byte)
+p 00 00000 00001 14B8
+p 01 00000 00001 5BFF
+p 01 00000 00001 1001
+#
+# Set r0 to 0x0008 (word)
+p 00 00000 00001 14B9
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 14BA
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry (group variant)
+p 00 00000 00001 14BB
+p 01 00000 00001 1100
+p 01 00000 00001 14A0
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 14BC
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper, 83 (word, one immediate byte)
+#
+# r2 = 0001 (scheduled read 1 cycle after the ModR/M byte)
+p 00 00000 00001 14C0
+p 01 00000 00001 5BFF
+p 01 00000 00001 0001
+#
+# Set r0 to 0x0008 (word)
+p 00 00000 00001 14C1
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 14C2
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry (group variant)
+p 00 00000 00001 14C3
+p 01 00000 00001 1100
+p 01 00000 00001 14A0
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 14C4
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# Immediate fetch wrapper, imm8 (80/82/83)
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 14C8
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register path
+p 00 00000 00001 14C9
+p 01 00000 00001 1001
+p 01 00000 00001 14D3
+#
+# SYNC: 2 cycles after the operand read ended
+p 00 00000 00001 14CA
+p 01 00000 00001 0000
+p 01 00000 00001 C002
+#
+# CALL the fetch procedure
+p 00 00000 00001 14CB
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+#
+# r2 = r1 AND 0038 (the REG field of the ModR/M byte)
+p 00 00000 00001 14CC
+p 01 00000 00001 4BAF
+p 01 00000 00001 0038
+#
+# Dummy = r2 XOR 0038 (zero for CMP)
+p 00 00000 00001 14CD
+p 01 00000 00001 6EBF
+p 01 00000 00001 0038
+#
+# Jump if last_alu is non-zero (not CMP) to the return
+p 00 00000 00001 14CE
+p 01 00000 00001 1001
+p 01 00000 00001 14D2
+#
+# biu_dataout = A003 (end: 3 cycles after the last queue read)
+p 00 00000 00001 14CF
+p 01 00000 00001 5FFF
+p 01 00000 00001 A003
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 14D0
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 14D1
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 14D2
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# CALL the fetch procedure (register operand)
+p 00 00000 00001 14D3
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+#
+# biu_dataout = A002 (end: 2 cycles after the last queue read)
+p 00 00000 00001 14D4
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 14D5
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 14D6
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 14D7
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Immediate fetch wrapper, imm16 (81)
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 14E0
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register path
+p 00 00000 00001 14E1
+p 01 00000 00001 1001
+p 01 00000 00001 14EB
+#
+# SYNC: 2 cycles after the operand read ended
+p 00 00000 00001 14E2
+p 01 00000 00001 0000
+p 01 00000 00001 C002
+#
+# CALL the fetch procedure
+p 00 00000 00001 14E3
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+#
+# r2 = r1 AND 0038 (the REG field of the ModR/M byte)
+p 00 00000 00001 14E4
+p 01 00000 00001 4BAF
+p 01 00000 00001 0038
+#
+# Dummy = r2 XOR 0038 (zero for CMP)
+p 00 00000 00001 14E5
+p 01 00000 00001 6EBF
+p 01 00000 00001 0038
+#
+# Jump if last_alu is non-zero (not CMP) to the return
+p 00 00000 00001 14E6
+p 01 00000 00001 1001
+p 01 00000 00001 14EA
+#
+# biu_dataout = A002 (end: 2 cycles after the last queue read)
+p 00 00000 00001 14E7
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 14E8
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 14E9
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 14EA
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# CALL the fetch procedure (register operand)
+p 00 00000 00001 14EB
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+#
+# biu_dataout = A004 (end: 4 cycles after the last queue read)
+p 00 00000 00001 14EC
+p 01 00000 00001 5FFF
+p 01 00000 00001 A004
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 14ED
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 14EE
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 14EF
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# --------------------------------------------------------------------
+# ModR/M instructions by class, with the end also for memory operands. The
+# armed ModR/M entries (as 0x1060) arm the end for mod = 11 from r2 and, for
+# a memory operand, "n cycles after the next transfer ends" (0xB00n):
+#   ALU into a register, CMP r/m,r, TEST: register 2, memory 3
+#   MOV r,r/m: register 1, memory 2
+#   MOV r/m,r: register 1, memory at the write's T3 (0)
+# MOV r/m,r writes 4 cycles after the 8088 would have read the operand
+# (MartyPC: 0x1e3/RTN, then 0x000/0x001): its writeback path (0x15A0/0x15B0)
+# adds 4 to the EA's request release (register strobe 11, code 14).
+# Known: with a segment prefix, [bx+di]/[bp+si] writes come 1 cycle early.
+#
+# Armed ModR/M entry, memory end 0 cycle(s) after the transfer
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1500
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1501
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 1502
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 1503
+p 01 00000 00001 1002
+p 01 00000 00001 1502
+#
+# SYNC to cycle 1
+p 00 00000 00001 1504
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 1505
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 1506
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00C0 (MOD bits)
+p 00 00000 00001 1507
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11)
+p 00 00000 00001 1508
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero (memory operand)
+p 00 00000 00001 1509
+p 01 00000 00001 1001
+p 01 00000 00001 150E
+#
+# biu_dataout = r2 (the register end)
+p 00 00000 00001 150A
+p 01 00000 00001 5FBF
+p 01 00000 00001 0000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 150B
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 150C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 150D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = B000 (end: 0 cycle(s) after the next transfer ends)
+p 00 00000 00001 150E
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 150F
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1510
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1511
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Armed ModR/M entry, memory end 2 cycle(s) after the transfer
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1520
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1521
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 1522
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 1523
+p 01 00000 00001 1002
+p 01 00000 00001 1522
+#
+# SYNC to cycle 1
+p 00 00000 00001 1524
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 1525
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 1526
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00C0 (MOD bits)
+p 00 00000 00001 1527
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11)
+p 00 00000 00001 1528
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero (memory operand)
+p 00 00000 00001 1529
+p 01 00000 00001 1001
+p 01 00000 00001 152E
+#
+# biu_dataout = r2 (the register end)
+p 00 00000 00001 152A
+p 01 00000 00001 5FBF
+p 01 00000 00001 0000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 152B
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 152C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 152D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = B002 (end: 2 cycle(s) after the next transfer ends)
+p 00 00000 00001 152E
+p 01 00000 00001 5FFF
+p 01 00000 00001 B002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 152F
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1530
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1531
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Armed ModR/M entry, memory end 3 cycle(s) after the transfer
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1540
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1541
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 1542
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 1543
+p 01 00000 00001 1002
+p 01 00000 00001 1542
+#
+# SYNC to cycle 1
+p 00 00000 00001 1544
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 1545
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 1546
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00C0 (MOD bits)
+p 00 00000 00001 1547
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11)
+p 00 00000 00001 1548
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero (memory operand)
+p 00 00000 00001 1549
+p 01 00000 00001 1001
+p 01 00000 00001 154E
+#
+# biu_dataout = r2 (the register end)
+p 00 00000 00001 154A
+p 01 00000 00001 5FBF
+p 01 00000 00001 0000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 154B
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 154C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 154D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = B003 (end: 3 cycle(s) after the next transfer ends)
+p 00 00000 00001 154E
+p 01 00000 00001 5FFF
+p 01 00000 00001 B003
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 154F
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1550
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1551
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# CALC_EA wrapper: ALU into a register / CMP / TEST, byte
+#
+# r2 = A002 (register end: 2 cycle(s) after the ModR/M read)
+p 00 00000 00001 1560
+p 01 00000 00001 5BFF
+p 01 00000 00001 A002
+#
+# Set r0 to 0x0000
+p 00 00000 00001 1561
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1562
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 1563
+p 01 00000 00001 1100
+p 01 00000 00001 1540
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1564
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper: ALU into a register / CMP / TEST, word
+#
+# r2 = A002 (register end: 2 cycle(s) after the ModR/M read)
+p 00 00000 00001 1568
+p 01 00000 00001 5BFF
+p 01 00000 00001 A002
+#
+# Set r0 to 0x0008
+p 00 00000 00001 1569
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 156A
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 156B
+p 01 00000 00001 1100
+p 01 00000 00001 1540
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 156C
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper: MOV r,r/m, byte
+#
+# r2 = A001 (register end: 1 cycle(s) after the ModR/M read)
+p 00 00000 00001 1570
+p 01 00000 00001 5BFF
+p 01 00000 00001 A001
+#
+# Set r0 to 0x0000
+p 00 00000 00001 1571
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1572
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 1573
+p 01 00000 00001 1100
+p 01 00000 00001 1520
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1574
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper: MOV r,r/m, word
+#
+# r2 = A001 (register end: 1 cycle(s) after the ModR/M read)
+p 00 00000 00001 1578
+p 01 00000 00001 5BFF
+p 01 00000 00001 A001
+#
+# Set r0 to 0x0008
+p 00 00000 00001 1579
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 157A
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 157B
+p 01 00000 00001 1100
+p 01 00000 00001 1520
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 157C
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper: MOV r/m,r, byte
+#
+# r2 = A001 (register end: 1 cycle(s) after the ModR/M read)
+p 00 00000 00001 1580
+p 01 00000 00001 5BFF
+p 01 00000 00001 A001
+#
+# Set r0 to 0x0000
+p 00 00000 00001 1581
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1582
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 1583
+p 01 00000 00001 1100
+p 01 00000 00001 1500
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1584
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper: MOV r/m,r, word
+#
+# r2 = A001 (register end: 1 cycle(s) after the ModR/M read)
+p 00 00000 00001 1588
+p 01 00000 00001 5BFF
+p 01 00000 00001 A001
+#
+# Set r0 to 0x0008
+p 00 00000 00001 1589
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 158A
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry
+p 00 00000 00001 158B
+p 01 00000 00001 1100
+p 01 00000 00001 1500
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 158C
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# MOV r/m,r writeback, byte
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 15A0
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the writeback
+p 00 00000 00001 15A1
+p 01 00000 00001 1001
+p 01 00000 00001 15A8
+#
+# biu_dataout = 0004
+p 00 00000 00001 15A2
+p 01 00000 00001 5FFF
+p 01 00000 00001 0004
+#
+# Strobe BIU - add to the request release (register strobe, code 14)
+p 00 00000 00001 15A3
+p 01 00000 00001 5DDF
+p 01 00000 00001 30E0
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 15A4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 15A5
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 15A6
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 15A7
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# CALL WRITEBACK_EA_BYTE
+p 00 00000 00001 15A8
+p 01 00000 00001 1100
+p 01 00000 00001 07E0
+#
+# Jump unconditional to the common ending (strobe, main loop)
+p 00 00000 00001 15A9
+p 01 00000 00001 1000
+p 01 00000 00001 090E
+#
+# MOV r/m,r writeback, word
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 15B0
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the writeback
+p 00 00000 00001 15B1
+p 01 00000 00001 1001
+p 01 00000 00001 15B8
+#
+# biu_dataout = 0004
+p 00 00000 00001 15B2
+p 01 00000 00001 5FFF
+p 01 00000 00001 0004
+#
+# Strobe BIU - add to the request release (register strobe, code 14)
+p 00 00000 00001 15B3
+p 01 00000 00001 5DDF
+p 01 00000 00001 30E0
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 15B4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 15B5
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 15B6
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 15B7
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# CALL WRITEBACK_EA_WORD
+p 00 00000 00001 15B8
+p 01 00000 00001 1100
+p 01 00000 00001 07E2
+#
+# Jump unconditional to the common ending (strobe, main loop)
+p 00 00000 00001 15B9
+p 01 00000 00001 1000
+p 01 00000 00001 091D

@@ -34,7 +34,9 @@
 //   bit 15 = 1: n 8088 clocks have passed since the SYNC started waiting
 //               (input EU_STEP marks every 8088 clock), or
 //   bit 14 = 1: n 8088 clocks have passed since the last queue read (input
-//               EU_SINCE_READ; e.g. a displacement after the ModR/M byte).
+//               EU_SINCE_READ; e.g. a displacement after the ModR/M byte), or
+//   bits 15:14 = 11: n 8088 clocks have passed since the last EU bus
+//               transfer ended (input EU_SINCE_DONE).
 // Type 0 with immediate 0 stays a NOP. Note that the microcode addresses
 // 0x09C9, 0x0A03, 0x0E76, 0x0F02 and 0x0F11 are compared below; code there
 // must not move.
@@ -73,6 +75,7 @@ module mcl86_eu_core
     input               EU_STEP,                // pc10-iii: one CORE_CLK per 8088 clock
     input      [11:0]   EU_CYC,                 // pc10-iii: 8088 clocks since the opcode read (BIU)
     input      [11:0]   EU_SINCE_READ,          // pc10-iii: 8088 clocks since the last queue read (BIU)
+    input      [11:0]   EU_SINCE_DONE,          // pc10-iii: 8088 clocks since an EU transfer ended (BIU)
     output     [1:0]    EU_QREAD,               // pc10-iii: the EU uses the queue top: 01 opcode, 11 other
 
     
@@ -374,7 +377,9 @@ assign new_instruction = (eu_rom_address[12:8]==5'h01) ? 1'b1 : 1'b0;
 // pc10-iii: SYNC - a type 0 microinstruction with a non-zero immediate waits
 wire eu_is_sync   = eu_opcode_type==3'h0 && eu_rom_data[31]==1'b0 &&
                     eu_opcode_immediate!=16'h0 && eu_stall_pipeline==1'b0;
-wire eu_sync_done = eu_opcode_immediate[15] ?
+wire eu_sync_done = eu_opcode_immediate[15:14]==2'b11 ?
+                        (EU_SINCE_DONE >= eu_opcode_immediate[11:0]) :
+                    eu_opcode_immediate[15] ?
                         (eu_sync_armed && eu_sync_rel==12'h0) :
                     eu_opcode_immediate[14] ?
                         (EU_SINCE_READ >= eu_opcode_immediate[11:0]) :
@@ -454,7 +459,7 @@ else
   
     // pc10-iii: relative SYNC
     new_instruction_d1 <= new_instruction;
-    if (eu_is_sync==1'b1 && eu_opcode_immediate[15]==1'b1 && eu_sync_armed==1'b0)
+    if (eu_is_sync==1'b1 && eu_opcode_immediate[15:14]==2'b10 && eu_sync_armed==1'b0)
       begin
         eu_sync_armed <= 1'b1;
         eu_sync_rel   <= eu_opcode_immediate[11:0];

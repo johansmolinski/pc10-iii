@@ -138,7 +138,8 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-h | + PUSH/POP, PUSHF fix, conditional jumps | 96.7% | 60.4% | 1,570,430 (52.2%) |
 | biu88-i | + JMP/CALL near, RET/RETF (+imm), harness NOP fetches, SUSP fix | 96.7% | 63.6% | 1,674,263 (55.7%) |
 | biu88-j | + JMP/CALL FAR, loops, one read per cycle, idle start | 96.7% | 65.2% | 1,713,805 (57.0%) |
-| biu88-k | + direct moves, port I/O, XLAT, LAHF, CWD, BCD adjusts | see below | | |
+| biu88-k | + direct moves, port I/O, XLAT, LAHF, CWD, BCD adjusts | 96.7% | 71.3% | 1,897,857 (63.1%) |
+| biu88-l | + ALU groups 80-83, ModR/M memory ends by class, MOV [m],r | see below | | |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
@@ -384,4 +385,43 @@ j to k:
 - Losses in j against i: lucky traces of group opcodes (C6, F6.0/F6.1, D0,
   1B/3B memory forms) whose immediate read moved with the one-read-per-cycle
   SYNC. Their timing is not done yet.
+
+## 2026-10-21 - ALU groups, memory-form ends, MOV to memory
+
+k to l:
+- **BIU: scheduled read** (register strobe 11, code 7). The BIU reads the
+  next queue byte (QS=S) n clocks after the last read, the transfer end or
+  the opcode read; with bit 12 also the byte after it, one clock later.
+  - For operand bytes the 8088 reads before MCL86 gets to them: the
+    immediate of a register-form 80-83, one cycle after the ModR/M byte,
+    behind about 40 microinstructions of CALC_EA, FETCH_EA and the fetch
+    procedure.
+  - The EU's later peek finds the byte read already.
+- **EU: SYNC since the last transfer end** (bits 15:14 = 11, input
+  EU_SINCE_DONE). For memory forms the EU is early instead; it must wait
+  itself, or its own read beats the schedule and the scheduled read then
+  takes the next byte too.
+- **End "n after the next transfer end"** (0xB00n) now starts counting at
+  the transfer's end; it counted down while waiting before.
+- **Release add** (register strobe 11, code 14).
+- **ALU groups 80/82, 81, 83** (0x14A0-0x14EF):
+  - group CALC_EA wrappers schedule the immediate read for register
+    operands;
+  - the immediate wrapper SYNCs memory forms 2 cycles after the read ended;
+  - CMP (reg field 7) with a memory operand ends 3 cycles after imm8, 2
+    after imm16's high byte;
+  - the register forms end 2 cycles after imm8, 4 after imm16.
+  - Known limit: ADC/SBB/SUB with a memory operand write 1-2 cycles late.
+    MCL86's microcode for them, behind the immediate path, is slower than
+    the 8088.
+- **ModR/M classes with memory ends** (0x1500-0x158C). Armed-entry variants
+  arm "n after the next transfer end" for memory operands:
+  - ALU into a register, CMP r/m,r, TEST: 3;
+  - MOV r,r/m: 2;
+  - MOV r/m,r: 0, at the write.
+- **MOV r/m,r** (0x15A0/0x15B0): writes 4 cycles after the 8088 would have
+  read (MartyPC 0x1e3/RTN and 0x000/0x001), as a release add. Known: with a
+  segment prefix, [bx+di]/[bp+si] writes come 1 cycle early (4% of 88/89).
+- Sampled exact on all cycles: every ALU r/m,reg and reg,r/m form,
+  CMP/TEST, MOV r,r/m, all of ADD/OR/AND/XOR/CMP in 80-83.
 
