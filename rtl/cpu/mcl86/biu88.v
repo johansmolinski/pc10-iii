@@ -739,7 +739,7 @@ always @(posedge CORE_CLK_INT) begin
                     qlen = 3'd0; ntaken = 2'd0; preread = 1'b0; end_armed = 1'b0;
                     rel_armed = 1'b0; end_after_done = 1'b0;
                     pc = EU_REGISTER_R3; eu_ip = EU_REGISTER_R3;
-                    queue_op = QO_FLUSH; queue_byte = 8'h00;
+                    queue_op = QO_FLUSH;    // QS byte: the last byte read stays
                     if (latch == ST_CODE) discard = 1'b1;
                     fetch_state = FS_NORMAL;
                     fetch_start;

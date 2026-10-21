@@ -134,7 +134,8 @@ Full-suite runs (`~/pcxt-work/results/`):
 | biu88-d | + BIU-timed ends, main loop rework | 96.3% | 31.3% | 782,551 (26.0%) |
 | biu88-e | + ModR/M read at 1, ALU-imm end armed after the read, harness write fix | 96.4% | 32.6% | 819,712 (27.3%) |
 | biu88-f | + register-form ends at the ModR/M read | 96.4% | 35.3% | 900,920 (30.0%) |
-| biu88-g | + EA timing (displacement SYNC, request release), ALU writebacks | see below | | |
+| biu88-g | + EA timing (displacement SYNC, request release), ALU writebacks | 96.4% | 47.0% | 1,071,852 (35.6%) |
+| biu88-h | + PUSH/POP, PUSHF fix, conditional jumps | see below | | |
 
 In biu88-c, length fell while trace rose: the fetch-byte procedure's SYNC to
 cycle 2 also delayed the ModR/M read, which the 8088 does in cycle 1. Fixed
@@ -268,4 +269,33 @@ f to g, memory operands:
 - Result (sampled 2000 per file): all of 00/01/08/09/10/11/18/19/20/21/28/
   29/30/31 exact, register and memory forms, byte and word; the read-only
   memory forms of 03/0B/39/84/8A exact.
+
+## 2026-10-21 - Stack instructions, PUSHF, conditional jumps
+
+g to h:
+- **PUSH and POP** (registers, segment registers, flags) share one schedule
+  each.
+  - PUSH: write T1 at 9 and 13, end 15. The writes are released at cycle 5
+    of the instruction; the end is "in the cycle the transfer ends". The arm
+    replaces the routine's WAIT_CLOCKS call (0x1290), because the routine
+    loads biu_dataout with the value afterwards.
+  - POP: read T1 at 5 and 9, end 12. Released at cycle 2, end where the EU
+    resumes (0x1298, instead of the POP procedure call).
+- **PUSHF** pushed MCL86's internal flag bits. The 8088 reads bits 15-12
+  and 1 as 1, bits 5 and 3 as 0 (0x12A0). All 10,000 PUSHF tests failed on
+  state in the baseline; now all are exact.
+- **Conditional jumps:**
+  - Not taken: the end is armed 2 cycles after the displacement read (0x0340
+    calls the fetch wrapper 0x1020).
+  - Taken (0x12A8): SUSP 2 cycles after the displacement read; SUSP waits
+    for a running code fetch's T4; the flush 4 cycles after the EU resumes.
+    That is what makes full-queue and empty-queue tests differ by one cycle
+    relative to the displacement read.
+  - The end is "at the next byte in the queue" (0x12B0), armed after the
+    flush, which clears any armed end.
+- **BIU:** a flush keeps the last read byte on QS_BYTE (the suite records it
+  with the E status).
+- Losses in -g against -f: lucky traces of instructions that call CALC_EA
+  directly (80.3/82.3, LEA, D0/D1 shifts, F6.3/F7.3 NEG). Their memory reads
+  are timed now, the rest of them is not yet. States unchanged.
 

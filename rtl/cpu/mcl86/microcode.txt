@@ -3158,9 +3158,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL Fetch Opcode with QS=First opcode byte
+# pc10-iii: through the wrapper at 0x1020 (the end 2 cycles after the read)
 p 00 00000 00001 0340
 p 01 00000 00001 1100
-p 01 00000 00001 02A0
+p 01 00000 00001 1020
 #
 # Write clock count=4 to the BIU Dataout register
 p 00 00000 00001 0341
@@ -3210,9 +3211,10 @@ p 01 00000 00001 2CC8
 p 01 00000 00001 0000
 #
 # Debounce the BIU Command fields
+# pc10-iii: CALL the taken-jump timing at 0x12A8 (SUSP, then the flush cycle)
 p 00 00000 00001 0349
-p 01 00000 00001 4DDF
-p 01 00000 00001 0000
+p 01 00000 00001 1100
+p 01 00000 00001 12A8
 #
 # Set the BIU Command fields - Jump Request
 p 00 00000 00001 034A
@@ -3235,9 +3237,10 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 0000
 #
 # Jump unconditional to Multibyte Ending except dont assert the QS as it has already been done.
+# pc10-iii: to 0x12B0 instead (the end at the first byte from the new address)
 p 00 00000 00001 034E
 p 01 00000 00001 1000
-p 01 00000 00001 0352
+p 01 00000 00001 12B0
 #
 # -----------------------------------------------------
 #
@@ -4194,10 +4197,10 @@ p 00 00000 00001 040A
 p 01 00000 00001 5FFF
 p 01 00000 00001 C053
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 040B
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to ES
 p 00 00000 00001 040C
@@ -4226,10 +4229,10 @@ p 00 00000 00001 040F
 p 01 00000 00001 5FFF
 p 01 00000 00001 C053
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0410
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to CS
 p 00 00000 00001 0411
@@ -4258,10 +4261,10 @@ p 00 00000 00001 0414
 p 01 00000 00001 5FFF
 p 01 00000 00001 C053
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0415
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to SS
 p 00 00000 00001 0416
@@ -4290,10 +4293,10 @@ p 00 00000 00001 0419
 p 01 00000 00001 5FFF
 p 01 00000 00001 C053
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 041A
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to DS
 p 00 00000 00001 041B
@@ -4322,15 +4325,17 @@ p 00 00000 00001 041E
 p 01 00000 00001 5FFF
 p 01 00000 00001 C053
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 041F
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to Flags and set bits [15:12] to F like 8088 does.
+# pc10-iii: CALL 0x12A0, which also gives bit 1 = 1 and bits 3/5 = 0 (MCL86
+# keeps its own state there)
 p 00 00000 00001 0420
-p 01 00000 00001 5F8F
-p 01 00000 00001 F000
+p 01 00000 00001 1100
+p 01 00000 00001 12A0
 #
 # CALL PUSH Procedure
 p 00 00000 00001 0421
@@ -4354,10 +4359,10 @@ p 00 00000 00001 0423
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0424
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to AX
 p 00 00000 00001 0425
@@ -4386,10 +4391,10 @@ p 00 00000 00001 0428
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0429
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to CX
 p 00 00000 00001 042A
@@ -4418,10 +4423,10 @@ p 00 00000 00001 042D
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 042E
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to DX
 p 00 00000 00001 042F
@@ -4450,10 +4455,10 @@ p 00 00000 00001 0432
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0433
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to BX
 p 00 00000 00001 0434
@@ -4482,10 +4487,10 @@ p 00 00000 00001 0437
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0438
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to DI
 p 00 00000 00001 0439
@@ -4514,10 +4519,10 @@ p 00 00000 00001 043C
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 043D
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to BP
 p 00 00000 00001 043E
@@ -4546,10 +4551,10 @@ p 00 00000 00001 0441
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0442
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to SI
 p 00 00000 00001 0443
@@ -4578,10 +4583,10 @@ p 00 00000 00001 0446
 p 01 00000 00001 5FFF
 p 01 00000 00001 C07B
 #
-# CALL WAIT_CLOCKS
+# pc10-iii: CALL the PUSH timing at 0x1290 (instead of WAIT_CLOCKS)
 p 00 00000 00001 0447
 p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 1290
 #
 # Set biu_dataout register to SP-2 ((Add FFFE))
 p 00 00000 00001 0448
@@ -4650,9 +4655,10 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0457
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to the BIU Data Out register to update the segment register in the BIU
 p 00 00000 00001 0458
@@ -4714,9 +4720,10 @@ p 01 00000 00001 0470
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0461
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to the BIU Data Out register to update the segment register in the BIU
 p 00 00000 00001 0462
@@ -4746,9 +4753,10 @@ p 01 00000 00001 0470
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0466
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to the BIU Data Out register to update the segment register in the BIU
 p 00 00000 00001 0467
@@ -4832,9 +4840,10 @@ p 01 00000 00001 0011
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0480
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to AX
 p 00 00000 00001 0481
@@ -4854,9 +4863,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0483
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to CX
 p 00 00000 00001 0484
@@ -4876,9 +4886,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0486
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to DX
 p 00 00000 00001 0487
@@ -4898,9 +4909,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0489
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to BX
 p 00 00000 00001 048A
@@ -4920,9 +4932,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 048C
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to SP
 p 00 00000 00001 048D
@@ -4942,9 +4955,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 048F
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to BP
 p 00 00000 00001 0490
@@ -4964,9 +4978,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0492
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to SI
 p 00 00000 00001 0493
@@ -4986,9 +5001,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0495
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to DI
 p 00 00000 00001 0496
@@ -5008,9 +5024,10 @@ p 01 00000 00001 0040
 # -----------------------------------------------------
 #
 # CALL POP Procedure
+# pc10-iii: through the POP timing at 0x1298
 p 00 00000 00001 0498
 p 01 00000 00001 1100
-p 01 00000 00001 0450
+p 01 00000 00001 1298
 #
 # Copy BIU Return Data to the Flags register
 p 00 00000 00001 0499
@@ -21166,3 +21183,164 @@ p 01 00000 00001 CFFF
 p 00 00000 00001 128E
 p 01 00000 00001 1000
 p 01 00000 00001 07E2
+#
+# --------------------------------------------------------------------
+# Stack instructions. The 8088 pushes (registers, segment registers, flags)
+# with the write requests released 5 cycles after the opcode read (T1 at 9
+# and 13 with a full queue) and reads the next opcode in the T3 of the
+# second write; it pops with the reads released 2 cycles after the opcode
+# read (T1 at 5 and 9) and reads the next opcode where the EU resumes after
+# the second read.
+#
+# PUSH timing (CALL from the routines, before they set biu_dataout)
+#
+# biu_dataout = 4005 (release: cycle 5 of the instruction)
+p 00 00000 00001 1290
+p 01 00000 00001 5FFF
+p 01 00000 00001 4005
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1291
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1292
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 1293
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1294
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1295
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1296
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# POP timing (CALL instead of the POP procedure)
+#
+# biu_dataout = 4002 (release: cycle 2 of the instruction)
+p 00 00000 00001 1298
+p 01 00000 00001 5FFF
+p 01 00000 00001 4002
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1299
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 129A
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 129B
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 129C
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 129D
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to the POP procedure (it returns to the caller)
+p 00 00000 00001 129E
+p 01 00000 00001 1000
+p 01 00000 00001 0450
+#
+# PUSHF value: the 8088 reads FLAGS bits 15-12 and 1 as 1, bits 5 and 3 as 0
+#
+# r3 = Flags AND 0FD5
+p 00 00000 00001 12A0
+p 01 00000 00001 4C8F
+p 01 00000 00001 0FD5
+#
+# biu_dataout = r3 OR F002
+p 00 00000 00001 12A1
+p 01 00000 00001 5FCF
+p 01 00000 00001 F002
+#
+# Return to calling code
+p 00 00000 00001 12A2
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# --------------------------------------------------------------------
+# Taken short jumps (JUMP_TAKEN8, from 0x0349 and 0x034E). The 8088 suspends
+# prefetching 2 cycles after the displacement read; SUSP waits until a
+# running code fetch reaches T4 and the EU resumes there; the queue flush
+# comes 4 cycles later; the next opcode is read as soon as the first byte
+# from the new address is in the queue.
+#
+# SYNC: 2 cycles after the last queue read (the displacement)
+p 00 00000 00001 12A8
+p 01 00000 00001 0000
+p 01 00000 00001 4002
+#
+# Set the BIU Command fields - SUSP request (0x1E)
+p 00 00000 00001 12A9
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+# Isolate the System Signals BIU_Done bit into Dummy
+p 00 00000 00001 12AA
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+# If last_alu is zero, then Jump to restest the bit
+p 00 00000 00001 12AB
+p 01 00000 00001 1002
+p 01 00000 00001 12AA
+#
+# Debounce the BIU Command fields
+p 00 00000 00001 12AC
+p 01 00000 00001 4DDF
+p 01 00000 00001 0000
+#
+# SYNC: 4 cycles from now (the flush follows)
+p 00 00000 00001 12AD
+p 01 00000 00001 0000
+p 01 00000 00001 8004
+#
+# Return to calling code
+p 00 00000 00001 12AE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = A000 (end: at the next byte in the queue)
+p 00 00000 00001 12B0
+p 01 00000 00001 5FFF
+p 01 00000 00001 A000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 12B1
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 12B2
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to main microcode loop
+p 00 00000 00001 12B3
+p 01 00000 00001 1000
+p 01 00000 00001 0004
