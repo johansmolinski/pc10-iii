@@ -202,11 +202,25 @@ wire [5:0]  g_spt    = img_spt[pd];
 // Timing (pc10-iii, doc/timing.md): the image address is computed for both
 // drives' geometries and the DOR's drive select picks one at the end, so the
 // DOR is one LUT before the sector port's LBA register instead of in front of
-// the multiplication. The same value in every clk. Originally:
+// the multiplication (keep: synthesis would otherwise share one multiplier
+// behind a geometry multiplexer again). And as C * (H * S) + h * S + s - 1:
+// one 8 x 8 bit multiplication by the sectors per cylinder (geometry only,
+// at most 3 * 63 = 189, so 8 bits are exact) instead of two in a row. The
+// same value for every input: nothing in either form exceeds 16 bits
+// (255 * 189 + 63 + 255 < 65536). Originally:
 //   wire [15:0] x_lba    = 16'(({8'd0, x_cyl} * 16'(g_heads) + 16'(x_head)) * 16'(g_spt) + 16'(x_sec) - 16'd1);
-wire [15:0] x_lba_d0 = 16'(({8'd0, x_cyl} * 16'(img_heads[0]) + 16'(x_head)) * 16'(img_spt[0]) + 16'(x_sec) - 16'd1);
-wire [15:0] x_lba_d1 = 16'(({8'd0, x_cyl} * 16'(img_heads[1]) + 16'(x_head)) * 16'(img_spt[1]) + 16'(x_sec) - 16'd1);
+wire [7:0]  g_spc_d0 = 8'(img_heads[0]) * 8'(img_spt[0]);
+wire [7:0]  g_spc_d1 = 8'(img_heads[1]) * 8'(img_spt[1]);
+(* keep = "true" *) wire [15:0] x_lba_d0 =
+    16'({8'd0, x_cyl} * {8'd0, g_spc_d0}) + (x_head ? 16'(img_spt[0]) : 16'd0) + 16'(x_sec) - 16'd1;
+(* keep = "true" *) wire [15:0] x_lba_d1 =
+    16'({8'd0, x_cyl} * {8'd0, g_spc_d1}) + (x_head ? 16'(img_spt[1]) : 16'd0) + 16'(x_sec) - 16'd1;
 wire [15:0] x_lba    = pd ? x_lba_d1 : x_lba_d0;
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (x_lba !== 16'(({8'd0, x_cyl} * 16'(g_heads) + 16'(x_head)) * 16'(g_spt) + 16'(x_sec) - 16'd1))
+        $fatal(1, "fdc_card: LBA differs from the original formula");
+`endif
 
 upd765 #(
     .TIME_SCALE   (TIME_SCALE),

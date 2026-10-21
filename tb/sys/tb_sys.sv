@@ -57,12 +57,23 @@ initial begin
     if ($value$plusargs("rom=%s", f)) $readmemh(f, rom);
 end
 
+// RAM model: the answer comes +ramlat=<n> clk after ram_en (default 1, like a
+// bare block RAM; the MEGA65 glue's pc_ram answers after 6)
+int         ram_lat = 1;
+logic [15:0] ack_sh = '0;
+logic [7:0]  rd_sh [16];
+logic [7:0]  rd_q;
+initial if ($value$plusargs("ramlat=%d", ram_lat)) ;
 always_ff @(posedge clk) begin
-    ram_ack <= ram_en;
     if (ram_en && ram_we) ram[ram_addr] <= ram_wdata;
-    if (ram_en) ram_rdata <= ram[ram_addr];
+    if (ram_en) rd_q = ram[ram_addr];
+    ack_sh <= {ack_sh[14:0], ram_en};
+    rd_sh[0] <= rd_q;
+    for (int i = 1; i < 16; i++) rd_sh[i] <= rd_sh[i-1];
     rom_rdata <= rom[rom_addr];
 end
+assign ram_ack   = ack_sh[ram_lat - 1];
+assign ram_rdata = rd_sh[ram_lat - 1];
 
 pc_system u_pc (
     .clk        (clk),

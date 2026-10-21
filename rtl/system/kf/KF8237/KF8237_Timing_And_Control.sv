@@ -236,6 +236,82 @@ module KF8237_Timing_And_Control (
         endcase
     end
 
+    // pc10-iii (timing): the same decoder with READY = 1, for DACK (below).
+    // READY only decides between S4 and staying in S2/S3/SW, so
+    // next_state_r1 equals next_state except in S2/S3/SW without READY: there
+    // next_state can be S2 (compressed timing, verify) where next_state_r1 is
+    // S4. The only difference that matters is next_state == S2 in S2, which
+    // reloads dma_acknowledge_ff with dma_acknowledge_internal - the value it
+    // already has (it got it on entering S2, and the internal value only
+    // changes in SI).
+    state_t         next_state_r1;
+    logic           next_s4_r1;
+    always_comb begin
+        next_state_r1 = state;
+        next_s4_r1    = 1'b0;
+
+        casez (state)
+            SI: begin
+                if (0 != encoded_dma)
+                    next_state_r1 = S0;
+            end
+            S0: begin
+                if (hold_acknowledge)
+                    next_state_r1 = S1;
+            end
+            S1: begin
+                if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE) begin
+                    next_state_r1 = S4;
+                    next_s4_r1    = 1'b1;
+                end
+                else
+                    next_state_r1 = S2;
+            end
+            S2: begin
+                if (~compressed_timing)
+                    next_state_r1 = S3;
+                else if (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY) begin
+                    if (1'b1)
+                        next_state_r1 = S4;
+                    next_s4_r1    = 1'b1;
+                end
+                else
+                    next_state_r1 = SW;
+            end
+            S3: begin
+                if (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY) begin
+                    if (1'b1)
+                        next_state_r1 = S4;
+                    next_s4_r1    = 1'b1;
+                end
+                else
+                    next_state_r1 = SW;
+            end
+            SW: begin
+                if (1'b1)
+                    next_state_r1 = S4;
+                next_s4_r1    = 1'b1;
+            end
+            S4: begin
+                if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE)
+                    if (0 == (dma_acknowledge_internal & dma_request_state))
+                        next_state_r1 = SI;
+                    else
+                        next_state_r1 = S4;
+                else if (transfer_mode[dma_select] == `TRANSFER_MODE_SINGLE)
+                    next_state_r1 = SI;
+                else if ((transfer_mode[dma_select] == `TRANSFER_MODE_DEMAND) && (0 == (dma_acknowledge_internal & dma_request_state)))
+                    next_state_r1 = SI;
+                else if (end_of_process_internal)
+                    next_state_r1 = SI;
+                else
+                    next_state_r1 = (reoutput_high_address) ? S1 : S2;
+            end
+            default: begin
+            end
+        endcase
+    end
+
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             state <= SI;
@@ -458,9 +534,9 @@ module KF8237_Timing_And_Control (
         if (master_clear)
             dma_acknowledge_ff_next = 0;
         else if (cpu_clock_negedge)
-            if (next_state == S2)
+            if (next_state_r1 == S2)
                 dma_acknowledge_ff_next = dma_acknowledge_internal;
-            else if (next_state == SI)
+            else if (next_state_r1 == SI)
                 dma_acknowledge_ff_next = 0;
             else
                 dma_acknowledge_ff_next = dma_acknowledge_ff;
@@ -478,6 +554,10 @@ module KF8237_Timing_And_Control (
     assign  dma_acknowledge = dma_acknowledge_q;
 
 `ifndef SYNTHESIS
+    always_ff @(posedge clock)
+        if (!reset && !master_clear && cpu_clock_negedge && dma_acknowledge_ff_next !==
+            ((next_state == S2) ? dma_acknowledge_internal : (next_state == SI) ? 4'b0000 : dma_acknowledge_ff))
+            $fatal(1, "KF8237: DACK next value without READY differs from the original");
     always_ff @(posedge clock)
         if (!reset && next_word !== (((next_state == S4) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ? 1'b1 : 1'b0))
             $fatal(1, "KF8237: next_word differs from the original");

@@ -241,7 +241,7 @@ always_comb begin
     if (reset) begin
         page_next[0] = 4'h0; page_next[1] = 4'h0; page_next[2] = 4'h0; page_next[3] = 4'h0;
     end else if (cs_page && cpu_iow)
-        page_next[bus_addr[1:0]] = bus_wdata[3:0];
+        page_next[bus_addr[1:0]] = cpu_dout[3:0];   // = bus_wdata: CPU writes need !aen (pc10-iii)
 end
 always_ff @(posedge clk) page <= page_next;
 
@@ -262,6 +262,9 @@ end
 assign bus_addr  = dma_sel_q ? {dma_page_q, dma_addr} : cpu_addr;
 
 `ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (!reset && cpu_iow && bus_wdata != cpu_dout)
+        $fatal(1, "xt_board: CPU I/O write while the DMA drives the data bus");
 wire [3:0] dma_page_ref = !dack_n[2] ? page[1] : !dack_n[3] ? page[2] : page[3];
 always_ff @(posedge clk)
     if (!reset && bus_addr != (dma_owns && !(&dack_n) ? {dma_page_ref, dma_addr} : cpu_addr))
@@ -364,7 +367,7 @@ KF8255 u_ppi (
 logic nmi_en;
 always_ff @(posedge clk)
     if (reset) nmi_en <= 1'b0;
-    else if (cs_nmi && cpu_iow) nmi_en <= bus_wdata[7];
+    else if (cs_nmi && cpu_iow) nmi_en <= cpu_dout[7];      // = bus_wdata (pc10-iii)
 assign cpu_nmi = 1'b0 & nmi_en;          // no parity / IO channel check yet
 
 // ------------------------------------------------------------ keyboard
