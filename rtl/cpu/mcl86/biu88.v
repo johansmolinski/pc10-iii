@@ -24,7 +24,7 @@
 // it. The real chip removes a byte from the queue when it reads it, so here
 // the EU's first use of the top byte (input eu_qread: 01 a jump through the
 // opcode table, 11 any other use) is the read: the byte leaves the 4-byte
-// queue and is "taken" (up to two bytes) for the EU's view until the strobe
+// queue and is "taken" (up to three bytes) for the EU's view until the strobe
 // pops it. Queue status (QS1:QS0) is reported one cycle after the read, as on
 // the real chip.
 //
@@ -120,6 +120,7 @@ module biu88 (
     output     [11:0]   BIU_CYC,            // 8088 clocks since the opcode read
     output     [11:0]   BIU_SINCE_READ,     // 8088 clocks since the last queue read
     output     [11:0]   BIU_SINCE_DONE,     // 8088 clocks since an EU transfer ended
+    output              BIU_SR_PENDING,     // a scheduled read has not happened yet
 
     // test only (SingleStepTests): install a prefetched queue
     input               tb_preload,
@@ -174,7 +175,7 @@ reg         discard;              // a flush hit a running code fetch
 reg  [7:0]  q0, q1, q2, q3;
 reg  [2:0]  qlen;
 reg  [15:0] pc;                   // offset of the next code fetch
-reg  [7:0]  taken0, taken1;       // bytes read from the queue, not yet
+reg  [7:0]  taken0, taken1, taken2; // bytes read from the queue, not yet
 reg  [1:0]  ntaken;               // popped by the EU (taken0 = its view's top)
 reg         preread;              // taken1/taken0 holds an opcode the BIU read
 reg         end_armed;            // an end counter is running
@@ -245,6 +246,7 @@ assign BIU_RETURN_DATA      = return_data;
 assign BIU_CYC              = since_dispatch;
 assign BIU_SINCE_READ       = since_read;
 assign BIU_SINCE_DONE       = since_done;
+assign BIU_SR_PENDING       = sr_armed;
 assign BIU_DONE             = done;
 assign BIU_CLK_COUNTER_ZERO = counter == 13'd0;
 assign BIU_NMI_CAUGHT       = 1'b0;
@@ -471,7 +473,9 @@ task take_byte;
     input [1:0] op;
     begin
         queue_read_effects;
-        if (ntaken == 2'd0) taken0 = q0; else taken1 = q0;
+        if (ntaken == 2'd0) taken0 = q0;
+        else if (ntaken == 2'd1) taken1 = q0;
+        else taken2 = q0;
         ntaken     = ntaken + 2'd1;
         queue_byte = q0;
         q_pop;
@@ -578,7 +582,7 @@ always @(posedge CORE_CLK_INT) begin
         bus_pending = BP_NONE;  final_transfer = 1'b1;  transfer_n = 2'd0;
         address_latch = 20'h0;  data_bus = 8'h0;  discard = 1'b0;
         q0 = 8'h0; q1 = 8'h0; q2 = 8'h0; q3 = 8'h0;  qlen = 3'd0;
-        pc = 16'h0;  taken0 = 8'h0;  taken1 = 8'h0;  ntaken = 2'd0;
+        pc = 16'h0;  taken0 = 8'h0;  taken1 = 8'h0;  taken2 = 8'h0;  ntaken = 2'd0;
         preread = 1'b0;  end_armed = 1'b0;  end_after_done = 1'b0;  end_ad_n = 12'd0;
         eu_ip = 16'h0;  queue_op = QO_IDLE;  QS_OUT = QO_IDLE;
         queue_byte = 8'h0;  QS_BYTE = 8'h0;
@@ -748,6 +752,7 @@ always @(posedge CORE_CLK_INT) begin
                 take_byte(eu_qs == 2'b01 ? QO_FIRST : QO_SUBS);
             if (ntaken != 2'd0) begin
                 taken0 = taken1;
+                taken1 = taken2;
                 ntaken = ntaken - 2'd1;
                 eu_ip  = eu_ip + 16'd1;
             end
@@ -757,7 +762,7 @@ always @(posedge CORE_CLK_INT) begin
         // a scheduled subsequent-byte read: the BIU reads the next byte at
         // the cycle the 8088 reads it, even if the EU gets to it later (it
         // then finds the byte read already)
-        if (sr_armed && sr_due(sr_n) && ntaken != 2'd2 && qlen != 3'd0) begin
+        if (sr_armed && sr_due(sr_n) && ntaken != 2'd3 && qlen != 3'd0) begin
             take_byte(QO_SUBS);
             if (sr_two) begin                   // the second byte, next cycle
                 sr_two  = 1'b0;
@@ -770,7 +775,7 @@ always @(posedge CORE_CLK_INT) begin
         // the end of the instruction: when its absolute end counter runs out,
         // the next opcode is read in that cycle even if the EU is still busy
         // (MCL86's microcode can take longer than the 8088 for its last steps)
-        if (end_armed && counter == 13'd0 && ntaken != 2'd2 && qlen != 3'd0 && !preread) begin
+        if (end_armed && counter == 13'd0 && ntaken != 2'd3 && qlen != 3'd0 && !preread) begin
             take_byte(QO_FIRST);
             preread   = 1'b1;
             end_armed = 1'b0;

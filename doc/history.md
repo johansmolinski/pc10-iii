@@ -425,3 +425,33 @@ k to l:
 - Sampled exact on all cycles: every ALU r/m,reg and reg,r/m form,
   CMP/TEST, MOV r,r/m, all of ADD/OR/AND/XOR/CMP in 80-83.
 
+## 2026-10-21 - MOV r/m,imm, TEST r/m,imm, NOT/NEG; a writeback fix
+
+l to m:
+- **BIU:** three taken bytes. MOV r/m16,imm16 deadlocked with two (the
+  ModR/M byte held, the immediate's low byte taken, the scheduled high byte
+  had no room). The scheduled-read pending flag goes to the EU as
+  system_signals bit 14, so microcode can wait for the BIU's read instead of
+  racing it.
+- **MOV r/m,imm (C6/C7):**
+  - register operand as group 80/81;
+  - memory operand: the immediate 2 cycles after the 8088 would have read
+    the operand (scheduled at the EA release in r2 + 2), the write 3 cycles
+    after the immediate, the end at the write.
+  - Known: C7 to memory writes late in ~40%.
+- **TEST r/m,imm (F6.0/F6.1/F7.0):** the immediate 2 cycles after the
+  ModR/M byte for a register, scheduled by a reg-field-aware armed entry,
+  since the F6/F7 groups share CALC_EA with NOT/NEG/MUL/DIV. Memory as CMP.
+  All exact.
+- **ALU writeback fix:**
+  - The patch armed "end at the next transfer" for register destinations
+    too. Without an earlier armed end (NOT/NEG of a register) no transfer
+    ever came, and the instruction waited on the parked counter for
+    hundreds of cycles.
+  - Now memory only (0x1670/0x1680).
+- **NOT/NEG:**
+  - end 2 after the ModR/M byte for a register;
+  - memory write released 4 cycles after the read ended.
+  - NEG r/m16 exact. Known: NOT to memory 1 cycle early in ~20%; NEG r/m8
+    1 cycle late in ~75% (MCL86's byte SUB is slow).
+

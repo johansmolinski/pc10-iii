@@ -10258,10 +10258,10 @@ p 01 00000 00001 F7FE
 # ----------------
 #
 # CALL WRITEBACK_EA_BYTE
-# pc10-iii: through the patch at 0x1280 (times the write and the end)
+# pc10-iii: through the patch at 0x1670 (times the write and the end, memory only)
 p 00 00000 00001 090D
 p 01 00000 00001 1100
-p 01 00000 00001 1280
+p 01 00000 00001 1670
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode 
 p 00 00000 00001 090E
@@ -10328,10 +10328,10 @@ p 01 00000 00001 F7FE
 # ----------------
 #
 # CALL WRITEBACK_EA_WORD
-# pc10-iii: through the patch at 0x1288 (times the write and the end)
+# pc10-iii: through the patch at 0x1680 (times the write and the end, memory only)
 p 00 00000 00001 091C
 p 01 00000 00001 1100
-p 01 00000 00001 1288
+p 01 00000 00001 1680
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode 
 p 00 00000 00001 091D
@@ -15511,14 +15511,16 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: CALL the group CALC_EA wrapper at 0x14B0
 p 00 00000 00001 0CE7
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 14B0
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3 - Fetch IMM8
+# pc10-iii: CALL the MOV r/m,imm fetch at 0x15C0
 p 00 00000 00001 0CE8
 p 01 00000 00001 1100
-p 01 00000 00001 02A5 
+p 01 00000 00001 15C0
 #
 # Copy r3 to r0 
 p 00 00000 00001 0CE9
@@ -15526,9 +15528,10 @@ p 01 00000 00001 59CF
 p 01 00000 00001 0000
 #
 # Jump unconditional to common code
+# pc10-iii: to the writeback at 0x1600
 p 00 00000 00001 0CEA
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1600
 #
 
 # -----------------------------------------------------
@@ -15538,14 +15541,16 @@ p 01 00000 00001 090D
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: CALL the group CALC_EA wrapper at 0x14B8
 p 00 00000 00001 0CEB
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 14B8
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode word into r3 - Fetch IMM16
+# pc10-iii: CALL the MOV r/m,imm fetch at 0x15E0
 p 00 00000 00001 0CEC
 p 01 00000 00001 1100
-p 01 00000 00001 02E5 
+p 01 00000 00001 15E0
 #
 # Copy r3 to r0 
 p 00 00000 00001 0CED
@@ -15553,9 +15558,10 @@ p 01 00000 00001 59CF
 p 01 00000 00001 0000
 #
 # Jump unconditional to common code
+# pc10-iii: to the writeback at 0x1602
 p 00 00000 00001 0CEE
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 1602
 #
 # -----------------------------------------------------
 #
@@ -17014,9 +17020,10 @@ p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
 # CALL CALC_EA_BYTE
+# pc10-iii: CALL the F6 CALC_EA wrapper at 0x1650
 p 00 00000 00001 0E13
 p 01 00000 00001 1100
-p 01 00000 00001 0760
+p 01 00000 00001 1650
 #
 # CALL FETCH_EA_BYTE into r0
 p 00 00000 00001 0E14
@@ -17090,9 +17097,10 @@ p 01 00000 00001 0E54
 # -----------------------------------------------------
 #
 # CALL Fetch Opcode byte with QS=Subsequent opcode byte into r3 - Fetch IMM8
+# pc10-iii: CALL the TEST fetch at 0x1610
 p 00 00000 00001 0E20
 p 01 00000 00001 1100
-p 01 00000 00001 02A5 
+p 01 00000 00001 1610
 #
 # NOP
 p 00 00000 00001 0E21
@@ -17127,9 +17135,10 @@ p 01 00000 00001 699F
 p 01 00000 00001 FFFF
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: to the NOT/NEG writeback at 0x1690
 p 00 00000 00001 0E27
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -17154,9 +17163,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0A46
 #
 # Jump unconditional to common code to writeback the EA Byte
+# pc10-iii: to the NOT/NEG writeback at 0x1690
 p 00 00000 00001 0E2B
 p 01 00000 00001 1000
-p 01 00000 00001 090D
+p 01 00000 00001 1690
 #
 #
 # -----------------------------------------------------
@@ -17653,9 +17663,10 @@ p 01 00000 00001 0F77
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
+# pc10-iii: CALL the F7 CALC_EA wrapper at 0x1654
 p 00 00000 00001 0E83
 p 01 00000 00001 1100
-p 01 00000 00001 0762
+p 01 00000 00001 1654
 #
 # CALL FETCH_EA_WORD into r0
 p 00 00000 00001 0E84
@@ -17734,9 +17745,10 @@ p 01 00000 00001 488F
 p 01 00000 00001 F7FE
 #
 # CALL Fetch Opcode word with QS=Subsequent opcode byte into r3 - Fetch IMM16
+# pc10-iii: CALL the TEST fetch at 0x1620
 p 00 00000 00001 0E91
 p 01 00000 00001 1100
-p 01 00000 00001 02E5 
+p 01 00000 00001 1620
 #
 # Dummy <= r0 AND r3
 p 00 00000 00001 0E92
@@ -17761,9 +17773,10 @@ p 01 00000 00001 699F
 p 01 00000 00001 FFFF
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: to the NOT/NEG writeback at 0x16A0
 p 00 00000 00001 0E95
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -17788,9 +17801,10 @@ p 01 00000 00001 1100
 p 01 00000 00001 0A52
 #
 # Jump unconditional to common code to writeback the EA Word
+# pc10-iii: to the NOT/NEG writeback at 0x16A0
 p 00 00000 00001 0E99
 p 01 00000 00001 1000
-p 01 00000 00001 091C
+p 01 00000 00001 16A0
 #
 #
 # -----------------------------------------------------
@@ -23851,3 +23865,1024 @@ p 01 00000 00001 07E2
 p 00 00000 00001 15B9
 p 01 00000 00001 1000
 p 01 00000 00001 091D
+#
+# --------------------------------------------------------------------
+# MOV r/m,imm (C6/C7) and TEST r/m,imm (F6.0/F6.1/F7.0).
+# MOV r/m,imm: register operand as group 80/81 (immediate scheduled 1 cycle
+# after the ModR/M byte through 0x14B0/0x14B8, end 2 after imm8, 4 after
+# imm16's high byte); memory operand: the 8088 reads the immediate 2
+# cycles after it would have issued an operand read (the EA release in r2
+# + 2, a scheduled read - the EU waits until the BIU did it, system_signals
+# bit 14), writes 3 cycles after it and ends at the write. Its writeback
+# bypasses the ALU writeback patch (0x1600/0x1602).
+# TEST r/m,imm: the immediate 2 cycles after the ModR/M byte for a register
+# (a TEST variant of the armed ModR/M entry schedules it when mod = 11 and
+# reg = 0/1 - the F6/F7 groups share CALC_EA with NOT/NEG/MUL/DIV), end 2
+# after imm8, 3 after imm16; memory: 2 cycles after the read ended, end 3
+# after imm8, 2 after imm16.
+# Known: MOV r/m16,imm16 to memory writes late in ~40% (word path slower).
+#
+# MOV r/m,imm immediate fetch, byte
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 15C0
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register path
+p 00 00000 00001 15C1
+p 01 00000 00001 1001
+p 01 00000 00001 15D0
+#
+# biu_dataout = r2 + 0002 (scheduled read: the EA release + 2)
+p 00 00000 00001 15C2
+p 01 00000 00001 2FBF
+p 01 00000 00001 0002
+#
+# Strobe BIU - schedule the read (register strobe, code 7)
+p 00 00000 00001 15C3
+p 01 00000 00001 5DDF
+p 01 00000 00001 3070
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 15C4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Isolate system_signals bit 14 (scheduled read pending)
+p 00 00000 00001 15C5
+p 01 00000 00001 4EEF
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to retest
+p 00 00000 00001 15C6
+p 01 00000 00001 1001
+p 01 00000 00001 15C5
+#
+# CALL the fetch procedure (the byte(s) are read already)
+p 00 00000 00001 15C7
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+#
+# biu_dataout = 0003 (release: 3 cycles after the last queue read)
+p 00 00000 00001 15C8
+p 01 00000 00001 5FFF
+p 01 00000 00001 0003
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 15C9
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 15CA
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 15CB
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 15CC
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 15CD
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 15CE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# NOP
+p 00 00000 00001 15CF
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# CALL the fetch procedure (register operand)
+p 00 00000 00001 15D0
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+#
+# biu_dataout = A002 (end: 2 cycles after the last queue read)
+p 00 00000 00001 15D1
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 15D2
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 15D3
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 15D4
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# MOV r/m,imm immediate fetch, word
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 15E0
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register path
+p 00 00000 00001 15E1
+p 01 00000 00001 1001
+p 01 00000 00001 15F0
+#
+# biu_dataout = r2 + 1002 (scheduled read: the EA release + 2)
+p 00 00000 00001 15E2
+p 01 00000 00001 2FBF
+p 01 00000 00001 1002
+#
+# Strobe BIU - schedule the read (register strobe, code 7)
+p 00 00000 00001 15E3
+p 01 00000 00001 5DDF
+p 01 00000 00001 3070
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 15E4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Isolate system_signals bit 14 (scheduled read pending)
+p 00 00000 00001 15E5
+p 01 00000 00001 4EEF
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to retest
+p 00 00000 00001 15E6
+p 01 00000 00001 1001
+p 01 00000 00001 15E5
+#
+# CALL the fetch procedure (the byte(s) are read already)
+p 00 00000 00001 15E7
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+#
+# biu_dataout = 0003 (release: 3 cycles after the last queue read)
+p 00 00000 00001 15E8
+p 01 00000 00001 5FFF
+p 01 00000 00001 0003
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 15E9
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 15EA
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 15EB
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 15EC
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 15ED
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 15EE
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# NOP
+p 00 00000 00001 15EF
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# CALL the fetch procedure (register operand)
+p 00 00000 00001 15F0
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+#
+# biu_dataout = A004 (end: 4 cycles after the last queue read)
+p 00 00000 00001 15F1
+p 01 00000 00001 5FFF
+p 01 00000 00001 A004
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 15F2
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 15F3
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 15F4
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# MOV r/m,imm writebacks
+#
+# CALL WRITEBACK_EA_BYTE
+p 00 00000 00001 1600
+p 01 00000 00001 1100
+p 01 00000 00001 07E0
+#
+# Jump unconditional to the common ending
+p 00 00000 00001 1601
+p 01 00000 00001 1000
+p 01 00000 00001 090E
+#
+# CALL WRITEBACK_EA_WORD
+p 00 00000 00001 1602
+p 01 00000 00001 1100
+p 01 00000 00001 07E2
+#
+# Jump unconditional to the common ending
+p 00 00000 00001 1603
+p 01 00000 00001 1000
+p 01 00000 00001 091D
+#
+# TEST r/m,imm immediate fetch, imm8
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1610
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register path
+p 00 00000 00001 1611
+p 01 00000 00001 1001
+p 01 00000 00001 1618
+#
+# SYNC: 2 cycles after the operand read ended
+p 00 00000 00001 1612
+p 01 00000 00001 0000
+p 01 00000 00001 C002
+#
+# CALL the fetch procedure
+p 00 00000 00001 1613
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+#
+# biu_dataout = A003 (end: 3 cycles after the last queue read)
+p 00 00000 00001 1614
+p 01 00000 00001 5FFF
+p 01 00000 00001 A003
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1615
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1616
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1617
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# SYNC: 2 cycles after the last queue read
+p 00 00000 00001 1618
+p 01 00000 00001 0000
+p 01 00000 00001 4002
+#
+# CALL the fetch procedure (register operand; scheduled read)
+p 00 00000 00001 1619
+p 01 00000 00001 1100
+p 01 00000 00001 02A5
+#
+# biu_dataout = A002 (end: 2 cycles after the last queue read)
+p 00 00000 00001 161A
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 161B
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 161C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 161D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# TEST r/m,imm immediate fetch, imm16
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1620
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register path
+p 00 00000 00001 1621
+p 01 00000 00001 1001
+p 01 00000 00001 1628
+#
+# SYNC: 2 cycles after the operand read ended
+p 00 00000 00001 1622
+p 01 00000 00001 0000
+p 01 00000 00001 C002
+#
+# CALL the fetch procedure
+p 00 00000 00001 1623
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+#
+# biu_dataout = A002 (end: 2 cycles after the last queue read)
+p 00 00000 00001 1624
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1625
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1626
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1627
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# SYNC: 2 cycles after the last queue read
+p 00 00000 00001 1628
+p 01 00000 00001 0000
+p 01 00000 00001 4002
+#
+# CALL the fetch procedure (register operand; scheduled read)
+p 00 00000 00001 1629
+p 01 00000 00001 1100
+p 01 00000 00001 02E5
+#
+# biu_dataout = A003 (end: 3 cycles after the last queue read)
+p 00 00000 00001 162A
+p 01 00000 00001 5FFF
+p 01 00000 00001 A003
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 162B
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 162C
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 162D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Armed ModR/M entry, TEST variant (F6): mod = 11 and reg = 0/1 schedule the immediate
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1630
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1631
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 1632
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 1633
+p 01 00000 00001 1002
+p 01 00000 00001 1632
+#
+# SYNC to cycle 1
+p 00 00000 00001 1634
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 1635
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 1636
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00F0 (MOD and REG bits 5:4)
+p 00 00000 00001 1637
+p 01 00000 00001 4ACF
+p 01 00000 00001 00F0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11, REG = 0/1)
+p 00 00000 00001 1638
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero to the return
+p 00 00000 00001 1639
+p 01 00000 00001 1001
+p 01 00000 00001 163D
+#
+# biu_dataout = 0002 (scheduled read 2 cycles after the ModR/M byte)
+p 00 00000 00001 163A
+p 01 00000 00001 5FFF
+p 01 00000 00001 0002
+#
+# Strobe BIU - schedule the read (register strobe, code 7)
+p 00 00000 00001 163B
+p 01 00000 00001 5DDF
+p 01 00000 00001 3070
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 163C
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Return to calling code
+p 00 00000 00001 163D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Armed ModR/M entry, TEST variant (F7): mod = 11 and reg = 0/1 schedule the immediate
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 1640
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1641
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 1642
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 1643
+p 01 00000 00001 1002
+p 01 00000 00001 1642
+#
+# SYNC to cycle 1
+p 00 00000 00001 1644
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 1645
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 1646
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00F0 (MOD and REG bits 5:4)
+p 00 00000 00001 1647
+p 01 00000 00001 4ACF
+p 01 00000 00001 00F0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11, REG = 0/1)
+p 00 00000 00001 1648
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero to the return
+p 00 00000 00001 1649
+p 01 00000 00001 1001
+p 01 00000 00001 164D
+#
+# biu_dataout = 1002 (scheduled read 2 cycles after the ModR/M byte)
+p 00 00000 00001 164A
+p 01 00000 00001 5FFF
+p 01 00000 00001 1002
+#
+# Strobe BIU - schedule the read (register strobe, code 7)
+p 00 00000 00001 164B
+p 01 00000 00001 5DDF
+p 01 00000 00001 3070
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 164C
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Return to calling code
+p 00 00000 00001 164D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# CALC_EA wrapper, group F6
+#
+# Set r0 to 0x0000
+p 00 00000 00001 1650
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1651
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry (F6, reg field)
+p 00 00000 00001 1652
+p 01 00000 00001 1100
+p 01 00000 00001 16B0
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1653
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# CALC_EA wrapper, group F7
+#
+# Set r0 to 0x0008
+p 00 00000 00001 1654
+p 01 00000 00001 59FF
+p 01 00000 00001 0008
+#
+# Initialize REPZ and REPNZ flags to zero
+p 00 00000 00001 1655
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
+#
+# CALL the armed ModR/M entry (F7, reg field)
+p 00 00000 00001 1656
+p 01 00000 00001 1100
+p 01 00000 00001 16D0
+#
+# Jump unconditional to the rest of CALC_EA (it returns to the caller)
+p 00 00000 00001 1657
+p 01 00000 00001 1000
+p 01 00000 00001 0765
+#
+# --------------------------------------------------------------------
+# ALU writeback, second version (from 0x090D/0x091C; 0x1280-0x128E are no
+# longer used): the release and "end at the next transfer" are armed for a
+# memory destination only. A register destination has no transfer, and an
+# instruction without an earlier armed end then waited on the parked
+# counter (NOT/NEG of a register did).
+# NOT/NEG writeback (0x1690/0x16A0): the 8088 writes 4 cycles after the read
+# ended (one earlier than the ALU r/m,reg forms).
+# F6/F7 armed ModR/M entries with the reg field (0x16B0/0x16D0, from the
+# wrappers 0x1650/0x1654): mod = 11 and reg 0/1 (TEST) schedule the
+# immediate 2 cycles after the ModR/M byte, reg 2/3 (NOT/NEG) arm the end 2
+# cycles after it; MUL/DIV nothing yet.
+# Known: NOT with a memory operand writes 1 cycle early in ~20%, NEG r/m8 1
+# cycle late in ~75% (MCL86's byte SUB is slower than the 8088).
+#
+# ALU writeback, byte
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1670
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the writeback
+p 00 00000 00001 1671
+p 01 00000 00001 1001
+p 01 00000 00001 1678
+#
+# biu_dataout = 2005 (release: 5 cycles after the last transfer ended)
+p 00 00000 00001 1672
+p 01 00000 00001 5FFF
+p 01 00000 00001 2005
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1673
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1674
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 1675
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1676
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1677
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to WRITEBACK_EA_BYTE (it returns to the caller)
+p 00 00000 00001 1678
+p 01 00000 00001 1000
+p 01 00000 00001 07E0
+#
+# ALU writeback, word
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1680
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the writeback
+p 00 00000 00001 1681
+p 01 00000 00001 1001
+p 01 00000 00001 1688
+#
+# biu_dataout = 2005 (release: 5 cycles after the last transfer ended)
+p 00 00000 00001 1682
+p 01 00000 00001 5FFF
+p 01 00000 00001 2005
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1683
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1684
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 1685
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1686
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1687
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump unconditional to WRITEBACK_EA_WORD (it returns to the caller)
+p 00 00000 00001 1688
+p 01 00000 00001 1000
+p 01 00000 00001 07E2
+#
+# NOT/NEG writeback, byte
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1690
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the writeback
+p 00 00000 00001 1691
+p 01 00000 00001 1001
+p 01 00000 00001 1698
+#
+# biu_dataout = 2004 (release: 4 cycles after the last transfer ended)
+p 00 00000 00001 1692
+p 01 00000 00001 5FFF
+p 01 00000 00001 2004
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1693
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1694
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 1695
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1696
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1697
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# CALL WRITEBACK_EA_BYTE
+p 00 00000 00001 1698
+p 01 00000 00001 1100
+p 01 00000 00001 07E0
+#
+# Jump unconditional to the common ending
+p 00 00000 00001 1699
+p 01 00000 00001 1000
+p 01 00000 00001 090E
+#
+# NOT/NEG writeback, word
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 16A0
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the writeback
+p 00 00000 00001 16A1
+p 01 00000 00001 1001
+p 01 00000 00001 16A8
+#
+# biu_dataout = 2004 (release: 4 cycles after the last transfer ended)
+p 00 00000 00001 16A2
+p 01 00000 00001 5FFF
+p 01 00000 00001 2004
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 16A3
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 16A4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 16A5
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 16A6
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 16A7
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# CALL WRITEBACK_EA_WORD
+p 00 00000 00001 16A8
+p 01 00000 00001 1100
+p 01 00000 00001 07E2
+#
+# Jump unconditional to the common ending
+p 00 00000 00001 16A9
+p 01 00000 00001 1000
+p 01 00000 00001 091D
+#
+# Armed ModR/M entry, F6 (reg field)
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 16B0
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 16B1
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 16B2
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 16B3
+p 01 00000 00001 1002
+p 01 00000 00001 16B2
+#
+# SYNC to cycle 1
+p 00 00000 00001 16B4
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 16B5
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 16B6
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00C0 (MOD bits)
+p 00 00000 00001 16B7
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11)
+p 00 00000 00001 16B8
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero (memory operand) to the return
+p 00 00000 00001 16B9
+p 01 00000 00001 1001
+p 01 00000 00001 16C1
+#
+# r1 = r3 AND 0030 (REG bits 5:4)
+p 00 00000 00001 16BA
+p 01 00000 00001 4ACF
+p 01 00000 00001 0030
+#
+# Jump if last_alu is zero (REG 0/1, TEST) to the scheduled read
+p 00 00000 00001 16BB
+p 01 00000 00001 1002
+p 01 00000 00001 16C2
+#
+# Dummy = r1 XOR 0010 (zero for REG 2/3)
+p 00 00000 00001 16BC
+p 01 00000 00001 6EAF
+p 01 00000 00001 0010
+#
+# Jump if last_alu is non-zero (MUL/DIV) to the return
+p 00 00000 00001 16BD
+p 01 00000 00001 1001
+p 01 00000 00001 16C1
+#
+# biu_dataout = A002 (NOT/NEG end: 2 cycles after the ModR/M read)
+p 00 00000 00001 16BE
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 16BF
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 16C0
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 16C1
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = 0002 (TEST: scheduled read 2 cycles after the ModR/M byte)
+p 00 00000 00001 16C2
+p 01 00000 00001 5FFF
+p 01 00000 00001 0002
+#
+# Strobe BIU - schedule the read (register strobe, code 7)
+p 00 00000 00001 16C3
+p 01 00000 00001 5DDF
+p 01 00000 00001 3070
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 16C4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Return to calling code
+p 00 00000 00001 16C5
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Armed ModR/M entry, F7 (reg field)
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode
+p 00 00000 00001 16D0
+p 01 00000 00001 5DDF
+p 01 00000 00001 1004
+#
+# Debounce BIU Strobe
+p 00 00000 00001 16D1
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Isolate the Prefetch Queue EMPTY bit into r3
+p 00 00000 00001 16D2
+p 01 00000 00001 4CEF
+p 01 00000 00001 0080
+#
+# Jump to Prefetch Queue EMPTY bit check if last result is zero
+p 00 00000 00001 16D3
+p 01 00000 00001 1002
+p 01 00000 00001 16D2
+#
+# SYNC to cycle 1
+p 00 00000 00001 16D4
+p 01 00000 00001 0000
+p 01 00000 00001 0001
+#
+# r3 = 0000 OR prefetch_queue_byte (the ModR/M read)
+p 00 00000 00001 16D5
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 16D6
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# r1 = r3 AND 00C0 (MOD bits)
+p 00 00000 00001 16D7
+p 01 00000 00001 4ACF
+p 01 00000 00001 00C0
+#
+# Dummy = r1 XOR 00C0 (zero for MOD = 11)
+p 00 00000 00001 16D8
+p 01 00000 00001 6EAF
+p 01 00000 00001 00C0
+#
+# Jump if last_alu is non-zero (memory operand) to the return
+p 00 00000 00001 16D9
+p 01 00000 00001 1001
+p 01 00000 00001 16E1
+#
+# r1 = r3 AND 0030 (REG bits 5:4)
+p 00 00000 00001 16DA
+p 01 00000 00001 4ACF
+p 01 00000 00001 0030
+#
+# Jump if last_alu is zero (REG 0/1, TEST) to the scheduled read
+p 00 00000 00001 16DB
+p 01 00000 00001 1002
+p 01 00000 00001 16E2
+#
+# Dummy = r1 XOR 0010 (zero for REG 2/3)
+p 00 00000 00001 16DC
+p 01 00000 00001 6EAF
+p 01 00000 00001 0010
+#
+# Jump if last_alu is non-zero (MUL/DIV) to the return
+p 00 00000 00001 16DD
+p 01 00000 00001 1001
+p 01 00000 00001 16E1
+#
+# biu_dataout = A002 (NOT/NEG end: 2 cycles after the ModR/M read)
+p 00 00000 00001 16DE
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 16DF
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 16E0
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 16E1
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = 1002 (TEST: scheduled read 2 cycles after the ModR/M byte)
+p 00 00000 00001 16E2
+p 01 00000 00001 5FFF
+p 01 00000 00001 1002
+#
+# Strobe BIU - schedule the read (register strobe, code 7)
+p 00 00000 00001 16E3
+p 01 00000 00001 5DDF
+p 01 00000 00001 3070
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 16E4
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Return to calling code
+p 00 00000 00001 16E5
+p 01 00000 00001 1030
+p 01 00000 00001 0000

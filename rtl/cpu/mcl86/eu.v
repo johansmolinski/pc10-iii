@@ -76,6 +76,7 @@ module mcl86_eu_core
     input      [11:0]   EU_CYC,                 // pc10-iii: 8088 clocks since the opcode read (BIU)
     input      [11:0]   EU_SINCE_READ,          // pc10-iii: 8088 clocks since the last queue read (BIU)
     input      [11:0]   EU_SINCE_DONE,          // pc10-iii: 8088 clocks since an EU transfer ended (BIU)
+    input               EU_SR_PENDING,          // pc10-iii: the BIU's scheduled read is pending (system_signals[14])
     output     [1:0]    EU_QREAD,               // pc10-iii: the EU uses the queue top: 01 opcode, 11 other
 
     
@@ -292,6 +293,7 @@ assign eu_jump_boolean = ( (idiv_opcode=='h1) && (eu_rom_address == 'h0E76) && (
 	  
                                                   
 // Consolidated system signals
+assign system_signals[14]   = EU_SR_PENDING;     // pc10-iii
 assign system_signals[13]   = eu_add_carry8;      
 assign system_signals[12]   = BIU_CLK_COUNTER_ZERO;   
 assign system_signals[11]   = eu_add_overflow16;      
