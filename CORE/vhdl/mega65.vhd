@@ -359,6 +359,8 @@ signal main_rst               : std_logic;
 signal video_clk              : std_logic;
 signal video_rst              : std_logic;
 signal main_pc_reset          : std_logic := '1';
+attribute max_fanout : integer;
+attribute max_fanout of main_pc_reset : signal is 32;    -- the PC's synchronous reset
 signal main_bios_valid        : std_logic;
 signal main_mem_size          : std_logic_vector(1 downto 0);
 

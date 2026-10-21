@@ -7,10 +7,11 @@
 -- * 20 banks of 32 KB at 00000-9FFFF (8 RAMB36 each, 160 in all). NO QNICE port
 --   (Megamiga hard rule 4: QNICE accesses on the falling
 --   clock edge, a half-period path into 160 spread tiles does not close).
--- * Latency (timing at 100 MHz): the request is registered and decoded into one of 20 banks
---   of 32 KB; each bank has its own copy of the address, write enable and data (so a register
---   drives only the 8 RAMB36 of its bank); the banks' outputs are multiplexed into a register.
---   Read data and ram_ack_o are valid 3 clocks after ram_en_i; pc_system waits for ram_ack_o
+-- * Latency (timing at 100 MHz): the request is registered as it comes (pc_system's address
+--   and data come out of deep logic), then decoded into one of 20 banks of 32 KB with one
+--   copy of the address, write enable and data per bank (so a register drives only the 8
+--   RAMB36 of its bank); the banks' outputs are multiplexed into a register. Read data and
+--   ram_ack_o are valid 4 clocks after ram_en_i; pc_system waits for ram_ack_o
 --   (architecture.md section 4 allows a later answer than the 1 clock of a bare BRAM).
 -- * size_i limits the RAM seen by the PC at run time (OSM "Memory"): 00 = 640 KB,
 --   01 = 512 KB, 10 = 256 KB, 11 = 128 KB. Above the limit reads return 0xFF (open
@@ -44,7 +45,13 @@ architecture synthesis of pc_ram is
    type t_addr   is array (0 to C_BANKS - 1) of std_logic_vector(14 downto 0);
    type t_data   is array (0 to C_BANKS - 1) of std_logic_vector(7 downto 0);
 
-   -- stage 1: the registered request, one copy per bank
+   -- stage 0: the request as it comes
+   signal r_addr   : std_logic_vector(19 downto 0) := (others => '0');
+   signal r_wdata  : std_logic_vector(7 downto 0) := (others => '0');
+   signal r_en     : std_logic := '0';
+   signal r_we     : std_logic := '0';
+
+   -- stage 1: the decoded request, one copy per bank
    signal b_addr   : t_addr := (others => (others => '0'));
    signal b_wdata  : t_data := (others => (others => '0'));
    signal b_we     : std_logic_vector(C_BANKS - 1 downto 0) := (others => '0');
@@ -75,28 +82,38 @@ begin
       to_unsigned(16#40000#, 20) when "10",
       to_unsigned(16#20000#, 20) when others;
 
+   p_in : process (clk_i)
+   begin
+      if rising_edge(clk_i) then
+         r_addr  <= ram_addr_i;
+         r_wdata <= ram_wdata_i;
+         r_en    <= ram_en_i;
+         r_we    <= ram_we_i;
+      end if;
+   end process p_in;
+
    p_req : process (clk_i)
       variable v_bank : natural range 0 to 31;
       variable v_inr  : std_logic;
    begin
       if rising_edge(clk_i) then
-         v_bank := to_integer(unsigned(ram_addr_i(19 downto 15)));
-         if unsigned(ram_addr_i) < limit then
+         v_bank := to_integer(unsigned(r_addr(19 downto 15)));
+         if unsigned(r_addr) < limit then
             v_inr := '1';
          else
             v_inr := '0';
          end if;
          for k in 0 to C_BANKS - 1 loop
-            b_addr(k)  <= ram_addr_i(14 downto 0);
-            b_wdata(k) <= ram_wdata_i;
-            if ram_en_i = '1' and ram_we_i = '1' and v_inr = '1' and v_bank = k then
+            b_addr(k)  <= r_addr(14 downto 0);
+            b_wdata(k) <= r_wdata;
+            if r_en = '1' and r_we = '1' and v_inr = '1' and v_bank = k then
                b_we(k) <= '1';
             else
                b_we(k) <= '0';
             end if;
          end loop;
          bank_q <= v_bank;
-         en_q   <= ram_en_i;
+         en_q   <= r_en;
          inr_q  <= v_inr;
       end if;
    end process p_req;

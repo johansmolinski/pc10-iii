@@ -160,7 +160,7 @@ begin
             n := n + 1;
             exit when mack = '1';
          end loop;
-         assert n = 3 report "RAM ack after " & integer'image(n) & " TB waits (expected 3: ack 3 clocks after ram_en)" severity failure;
+         assert n = 4 report "RAM ack after " & integer'image(n) & " TB waits (expected 4: ack 4 clocks after ram_en)" severity failure;
          assert mrd = d report "RAM " & to_hstring(to_unsigned(a, 20)) & ": " & to_hstring(mrd)
                                 & " expected " & to_hstring(d) severity failure;
       end procedure;
