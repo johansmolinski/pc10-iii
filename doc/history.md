@@ -488,3 +488,56 @@ tools/ctrace_diff.py compare instruction and cycle traces with MartyPC
 (branch martypc-ref): the first 16,460 instructions match register for
 register; the first cycle difference is the end of an instruction whose
 last bus cycle has a wait state (OUT A0h, clock 347).
+
+## 2026-10-21 - IBM CGA card
+
+`rtl/video/cga/` (branch `cga`): the IBM CGA on the card bus, with
+MartyPC (MIT, commit 05c0d08) as the timing reference. Design and every
+deviation: `doc/cga.md`.
+- `cga_crtc.sv`: the Motorola MC6845, MartyPC's `Crtc6845::tick()` per
+  character clock (last-line management, VTA, interlace, HSYNC width 0 = 16,
+  fixed 16-line VSYNC, cursor blink modes, light pen).
+- `cga_card.sv`: 16 KB VRAM (mirrored), 3D0-3DF, the mode deferral of
+  text/graphics changes to HSYNC, the 80-column clock switching on lchar
+  boundaries, all modes with MartyPC's drawing rules, blink, snow, an 8 KB
+  character ROM port (IBM ROM layout, loaded by the glue), RGBI + syncs + a
+  display window, raw composite signals.
+- **Wait states:** MartyPC's `WAIT_TABLE` is one rule: the access ends at
+  the instant the lchar phase becomes 14, at least 9 ticks after (end of
+  T2 + 1). The card applies it from the board's MEMR/MEMW edges
+  (`RD_LEAD` 6, `WR_LEAD` 3 for `xt_board.sv`).
+- **Timing convention:** the card's dot update runs one clk before the
+  board's edge of the same 14.318 MHz instant (`CE_DELAY` 6), which gives
+  MartyPC's "catch up, then access" order for READY, read data and writes.
+
+`tb/cga/`: Verilator TB with a model of `xt_board.sv`'s bus timing and a
+C++ transliteration of MartyPC's CGA/6845 (`cga_model.h`) ticked next to
+the card; every dot (colour, HSYNC, VSYNC) and every bus read is compared.
+
+Results (`make -C tb/cga run`, 3 minutes):
+- wait states at all 16 lchar phases, reads and writes: equal to MartyPC's
+  table (256 accesses);
+- BIOS modes 0-6: every dot of 2 frames equal, 912 dots x 262 lines;
+- 3DA: 31,872 reads equal (also with VSYNC inside the display);
+- random register writes (CRTC, mode, colour, light pen) and small 6845
+  geometries: ~7.7 M dots and ~25,000 reads equal; cursor through VTA,
+  snow, 34 frames of blink, thin font: equal.
+- `tb/cga/mut.py`: 25 mutants, all killed. The first run found three
+  test holes (blink compared only the last frames; no VSYNC inside the
+  display; no repeated last line or cursor through VTA), closed.
+- The `crtc` test found one real difference: MartyPC draws with the 6845's
+  live RA, so an R8 write in mid-character changes the glyph row there; the
+  card (and now the model) latches the row at the character clock, as the
+  CGA's shift register does.
+
+Out of context (Vivado 2022.2, xc7a200t-2, `tools/ooc/cga_ooc.tcl`): 480
+LUTs, 415 FFs, 6 BRAM tiles, +2.15 ns at 100.2273 MHz.
+
+System simulation with the real card instead of `cga_stub.sv` (`tb/sys`,
+GLaBIOS 0.4.2 8X, 2 s): boots to the RAM test with the BIOS screen in VRAM,
+so READY, the status polling and VRAM writes work with `xt_board.sv`
+(no font loaded there: `pc_system` has no font port yet).
+
+Open: composite decoding; a trace comparison with MartyPC itself running a
+program (`tb/sys`); the font port in `pc_system`.
+
