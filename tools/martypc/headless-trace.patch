@@ -1,0 +1,74 @@
+--- a/crates/bin/martypc_headless/src/run_benchmark.rs
++++ b/crates/bin/martypc_headless/src/run_benchmark.rs
+@@ -33,8 +33,8 @@
+ use marty_config::ConfigFileParams;
+ use marty_core::{
+     bus::ClockFactor,
+-    cpu_common::Cpu,
+-    machine::{ExecutionControl, ExecutionState, MachineBuilder, MachineRomManifest},
++    cpu_common::{Cpu, CpuOption},
++    machine::{ExecutionControl, ExecutionState, MachineBuilder, MachineRomManifest, MachineState},
+ };
+ use marty_frontend_common::{
+     floppy_manager::FloppyManager,
+@@ -50,7 +50,7 @@
+     config: &ConfigFileParams,
+     machine_config_file: &MachineConfigFileEntry,
+     rom_manifest: MachineRomManifest,
+-    _rm: ResourceManager,
++    rm: ResourceManager,
+     _romm: RomManager,
+     _fm: FloppyManager,
+ ) {
+@@ -62,13 +62,41 @@
+         .with_machine_config(&machine_config)
+         .with_machine_preferences(&machine_preferences)
+         .with_roms(rom_manifest)
+-        .with_trace_mode(config.machine.cpu.trace_mode.unwrap_or_default());
++        .with_trace_mode(config.machine.cpu.trace_mode.unwrap_or_default())
++        // pc10-iii: write the CPU trace in benchmark mode too (headless reference traces).
++        // A relative trace_file is taken relative to the 'trace' resource path.
++        .with_trace_log(config.machine.cpu.trace_file.as_ref().map(|f| {
++            if f.is_absolute() {
++                f.clone()
++            }
++            else {
++                rm.resource_path("trace").unwrap_or_default().join(f)
++            }
++        }));
+ 
+     let mut machine = machine_builder.build().unwrap_or_else(|e| {
+         log::error!("Failed to build machine: {:?}", e);
+         std::process::exit(1);
+     });
+ 
++    // pc10-iii: apply the CPU options the GUI and headless Emulator::apply_config() set, which
++    // benchmark mode skips. Without EnableWaitStates the CPU runs with no wait states at all and,
++    // since tick_dma() is gated by it, without DRAM refresh DMA.
++    machine.change_state(MachineState::On);
++    machine.pit_adjust(config.machine.pit_phase.unwrap_or(0) & 0x03);
++    machine.set_cpu_option(CpuOption::OffRailsDetection(
++        config.machine.cpu.off_rails_detection.unwrap_or(false),
++    ));
++    machine.set_cpu_option(CpuOption::EnableWaitStates(config.machine.cpu.wait_states.unwrap_or(true)));
++    println!(
++        "pc10-iii: wait_states={} dram_refresh_simulation={} pit_phase={} trace_on={} trace_mode={:?}",
++        config.machine.cpu.wait_states.unwrap_or(true),
++        config.machine.cpu.dram_refresh_simulation.unwrap_or(true),
++        config.machine.pit_phase.unwrap_or(0) & 0x03,
++        config.machine.cpu.trace_on,
++        config.machine.cpu.trace_mode.unwrap_or_default()
++    );
++
+     let exec_control = Rc::new(RefCell::new(ExecutionControl::new()));
+     exec_control.borrow_mut().set_state(ExecutionState::Running);
+ 
+@@ -108,6 +136,8 @@
+         }
+     }
+     let benchmark_duration = benchmark_start.elapsed();
++    // pc10-iii: flush the trace log before the summary.
++    machine.flush_trace_logs();
+     let instruction_ct = machine.cpu_instructions();
+     let (cycle_total, halt_cycles) = machine.cpu().get_cycle_ct();
+ 
