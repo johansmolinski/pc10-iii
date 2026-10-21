@@ -5416,9 +5416,10 @@ p 01 00000 00001 04DD
 # -----------------------------------------------------
 #
 # Write 71 clocks to clock counter
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 04F4
-p 01 00000 00001 5FFF
-p 01 00000 00001 C1E2
+p 01 00000 00001 1000
+p 01 00000 00001 1A00
 #
 # CALL WAIT_CLOCKS
 p 00 00000 00001 04F5
@@ -5604,14 +5605,16 @@ p 01 00000 00001 0004
 # -----------------------------------------------------
 #
 # Write 1 clock to clock counter
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 051B
-p 01 00000 00001 5FFF
-p 01 00000 00001 C064
+p 01 00000 00001 1100
+p 01 00000 00001 1A80
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 051C
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to First Byte of Opcode 
 p 00 00000 00001 051D
@@ -5645,9 +5648,10 @@ p 01 00000 00001 04F4
 # -----------------------------------------------------
 #
 # Write 44 clocks to clock counter
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 0525
-p 01 00000 00001 5FFF
-p 01 00000 00001 C12B
+p 01 00000 00001 1000
+p 01 00000 00001 1A50
 #
 # CALL WAIT_CLOCKS
 p 00 00000 00001 0526
@@ -5871,30 +5875,35 @@ p 01 00000 00001 1001
 p 01 00000 00001 0551
 #
 # Write clock count=4 to the BIU Dataout register
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 054E
-p 01 00000 00001 5FFF
-p 01 00000 00001 C040
+p 01 00000 00001 1100
+p 01 00000 00001 1A8C
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 054F
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # Jump unconditional to NOP ending code
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 0550
 p 01 00000 00001 1000
-p 01 00000 00001 0045
+p 01 00000 00001 0040
 #
 # Interrupt Taken
 # Write clock count=2 to the BIU Dataout register
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 0551
-p 01 00000 00001 5FFF
-p 01 00000 00001 C08C
+p 01 00000 00001 1100
+p 01 00000 00001 1A84
 #
 # CALL WAIT_CLOCKS
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 0552
-p 01 00000 00001 1100
-p 01 00000 00001 03F2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # Set r0 to 0x3 - Interrupt Type 4
 p 00 00000 00001 0553
@@ -5939,9 +5948,10 @@ p 01 00000 00001 59CF
 p 01 00000 00001 0000
 #
 # NOP
+# pc10-iii: interrupt/IRET timing (see 0x1A00)
 p 00 00000 00001 055C
-p 01 00000 00001 0000
-p 01 00000 00001 0000
+p 01 00000 00001 1100
+p 01 00000 00001 1A88
 #
 # Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode 
 p 00 00000 00001 055D
@@ -13047,7 +13057,6 @@ p 01 00000 00001 0AE3
 # -----------------------------------------------------
 #
 # CALL CALC_EA_BYTE
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0AF7
 p 01 00000 00001 1100
 p 01 00000 00001 19E8
@@ -13269,7 +13278,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B10
 #
 # Jump unconditional to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B1F
 p 01 00000 00001 1000
 p 01 00000 00001 1690
@@ -13283,13 +13291,11 @@ p 01 00000 00001 1690
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B20
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B21
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -13300,7 +13306,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B23
 p 01 00000 00001 1002
 p 01 00000 00001 1698
@@ -13419,7 +13424,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B30
 #
 # Jump unconditional to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B3E
 p 01 00000 00001 1000
 p 01 00000 00001 1690
@@ -13433,13 +13437,11 @@ p 01 00000 00001 1690
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B3F
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B40
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -13450,7 +13452,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B42
 p 01 00000 00001 1002
 p 01 00000 00001 1698
@@ -13561,7 +13562,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B50
 #
 # Jump unconditional to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B5C
 p 01 00000 00001 1000
 p 01 00000 00001 1690
@@ -13575,13 +13575,11 @@ p 01 00000 00001 1690
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B5D
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B5E
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -13592,7 +13590,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B60
 p 01 00000 00001 1002
 p 01 00000 00001 1698
@@ -13722,7 +13719,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B6A
 #
 # Jump unconditional to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7A
 p 01 00000 00001 1000
 p 01 00000 00001 1690
@@ -13736,13 +13732,11 @@ p 01 00000 00001 1690
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7B
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7C
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -13753,7 +13747,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B7E
 p 01 00000 00001 1002
 p 01 00000 00001 1698
@@ -13869,7 +13862,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0B88
 #
 # Jump unconditional to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B95
 p 01 00000 00001 1000
 p 01 00000 00001 1690
@@ -13883,13 +13875,11 @@ p 01 00000 00001 1690
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B96
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B97
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -13900,7 +13890,6 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0B99
 p 01 00000 00001 1002
 p 01 00000 00001 1698
@@ -14038,7 +14027,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0BA4
 #
 # Jump unconditional to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB5
 p 01 00000 00001 1000
 p 01 00000 00001 1690
@@ -14052,13 +14040,11 @@ p 01 00000 00001 1690
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB6
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB7
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -14069,7 +14055,6 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BB9
 p 01 00000 00001 1002
 p 01 00000 00001 1698
@@ -14204,7 +14189,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0BC4
 #
 # Jump unconditional to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BD8
 p 01 00000 00001 1000
 p 01 00000 00001 1690
@@ -14218,13 +14202,11 @@ p 01 00000 00001 1690
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BD9
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BDA
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -14235,7 +14217,6 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Byte
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BDC
 p 01 00000 00001 1002
 p 01 00000 00001 1698
@@ -14283,7 +14264,6 @@ p 01 00000 00001 0BDC
 # -----------------------------------------------------
 #
 # CALL CALC_EA_WORD
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0BE6
 p 01 00000 00001 1100
 p 01 00000 00001 1088
@@ -14504,7 +14484,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C00
 #
 # Jump unconditional to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C0D
 p 01 00000 00001 1000
 p 01 00000 00001 16A0
@@ -14518,13 +14497,11 @@ p 01 00000 00001 16A0
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C0E
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C0F
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -14535,7 +14512,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C11
 p 01 00000 00001 1002
 p 01 00000 00001 16A8
@@ -14579,7 +14555,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0F46
 #
 # Jump unconditional to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C19
 p 01 00000 00001 1000
 p 01 00000 00001 16A0
@@ -14593,13 +14568,11 @@ p 01 00000 00001 16A0
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C1A
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C1B
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -14610,7 +14583,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C1D
 p 01 00000 00001 1002
 p 01 00000 00001 16A8
@@ -14716,7 +14688,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C27
 #
 # Jump unconditional to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C33
 p 01 00000 00001 1000
 p 01 00000 00001 16A0
@@ -14730,13 +14701,11 @@ p 01 00000 00001 16A0
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C34
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C35
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -14747,7 +14716,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C37
 p 01 00000 00001 1002
 p 01 00000 00001 16A8
@@ -14872,7 +14840,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C40
 #
 # Jump unconditional to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C50
 p 01 00000 00001 1000
 p 01 00000 00001 16A0
@@ -14886,13 +14853,11 @@ p 01 00000 00001 16A0
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C51
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C52
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -14903,7 +14868,6 @@ p 01 00000 00001 4C2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C54
 p 01 00000 00001 1002
 p 01 00000 00001 16A8
@@ -15014,7 +14978,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C60
 #
 # Jump unconditional to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C6D
 p 01 00000 00001 1000
 p 01 00000 00001 16A0
@@ -15028,13 +14991,11 @@ p 01 00000 00001 16A0
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C6E
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C6F
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -15045,7 +15006,6 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C71
 p 01 00000 00001 1002
 p 01 00000 00001 16A8
@@ -15190,7 +15150,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C7B
 #
 # Jump unconditional to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C8E
 p 01 00000 00001 1000
 p 01 00000 00001 16A0
@@ -15204,13 +15163,11 @@ p 01 00000 00001 16A0
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C8F
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C90
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -15221,7 +15178,6 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0C92
 p 01 00000 00001 1002
 p 01 00000 00001 16A8
@@ -15351,7 +15307,6 @@ p 01 00000 00001 1100
 p 01 00000 00001 0C9A
 #
 # Jump unconditional to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAB
 p 01 00000 00001 1000
 p 01 00000 00001 16A0
@@ -15365,13 +15320,11 @@ p 01 00000 00001 16A0
 #
 #
 # Write to clock counter to equal 8 clocks for this instruction
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAC
 p 01 00000 00001 1100
 p 01 00000 00001 19F0
 #
 # CALL WAIT_CLOCKS
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAD
 p 01 00000 00001 0000
 p 01 00000 00001 0000
@@ -15382,7 +15335,6 @@ p 01 00000 00001 4A2F
 p 01 00000 00001 00FF
 #
 # TOP: Jump if last_alu zero to common code to writeback the EA Word
-# pc10-iii: shift/rotate timing (see 0x19E8)
 p 00 00000 00001 0CAF
 p 01 00000 00001 1002
 p 01 00000 00001 16A8
@@ -27499,14 +27451,6 @@ p 00 00000 00001 19DC
 p 01 00000 00001 1000
 p 01 00000 00001 0004
 #
-# --------------------------------------------------------------------
-# pc10-iii: shifts and rotates. By 1 (D0/D1): register end 1 after the ModR/M
-# byte (byte wrapper 0x19E8, word 0x1088), memory through the NOT/NEG
-# writebacks (write 4 after the read). By CL (D2/D3): 0x19F0 arms, at the
-# start of each routine, the register end 7 + 4*CL after the ModR/M byte or
-# the memory write release 9 + 4*CL after the read (end at the write); the
-# routines then leave through the plain writebacks (0x1698/0x16A8).
-#
 p 00 00000 00001 19E8
 p 01 00000 00001 5BFF
 p 01 00000 00001 A001
@@ -27588,5 +27532,435 @@ p 01 00000 00001 4DDF
 p 01 00000 00001 CFFF
 #
 p 00 00000 00001 19FF
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# --------------------------------------------------------------------
+# pc10-iii: interrupts in the 8088's order (0x1A00, entered from 0x04F4):
+# read the vector's IP, its CS 1 later, SUSP at the end of that read, push
+# FLAGS 2 after the SUSP, push CS 5 after that push, flush 4 after the CS
+# push, push IP 7 after it (end at that write). The first table read is
+# released by the caller: INT n 4 after the type byte (0x1A88), INT3 8 after
+# the opcode (0x1A80), INTO 9 (0x1A84); INTO not taken ends at cycle 4
+# (0x1A8C). IRET (0x1A50, from 0x0525): pop IP 4 after the opcode, SUSP at its
+# end, pop CS 3 after, flush at its end, pop FLAGS 2 after, end 5 after that.
+#
+p 00 00000 00001 1A00
+p 01 00000 00001 2999
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A01
+p 01 00000 00001 2999
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A02
+p 01 00000 00001 5C9F
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A03
+p 01 00000 00001 5DFF
+p 01 00000 00001 0320
+#
+p 00 00000 00001 1A04
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+p 00 00000 00001 1A05
+p 01 00000 00001 1002
+p 01 00000 00001 1A04
+#
+p 00 00000 00001 1A06
+p 01 00000 00001 4DDF
+p 01 00000 00001 4003
+#
+p 00 00000 00001 1A07
+p 01 00000 00001 5AF7
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A08
+p 01 00000 00001 5FFF
+p 01 00000 00001 2001
+#
+p 00 00000 00001 1A09
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A0A
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A0B
+p 01 00000 00001 2C9F
+p 01 00000 00001 0002
+#
+p 00 00000 00001 1A0C
+p 01 00000 00001 5DFF
+p 01 00000 00001 0320
+#
+p 00 00000 00001 1A0D
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+p 00 00000 00001 1A0E
+p 01 00000 00001 1002
+p 01 00000 00001 1A0D
+#
+p 00 00000 00001 1A0F
+p 01 00000 00001 4DDF
+p 01 00000 00001 4003
+#
+p 00 00000 00001 1A10
+p 01 00000 00001 59F7
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A11
+p 01 00000 00001 0000
+p 01 00000 00001 C000
+#
+p 00 00000 00001 1A12
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+p 00 00000 00001 1A13
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+p 00 00000 00001 1A14
+p 01 00000 00001 1002
+p 01 00000 00001 1A13
+#
+p 00 00000 00001 1A15
+p 01 00000 00001 4DDF
+p 01 00000 00001 4003
+#
+p 00 00000 00001 1A16
+p 01 00000 00001 0000
+p 01 00000 00001 8002
+#
+p 00 00000 00001 1A17
+p 01 00000 00001 1100
+p 01 00000 00001 12A0
+#
+p 00 00000 00001 1A18
+p 01 00000 00001 1100
+p 01 00000 00001 0400
+#
+p 00 00000 00001 1A19
+p 01 00000 00001 488F
+p 01 00000 00001 FCFF
+#
+p 00 00000 00001 1A1A
+p 01 00000 00001 5FFF
+p 01 00000 00001 2005
+#
+p 00 00000 00001 1A1B
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A1C
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A1D
+p 01 00000 00001 5FF2
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A1E
+p 01 00000 00001 1100
+p 01 00000 00001 0400
+#
+p 00 00000 00001 1A1F
+p 01 00000 00001 5BF8
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A20
+p 01 00000 00001 4E8F
+p 01 00000 00001 E000
+#
+p 00 00000 00001 1A21
+p 01 00000 00001 1001
+p 01 00000 00001 1A24
+#
+p 00 00000 00001 1A22
+p 01 00000 00001 4EDF
+p 01 00000 00001 4000
+#
+p 00 00000 00001 1A23
+p 01 00000 00001 1002
+p 01 00000 00001 1A25
+#
+p 00 00000 00001 1A24
+p 01 00000 00001 2BBF
+p 01 00000 00001 FFFF
+#
+p 00 00000 00001 1A25
+p 01 00000 00001 0000
+p 01 00000 00001 C004
+#
+p 00 00000 00001 1A26
+p 01 00000 00001 5FF9
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A27
+p 01 00000 00001 5DDF
+p 01 00000 00001 3020
+#
+p 00 00000 00001 1A28
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFD3
+#
+p 00 00000 00001 1A29
+p 01 00000 00001 5CFA
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A2A
+p 01 00000 00001 5DDF
+p 01 00000 00001 0398
+#
+p 00 00000 00001 1A2B
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+p 00 00000 00001 1A2C
+p 01 00000 00001 1002
+p 01 00000 00001 1A2B
+#
+p 00 00000 00001 1A2D
+p 01 00000 00001 4DDF
+p 01 00000 00001 4003
+#
+p 00 00000 00001 1A2E
+p 01 00000 00001 5FFF
+p 01 00000 00001 2007
+#
+p 00 00000 00001 1A2F
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A30
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A31
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+p 00 00000 00001 1A32
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+p 00 00000 00001 1A33
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+p 00 00000 00001 1A34
+p 01 00000 00001 5FFB
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A35
+p 01 00000 00001 1100
+p 01 00000 00001 0400
+#
+p 00 00000 00001 1A36
+p 01 00000 00001 1000
+p 01 00000 00001 0004
+#
+p 00 00000 00001 1A50
+p 01 00000 00001 5FFF
+p 01 00000 00001 4004
+#
+p 00 00000 00001 1A51
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A52
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A53
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+p 00 00000 00001 1A54
+p 01 00000 00001 5BF7
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A55
+p 01 00000 00001 0000
+p 01 00000 00001 C000
+#
+p 00 00000 00001 1A56
+p 01 00000 00001 5DDF
+p 01 00000 00001 03E0
+#
+p 00 00000 00001 1A57
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+p 00 00000 00001 1A58
+p 01 00000 00001 1002
+p 01 00000 00001 1A57
+#
+p 00 00000 00001 1A59
+p 01 00000 00001 4DDF
+p 01 00000 00001 4003
+#
+p 00 00000 00001 1A5A
+p 01 00000 00001 0000
+p 01 00000 00001 8003
+#
+p 00 00000 00001 1A5B
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+p 00 00000 00001 1A5C
+p 01 00000 00001 5FF7
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A5D
+p 01 00000 00001 5DDF
+p 01 00000 00001 3020
+#
+p 00 00000 00001 1A5E
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFD3
+#
+p 00 00000 00001 1A5F
+p 01 00000 00001 0000
+p 01 00000 00001 C000
+#
+p 00 00000 00001 1A60
+p 01 00000 00001 5CFB
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A61
+p 01 00000 00001 5DDF
+p 01 00000 00001 0390
+#
+p 00 00000 00001 1A62
+p 01 00000 00001 4EEF
+p 01 00000 00001 0040
+#
+p 00 00000 00001 1A63
+p 01 00000 00001 1002
+p 01 00000 00001 1A62
+#
+p 00 00000 00001 1A64
+p 01 00000 00001 4DDF
+p 01 00000 00001 4003
+#
+p 00 00000 00001 1A65
+p 01 00000 00001 5FFF
+p 01 00000 00001 2002
+#
+p 00 00000 00001 1A66
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A67
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A68
+p 01 00000 00001 5FFF
+p 01 00000 00001 B005
+#
+p 00 00000 00001 1A69
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+p 00 00000 00001 1A6A
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+p 00 00000 00001 1A6B
+p 01 00000 00001 1100
+p 01 00000 00001 0450
+#
+p 00 00000 00001 1A6C
+p 01 00000 00001 59F7
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A6D
+p 01 00000 00001 499F
+p 01 00000 00001 0FD5
+#
+p 00 00000 00001 1A6E
+p 01 00000 00001 488F
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A6F
+p 01 00000 00001 5889
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A70
+p 01 00000 00001 488F
+p 01 00000 00001 0FD5
+#
+p 00 00000 00001 1A71
+p 01 00000 00001 1000
+p 01 00000 00001 0474
+#
+p 00 00000 00001 1A80
+p 01 00000 00001 5FFF
+p 01 00000 00001 4008
+#
+p 00 00000 00001 1A81
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A82
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A83
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A84
+p 01 00000 00001 5FFF
+p 01 00000 00001 4009
+#
+p 00 00000 00001 1A85
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A86
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A87
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A88
+p 01 00000 00001 5FFF
+p 01 00000 00001 0004
+#
+p 00 00000 00001 1A89
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+p 00 00000 00001 1A8A
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+p 00 00000 00001 1A8B
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+p 00 00000 00001 1A8C
+p 01 00000 00001 5FFF
+p 01 00000 00001 E004
+#
+p 00 00000 00001 1A8D
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+p 00 00000 00001 1A8E
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+p 00 00000 00001 1A8F
 p 01 00000 00001 1030
 p 01 00000 00001 0000

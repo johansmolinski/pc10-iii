@@ -637,3 +637,17 @@ System: the 8237 got the hold acknowledge while the CPU was still inside a
 bus cycle (the status pins go passive in T3), which broke GLaBIOS's PIC and
 RAM tests; AEN and the 8237's HLDA now come only at the CPU's T4 or an idle
 bus (b292ea6).
+
+## 2026-10-21 - INT/IRET (run u)
+
+- **Interrupts** in the 8088's order (0x1A00): vector IP read, CS read 1
+  later, SUSP at its end, push FLAGS 2 after, push CS 5 after that, flush 4
+  after the CS push, push IP 7 after it. First table read released by the
+  caller: INT n 4 after the type byte, INT3 8 after the opcode, INTO 9; INTO
+  not taken ends at cycle 4. **IRET** (0x1A50): pop IP 4 after the opcode,
+  SUSP, pop CS 3 after, flush at its end, pop FLAGS 2 after, end 5 after.
+  CC, CD, CE, CF 100%. Hardware interrupts, NMI, divide errors and the
+  single-step trap use the same routine; their entry timing is not
+  calibrated yet (system traces against MartyPC).
+- Run u: trace 2,777,773 (92.4%). F6.7 (IDIV r/m8) lost 1 test through the
+  divide-error path (IDIV is untimed).
