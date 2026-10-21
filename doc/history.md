@@ -465,3 +465,23 @@ Run m against l:
   These belong to the known limit (slow ADC/SBB/SUB microcode) and come back
   when that microcode is sped up.
 
+
+## 2026-10-21 - Floppy disk controller (branch `fdc`)
+
+`rtl/fdc/`: the IBM PC/XT diskette adapter (`fdc_card`: DOR 3F2, MSR 3F4,
+data 3F5, DRQ2/DACK2/TC, IRQ6, two drives) around a uPD765A core
+(`upd765`) and a two-slot sector buffer with the sector port to the MEGA65
+glue (`fdc_secbuf`). The disk surface is synthetic: a rotation of 6250 byte
+times (200 ms), standard IBM MFM layout, sectors fetched from / committed to
+the image through the sector port, the rotation held while the backend is
+late. Design, protocol and timing sources: `doc/fdc.md`.
+
+`tb/fdc` (`make run`): Verilator bench with BIOS-like bus cycles, an
+8237-like DMA model and an image backend with random latency. All checks
+pass (10.4 s simulated, about 5 minutes); five mutants (MT result table,
+overrun detection, TC zero padding, the 77-step recalibrate limit, DOR bit 3
+gating) are each caught.
+
+Found while wiring: `xt_board.sv` drives `isa_tc` active low (the 8237's
+EOP_n) and gives DMA memory-to-I/O cycles the card's own `isa_din` on
+`isa_dout` instead of the memory data (doc/fdc.md section 6).

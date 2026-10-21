@@ -1,0 +1,288 @@
+// fdc_card.sv - the IBM PC/XT diskette adapter on the card bus
+// (doc/architecture.md section 3, doc/fdc.md).
+//
+//   3F2  DOR (write only): bits 1-0 drive select, bit 2 = 0 holds the 765 in
+//        reset, bit 3 enables the DRQ2 and IRQ6 drivers, bits 7-4 motor
+//        enables of drives A-D
+//   3F4  765 main status register (read only)
+//   3F5  765 data register
+//   DMA channel 2 (DRQ2/DACK2, TC qualified by DACK2), IRQ6.
+//
+// The XT adapter has no DIR (3F7 read) and no CCR (3F7 write): the data rate
+// is fixed at 250 kbit/s. Both belong to the AT adapter (doc/fdc.md).
+//
+// As on IBM's adapter, a drive is selected by the DOR alone (select bits AND
+// its motor bit); the 765's unit-select outputs are not connected and its
+// READY input is tied high. Up to two drives (A:, B:).
+//
+// The drives are disk images outside the card: geometry, presence and write
+// protection come in per drive, the sector data through the sector port
+// (fdc_secbuf.sv).
+//
+// GPL-3.0-or-later, pc10-iii.
+
+module fdc_card #(
+    parameter int NDRIVES   = 2,
+    // 1 us enable = clk * US_NUM / US_DEN (100.2273 MHz = 2205/22 MHz)
+    parameter int US_NUM    = 22,
+    parameter int US_DEN    = 2205,
+    parameter int TIME_SCALE   = 2,
+    parameter int RQM_DELAY_US = 12,
+    parameter int RESET_US     = 1000
+) (
+    input  logic        clk,
+    input  logic        reset,          // RESET DRV
+
+    // card bus (doc/architecture.md section 3)
+    input  logic [19:0] isa_addr,
+    input  logic [7:0]  isa_dout,
+    output logic [7:0]  isa_din,
+    output logic        isa_dsel,       // this card drives isa_din
+    input  logic        isa_ior_n,
+    input  logic        isa_iow_n,
+    input  logic        isa_aen,
+    output logic        isa_ready,
+    output logic [7:2]  isa_irq,
+    output logic [3:1]  isa_drq,
+    input  logic [3:0]  isa_dack_n,
+    input  logic        isa_tc,         // active high, valid during the DACK cycle
+
+    // the drives
+    input  logic [1:0]       drv_80trk,     // drive mechanics: 0 = 40 tracks (5.25" DD), 1 = 80 tracks
+    input  logic [1:0]       img_present,
+    input  logic [1:0]       img_wp,
+    input  logic [1:0][7:0]  img_tracks,    // cylinders: 40 or 80 (up to 84)
+    input  logic [1:0][1:0]  img_heads,     // 1 or 2
+    input  logic [1:0][5:0]  img_spt,       // 8 or 9 (15/18 need a faster data rate)
+    output logic [1:0]       drv_motor,     // for LEDs / drive sounds
+    output logic             fdc_active,    // a read/write/format is executing
+
+    // sector port (doc/fdc.md)
+    output logic        sp_req,
+    output logic        sp_write,
+    output logic        sp_drive,
+    output logic [7:0]  sp_cyl,
+    output logic        sp_head,
+    output logic [7:0]  sp_sector,
+    output logic [15:0] sp_lba,
+    input  logic        sp_rd_valid,
+    input  logic [7:0]  sp_rd_data,
+    output logic        sp_wr_valid,
+    output logic [7:0]  sp_wr_data,
+    input  logic        sp_wr_ready,
+    input  logic        sp_done,
+    input  logic        sp_err
+);
+
+// ------------------------------------------------------------ 1 us enable
+logic [11:0] us_acc;
+logic        us_tick;
+always_ff @(posedge clk) begin
+    if (reset) begin
+        us_acc  <= 12'd0;
+        us_tick <= 1'b0;
+    end else if (us_acc + 12'(US_NUM) >= 12'(US_DEN)) begin
+        us_acc  <= us_acc + 12'(US_NUM) - 12'(US_DEN);
+        us_tick <= 1'b1;
+    end else begin
+        us_acc  <= us_acc + 12'(US_NUM);
+        us_tick <= 1'b0;
+    end
+end
+
+// ------------------------------------------------------------ bus strobes
+logic       ior_d, iow_d;
+logic [7:0] wdat_q;
+logic       dma_rd_cyc, dma_wr_cyc, tc_q, io_cyc_dor, io_cyc_fdc;
+logic       io_a0;
+wire        dack2  = !isa_dack_n[2];
+wire        io_sel = !isa_aen && isa_addr[9:3] == 7'b1111_110;        // 3F0-3F7
+wire        sel_dor = io_sel && isa_addr[2:0] == 3'd2;
+wire        sel_fdc = io_sel && (isa_addr[2:0] == 3'd4 || isa_addr[2:0] == 3'd5);
+wire        ior_fall = !isa_ior_n && ior_d;
+wire        iow_fall = !isa_iow_n && iow_d;
+wire        iow_rise = isa_iow_n && !iow_d;
+wire        ior_rise = isa_ior_n && !ior_d;
+
+always_ff @(posedge clk) begin
+    ior_d <= isa_ior_n;
+    iow_d <= isa_iow_n;
+    if (!isa_iow_n) wdat_q <= isa_dout;     // the last value seen during the strobe
+end
+
+// ------------------------------------------------------------ DOR
+logic [7:0] dor;
+
+// ------------------------------------------------------------ the 765
+logic       cpu_rd, cpu_wr;
+logic [7:0] cpu_rdata, dma_rdata;
+logic       drq, intr, dma_ack, dma_wr, tc_pulse;
+logic [1:0] us;
+logic       hd, step, step_dir;
+logic [9:0] buf_addr;
+logic       buf_we;
+logic [7:0] buf_wdata, buf_rdata;
+logic       x_start, x_write, x_slot, x_head, x_busy, x_done, x_err;
+logic [7:0] x_cyl, x_sec;
+logic       active;
+
+assign cpu_rd  = ior_fall && sel_fdc;
+assign cpu_wr  = iow_rise && io_cyc_fdc;
+assign dma_ack = (ior_fall || iow_fall) && dack2;
+assign dma_wr  = iow_rise && dma_wr_cyc;
+assign tc_pulse = (iow_rise && dma_wr_cyc && tc_q) || (ior_rise && dma_rd_cyc && tc_q);
+
+always_ff @(posedge clk) begin
+    if (reset) begin
+        dor <= 8'h00;
+        dma_rd_cyc <= 1'b0;  dma_wr_cyc <= 1'b0;  tc_q <= 1'b0;
+        io_cyc_dor <= 1'b0;  io_cyc_fdc <= 1'b0;
+        isa_din <= 8'h00;
+    end else begin
+        // CPU I/O cycles: decode at the strobe's start, act at its end
+        if (iow_fall) begin
+            io_cyc_dor <= sel_dor;
+            io_cyc_fdc <= sel_fdc;
+            io_a0      <= isa_addr[0];
+        end
+        if (iow_rise) begin
+            io_cyc_dor <= 1'b0;
+            io_cyc_fdc <= 1'b0;
+            if (io_cyc_dor) dor <= wdat_q;
+        end
+        if (cpu_rd) isa_din <= cpu_rdata;
+
+        // DMA cycles on channel 2
+        if (dma_ack) begin
+            dma_rd_cyc <= !isa_ior_n;
+            dma_wr_cyc <= !isa_iow_n;
+            tc_q <= isa_tc;
+            if (!isa_ior_n) isa_din <= dma_rdata;
+        end else if ((dma_rd_cyc || dma_wr_cyc) && dack2 && isa_tc)
+            tc_q <= 1'b1;
+        if ((ior_rise && dma_rd_cyc) || (iow_rise && dma_wr_cyc)) begin
+            dma_rd_cyc <= 1'b0;
+            dma_wr_cyc <= 1'b0;
+            tc_q <= 1'b0;
+        end
+    end
+end
+
+assign isa_dsel  = (!isa_ior_n && sel_fdc) || (!isa_ior_n && dack2);
+assign isa_ready = 1'b1;
+assign isa_irq   = {1'b0, intr && dor[3], 4'b0000};
+assign isa_drq   = {1'b0, drq && dor[3], 1'b0};
+
+// ------------------------------------------------------------ the drives
+// A drive is selected when the DOR selects it and its motor bit is set.
+wire [1:0] psel     = dor[1:0];
+wire       drv_sel  = int'(psel) < NDRIVES && dor[4 + psel];
+wire       pd       = psel[0];
+logic [7:0] cyl [2];
+
+always_ff @(posedge clk) begin
+    if (reset) begin
+        cyl[0] <= 8'd0;
+        cyl[1] <= 8'd0;
+    end else if (step && drv_sel) begin
+        if (step_dir) begin
+            if (cyl[pd] < (drv_80trk[pd] ? 8'd83 : 8'd41)) cyl[pd] <= cyl[pd] + 8'd1;
+        end else if (cyl[pd] != 8'd0)
+            cyl[pd] <= cyl[pd] - 8'd1;
+    end
+end
+
+assign drv_motor  = dor[5:4];
+assign fdc_active = active;
+
+// geometry of the selected drive's medium and the image address
+wire [7:0]  g_tracks = img_tracks[pd];
+wire [1:0]  g_heads  = img_heads[pd];
+wire [5:0]  g_spt    = img_spt[pd];
+wire [15:0] x_lba    = 16'(({8'd0, x_cyl} * 16'(g_heads) + 16'(x_head)) * 16'(g_spt) + 16'(x_sec) - 16'd1);
+
+upd765 #(
+    .TIME_SCALE   (TIME_SCALE),
+    .RQM_DELAY_US (RQM_DELAY_US),
+    .RESET_US     (RESET_US)
+) u_765 (
+    .clk        (clk),
+    .reset      (reset || !dor[2]),
+    .por        (reset),
+    .us_tick    (us_tick),
+    .cpu_rd     (cpu_rd),
+    .cpu_wr     (cpu_wr),
+    .cpu_a0     (cpu_rd ? isa_addr[0] : io_a0),
+    .cpu_wdata  (wdat_q),
+    .cpu_rdata  (cpu_rdata),
+    .drq        (drq),
+    .dma_ack    (dma_ack),
+    .dma_wr     (dma_wr),
+    .dma_wdata  (wdat_q),
+    .dma_rdata  (dma_rdata),
+    .tc         (tc_pulse),
+    .intr       (intr),
+    .us         (us),
+    .hd         (hd),
+    .step       (step),
+    .step_dir   (step_dir),
+    .drv_trk0   (drv_sel && cyl[pd] == 8'd0),
+    .drv_wp     (drv_sel && img_present[pd] && img_wp[pd]),
+    .drv_ready  (1'b1),
+    .drv_ts     (1'b1),
+    .drv_spin   (drv_sel && img_present[pd]),
+    .drv_cyl    (cyl[pd]),
+    .geo_tracks (g_tracks),
+    .geo_heads  (g_heads),
+    .geo_spt    (g_spt),
+    .buf_addr   (buf_addr),
+    .buf_we     (buf_we),
+    .buf_wdata  (buf_wdata),
+    .buf_rdata  (buf_rdata),
+    .x_start    (x_start),
+    .x_write    (x_write),
+    .x_slot     (x_slot),
+    .x_cyl      (x_cyl),
+    .x_head     (x_head),
+    .x_sec      (x_sec),
+    .x_busy     (x_busy),
+    .x_done     (x_done),
+    .x_err      (x_err),
+    .active     (active)
+);
+
+fdc_secbuf u_buf (
+    .clk         (clk),
+    .reset       (reset),
+    .a_addr      (buf_addr),
+    .a_we        (buf_we),
+    .a_wdata     (buf_wdata),
+    .a_rdata     (buf_rdata),
+    .x_start     (x_start),
+    .x_write     (x_write),
+    .x_slot      (x_slot),
+    .x_cyl       (x_cyl),
+    .x_head      (x_head),
+    .x_sec       (x_sec),
+    .x_lba       (x_lba),
+    .x_drive     (pd),
+    .x_busy      (x_busy),
+    .x_done      (x_done),
+    .x_err       (x_err),
+    .sp_req      (sp_req),
+    .sp_write    (sp_write),
+    .sp_drive    (sp_drive),
+    .sp_cyl      (sp_cyl),
+    .sp_head     (sp_head),
+    .sp_sector   (sp_sector),
+    .sp_lba      (sp_lba),
+    .sp_rd_valid (sp_rd_valid),
+    .sp_rd_data  (sp_rd_data),
+    .sp_wr_valid (sp_wr_valid),
+    .sp_wr_data  (sp_wr_data),
+    .sp_wr_ready (sp_wr_ready),
+    .sp_done     (sp_done),
+    .sp_err      (sp_err)
+);
+
+endmodule
