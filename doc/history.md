@@ -662,3 +662,13 @@ bus (b292ea6).
 - SALC (D6): CF set ends a cycle later (0x1A98). Prefixed SALC is still one
   cycle early.
 - Run v: trace 2,790,714 (92.8%), length 2,813,289. No file worse.
+
+## 2026-10-22 - First floppy boot (tb/sys)
+
+- tb/sys with GLaBIOS 0.4.2, the real CGA, the 765 + 8237 path and the test
+  image `hello360.img` (360 KB; its boot sector loads sector 2 by INT 13h and
+  prints a line): cold boot, RAM test to 640 KB, equipment line (CGA, 8088,
+  2 floppies), FDC reads C0 H0 S1 and S2 by DMA at 9.405 s simulated, screen
+  "Booted from floppy A: (pc10-iii FDC+DMA)", then the image's halt loop at
+  0000:7C1D. First end-to-end boot of the whole PC (CPU, board, DMA, FDC,
+  CGA) in simulation.
