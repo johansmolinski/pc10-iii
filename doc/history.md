@@ -954,3 +954,19 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   invisible (the window ends at that read); in a program the next
   instruction's first reads (ModR/M at cycle 1, an immediate at 2) come late.
   This is the next limit of the system trace.
+
+## 2026-10-22 - Faster flags for OR/AND/XOR/TEST (run y5)
+
+- The first step against the EU lateness above: the logical operations'
+  flags (S, Z, P from the result; C, O, A cleared; the suite masks A) in
+  10/11 microinstructions (LOGICB/LOGICW at 0x1F30) instead of
+  CALCULATE_FLAGS (18/12) plus the clear. `sst_run -L -n 1000`, tests whose
+  next dispatch comes more than 2 cycles after the BIU's read: 0A 119 -> 6,
+  22 119 -> 65, 32 143 -> 82, 84 117 -> 0 (max lag 51 -> 43 core clocks).
+- Run y5: identical to y4 (state 3,007,000, trace 3,006,693). tb/sys still
+  differs first at 2,439,285: OR AL,DL (register form, ~110
+  microinstructions from dispatch to the next dispatch, 5 cycles of EU time
+  for a 3-cycle instruction) leaves the EU 2 cycles behind, and TEST AL,2
+  reads its immediate a cycle late. Register-form ALU instructions need a
+  shorter path (operand fetch/writeback through the register tables,
+  CALC_EA's ModR/M decode for register operands, the main loop): open.

@@ -10348,9 +10348,10 @@ p 01 00000 00001 599A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_BYTE
+# pc10-iii: CALL LOGICB (0x1F30)
 p 00 00000 00001 090B
 p 01 00000 00001 1100
-p 01 00000 00001 0990
+p 01 00000 00001 1F30
 #
 # Zero the CF and OF Flags
 p 00 00000 00001 090C
@@ -10418,9 +10419,10 @@ p 01 00000 00001 599A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_WORD
+# pc10-iii: CALL LOGICW (0x1F3A)
 p 00 00000 00001 091A
 p 01 00000 00001 1100
-p 01 00000 00001 03D3
+p 01 00000 00001 1F3A
 #
 # Zero the CF and OF Flags
 p 00 00000 00001 091B
@@ -10489,9 +10491,10 @@ p 01 00000 00001 599A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_BYTE
+# pc10-iii: CALL LOGICB (0x1F30)
 p 00 00000 00001 0929
 p 01 00000 00001 1100
-p 01 00000 00001 0990
+p 01 00000 00001 1F30
 #
 # Zero the CF and OF Flags
 p 00 00000 00001 092A
@@ -10559,9 +10562,10 @@ p 01 00000 00001 599A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_WORD
+# pc10-iii: CALL LOGICW (0x1F3A)
 p 00 00000 00001 0938
 p 01 00000 00001 1100
-p 01 00000 00001 03D3
+p 01 00000 00001 1F3A
 #
 # Zero the CF and OF Flags
 p 00 00000 00001 0939
@@ -10610,9 +10614,10 @@ p 01 00000 00001 500C
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_BYTE
+# pc10-iii: CALL LOGICB (0x1F30)
 p 00 00000 00001 0942
 p 01 00000 00001 1100
-p 01 00000 00001 0990
+p 01 00000 00001 1F30
 #
 # Zero the CF and OF Flags
 p 00 00000 00001 0943
@@ -33391,3 +33396,116 @@ p 01 00000 00001 0587
 p 00 00000 00001 1F29
 p 01 00000 00001 1000
 p 01 00000 00001 090E
+#
+# --------------------------------------------------------------------
+# pc10-iii (2026-10-22): flags of OR/AND/XOR/TEST results (from 0x090B,
+# 0x091A, 0x0929, 0x0938, 0x0942 and the AND/XOR/TEST paths that jump there):
+# S, Z, P from the result in last_alu, C, O, A cleared (the suite masks A),
+# in 10/11 words instead of CALCULATE_FLAGS (18/12) - the EU is a cycle or
+# more behind the 8088 after short register instructions (doc/history.md,
+# 2026-10-22). Destroys r2 and r3, as CALCULATE_FLAGS.
+#
+# LOGICB: r2 <= last_alu result (the byte result)
+p 00 00000 00001 1F30
+p 01 00000 00001 5BFD
+p 01 00000 00001 0000
+#
+# Isolate the P flag from System Signals into r3 (parity of the result)
+p 00 00000 00001 1F31
+p 01 00000 00001 4CEF
+p 01 00000 00001 0004
+#
+# Zero out the O, A, P, Z, S, C bit fields in Flag register
+p 00 00000 00001 1F32
+p 01 00000 00001 488F
+p 01 00000 00001 F72A
+#
+# Merge r3 (P) into the Flags register
+p 00 00000 00001 1F33
+p 01 00000 00001 588C
+p 01 00000 00001 0000
+#
+# r3 = r2 AND 0080 (the S flag is bit 7)
+p 00 00000 00001 1F34
+p 01 00000 00001 4CBF
+p 01 00000 00001 0080
+#
+# Merge r3 (S) into the Flags register
+p 00 00000 00001 1F35
+p 01 00000 00001 588C
+p 01 00000 00001 0000
+#
+# Dummy = r2 AND 00FF (the Z flag)
+p 00 00000 00001 1F36
+p 01 00000 00001 4EBF
+p 01 00000 00001 00FF
+#
+# Jump if non-zero over the next
+p 00 00000 00001 1F37
+p 01 00000 00001 1001
+p 01 00000 00001 1F39
+#
+# Set the Zero Flag bit to a 1
+p 00 00000 00001 1F38
+p 01 00000 00001 588F
+p 01 00000 00001 0040
+#
+# Return to calling code
+p 00 00000 00001 1F39
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# LOGICW: r2 <= last_alu result (the word result)
+p 00 00000 00001 1F3A
+p 01 00000 00001 5BFD
+p 01 00000 00001 0000
+#
+# Isolate the P flag from System Signals into r3 (parity of the low byte)
+p 00 00000 00001 1F3B
+p 01 00000 00001 4CEF
+p 01 00000 00001 0004
+#
+# Zero out the O, A, P, Z, S, C bit fields in Flag register
+p 00 00000 00001 1F3C
+p 01 00000 00001 488F
+p 01 00000 00001 F72A
+#
+# Merge r3 (P) into the Flags register
+p 00 00000 00001 1F3D
+p 01 00000 00001 588C
+p 01 00000 00001 0000
+#
+# Isolate bit 15 of r2 (the S flag)
+p 00 00000 00001 1F3E
+p 01 00000 00001 4EBF
+p 01 00000 00001 8000
+#
+# Jump if zero over the next
+p 00 00000 00001 1F3F
+p 01 00000 00001 1002
+p 01 00000 00001 1F41
+#
+# Set the Sign Flag bit to a 1
+p 00 00000 00001 1F40
+p 01 00000 00001 588F
+p 01 00000 00001 0080
+#
+# Dummy = r2 (the Z flag)
+p 00 00000 00001 1F41
+p 01 00000 00001 4EBF
+p 01 00000 00001 FFFF
+#
+# Jump if non-zero over the next
+p 00 00000 00001 1F42
+p 01 00000 00001 1001
+p 01 00000 00001 1F44
+#
+# Set the Zero Flag bit to a 1
+p 00 00000 00001 1F43
+p 01 00000 00001 588F
+p 01 00000 00001 0040
+#
+# Return to calling code
+p 00 00000 00001 1F44
+p 01 00000 00001 1030
+p 01 00000 00001 0000
