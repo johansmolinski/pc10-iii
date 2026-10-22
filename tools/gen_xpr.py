@@ -24,8 +24,10 @@ VHDL = ["vhdl/globals.vhd", "vhdl/config.vhd", "vhdl/clk.vhd", "vhdl/keyboard.vh
         "vhdl/main.vhd", "vhdl/mega65.vhd"]
 KF_DIRS = ["KF8237", "KF8253", "KF8255", "KF8259"]
 # the PC (rtl/, doc/architecture.md section 2); --stub: the shell-only stand-in instead
-# (cpu8088's default CPU is z86; MCL86's eu.v/eu_rom.v stay listed for CPU = "mcl86")
+# (cpu8088's default CPU is z86; MCL86's eu.v/biu88.v (module biu88_mcl)/eu_rom.v
+# stay listed for CPU = "mcl86")
 PC = (["../rtl/cpu/mcl86/eu.v", "../rtl/cpu/mcl86/biu88.v", "../rtl/cpu/mcl86/eu_rom.v",
+       "../rtl/cpu/biu88.sv",
        "../rtl/cpu/z8086/alu.sv", "../rtl/cpu/z8086/z86_tables.sv", "../rtl/cpu/z8086/z86_eu.sv",
        "../rtl/cpu/z8086/cpu_z86.sv", "../rtl/cpu/cpu8088.sv"]
       + [f for d in KF_DIRS for f in rtl("rtl/system/kf/%s/*.sv" % d)]

@@ -44,7 +44,9 @@ why, test numbers).
 - `rtl/cpu/cpu8088.sv`: the 8088; `CPU = "z86"` (default) or `"mcl86"`.
 - `rtl/cpu/z8086/` (doc/z8086.md): z8086's EU (`z86_eu.sv`, `alu.sv`), the
   Intel tables as RAMs (`z86_tables.sv`), the 8088 interrupt overlay
-  (`z86_overlay.svh`), EU + adapter + biu88 (`cpu_z86.sv`).
+  (`z86_overlay.svh`), EU + tables + biu88 (`cpu_z86.sv`).
+- `rtl/cpu/biu88.sv`: the cycle-stepped BIU (MartyPC's model), one step per
+  8088 clock, the real chip's EU/BIU interface.
 - `tools/mkucode.py`: the microcode bundle (rule 4).
 - `rtl/cpu/mcl86/`:
   - eu.v (microsequencer);
@@ -69,9 +71,9 @@ why, test numbers).
   1/3 duty. MCL86's cycle counter and BIU state numbers are tuned for that
   ratio.
 - **z86:** biu88 steps at `step`, the EU at `step` + 3 clk (its enable, one
-  microinstruction per 8088 clock); the harness streams the microcode bundle
-  through the load port once per process (`$PC10_UCODE`). The phase sweep
-  (`-S`) changes nothing for it.
+  microinstruction per 8088 clock); each changes state only there. The
+  harness streams the microcode bundle through the load port once per
+  process (`$PC10_UCODE`). The phase sweep (`-S`) changes nothing for it.
 - **Loader:** the CPU's registers come from a program served on the bus
   (POPF, MOV r16,imm, MOV sreg,AX, JMP FAR).
   - Prefetched tests (initial queue non-empty): with `biu88`, a test-only

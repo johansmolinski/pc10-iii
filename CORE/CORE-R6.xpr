@@ -715,6 +715,12 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/../rtl/cpu/biu88.sv">
+        <FileInfo SFType="SVerilog">
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PPRDIR/../rtl/cpu/mcl86/eu_rom.v">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>

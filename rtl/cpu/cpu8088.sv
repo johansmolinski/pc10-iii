@@ -1,9 +1,10 @@
 // cpu8088.sv - the 8088 behind its max-mode pins.
 //
 // CPU = "z86" (default): z8086's EU running Intel's 8088 microcode (loaded
-// from the microcode bundle through ucl_*, doc/z8086.md) + biu88.
-// CPU = "mcl86": MCL86's EU + biu88 (the old CPU; until biu88 has its native
-// EU interface).
+// from the microcode bundle through ucl_*, doc/z8086.md) + biu88
+// (rtl/cpu/biu88.sv), one step per 8088 clock each.
+// CPU = "mcl86": MCL86's EU + biu88_mcl, its per-core-clock BIU (the old CPU,
+// to be removed).
 //
 // Runs on clk (100.2273 MHz); `step` is the rising edge of the 8088 CLK (one
 // clk wide, every 21 clk at 4.77 MHz). The pins follow the real chip:
@@ -13,8 +14,8 @@
 // status-pin timing reconstruction.
 //
 // GPL-3.0-or-later, pc10-iii. z8086 (Apache 2.0, nand2mario) in rtl/cpu/z8086,
-// MCL86 EU (MIT, Ted Fried / MicroCore Labs) and biu88 (pc10-iii) in
-// rtl/cpu/mcl86.
+// biu88 (pc10-iii) in rtl/cpu, MCL86 EU (MIT, Ted Fried / MicroCore Labs) and
+// biu88_mcl (pc10-iii) in rtl/cpu/mcl86.
 
 module cpu8088 #(
     parameter string CPU = "z86"
@@ -94,7 +95,7 @@ mcl86_eu_core eu (
     .BIU_RETURN_DATA      (biu_return_data)
 );
 
-biu88 biu (
+biu88_mcl biu (
     .CORE_CLK_INT         (clk),
     .RESET_INT            (reset),
     .step                 (step),
@@ -174,7 +175,6 @@ cpu_z86 cpu (
     .tb_queue     (32'h0),
     .tb_queue_len (3'd0),
     .tb_ip        (16'h0),
-    .dbg_cmd      (),
     .dbg_ce       (),
     .dbg_t_state  (bus_t),
     .dbg_ta_state (),

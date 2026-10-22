@@ -55,6 +55,8 @@ module tb_mcl86 (
 );
 
 wire ce;
+// the loader's JMP FAR as MCL86's flush request (sst_run.cpp: bit 9, code 0x19)
+assign dbg_eu_cmd = cpu.eu.flush ? 16'h0390 : 16'h0000;
 
 cpu_z86 cpu (
     .clk          (core_clk),
@@ -79,7 +81,6 @@ cpu_z86 cpu (
     .tb_queue     (tb_queue),
     .tb_queue_len (tb_queue_len),
     .tb_ip        (tb_ip),
-    .dbg_cmd      (dbg_eu_cmd),
     .dbg_ce       (ce),
     .dbg_t_state  (dbg_t_state),
     .dbg_ta_state (dbg_ta_state),
@@ -104,7 +105,7 @@ always @(posedge core_clk) begin
         ip_l      <= cpu.eu.biu_ip;
     end else if (ce)
         disp_wait <= 1'b0;
-    else if (disp_pend && !disp_wait && !cpu.bus_busy) begin
+    else if (disp_pend && !disp_wait && !(cpu.eu.bus_busy && !cpu.eu.bus_done)) begin
         disp_pend <= 1'b0;
         disp      <= 1'b1;
     end
@@ -128,8 +129,8 @@ assign dbg_pfq_top   = cpu.eu.IR;
 assign dbg_dispatch  = disp;
 assign dbg_rom_addr  = cpu.eu.loader_state == 2'd0 ? 13'h0006 : 13'h0100;
 assign dbg_holding   = 1'b0;
-assign dbg_qlen      = cpu.biu.qlen;
-assign dbg_pc        = cpu.biu.pc;
+assign dbg_qlen      = cpu.biu.o_qlen;
+assign dbg_pc        = cpu.biu.o_pc;
 assign dbg_pfq_empty = cpu.eu.q_none;
 
 // +z86trace: one line per EU clock
@@ -137,7 +138,7 @@ reg trace_on = 1'b0;
 initial if ($test$plusargs("z86trace")) trace_on = 1'b1;
 always @(posedge core_clk) if (trace_on && ce)
     $display("      eu ls=%0d FC=%b SC=%b ROME=%b stall=%b busy=%b ua=%03h uc=%06h RNI=%b NXT=%b qe=%b qt=%02h IR=%02h M=%02h N=%02h",
-             cpu.eu.loader_state, cpu.eu.FC, cpu.eu.SC, cpu.eu.ROME, cpu.eu.stall, cpu.bus_busy,
+             cpu.eu.loader_state, cpu.eu.FC, cpu.eu.SC, cpu.eu.ROME, cpu.eu.stall, cpu.eu.bus_busy,
              cpu.tables.uc_row, cpu.eu.uc, cpu.eu.RNI, cpu.eu.NXT, cpu.eu.q_empty, cpu.eu.q_top, cpu.eu.IR,
              cpu.eu.M, cpu.eu.N);
 

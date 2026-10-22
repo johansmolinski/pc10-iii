@@ -19,9 +19,9 @@ set placedir   [expr {[llength $argv] > 1 ? [lindex $argv 1] : "Explore"}]
 file mkdir $here/out
 set_part xc7a200tfbg484-2
 set ooc_cpu [expr {[info exists env(OOC_CPU)] ? $env(OOC_CPU) : "z86"}]
-read_verilog $here/cpu_ooc_top.v $rtl/eu.v $rtl/biu88.v $rtl/eu_rom.v
+read_verilog [list $here/cpu_ooc_top.v $rtl/eu.v $rtl/biu88.v $rtl/eu_rom.v]
 read_verilog -sv [list $cpu/z8086/alu.sv $cpu/z8086/z86_tables.sv $cpu/z8086/z86_eu.sv \
-    $cpu/z8086/cpu_z86.sv $cpu/cpu8088.sv]
+    $cpu/z8086/cpu_z86.sv $cpu/biu88.sv $cpu/cpu8088.sv]
 set clkxdc [open $here/out/clk.xdc w]
 puts $clkxdc {create_clock -name clk -period 9.977 [get_ports clk]}
 close $clkxdc

@@ -277,7 +277,7 @@ always_ff @(posedge clk)
         $display("z %0d ls=%0d FC=%b SC=%b ROME=%b st=%b busy=%b row=%03h RNI=%b NXT=%b qe=%b qt=%02h IR=%02h ip=%04h t=%0d irq=%b int=%b F=%04h CX=%04h",
                  zsteps, u_pc.u_cpu.g_z86.cpu.eu.loader_state, u_pc.u_cpu.g_z86.cpu.eu.FC,
                  u_pc.u_cpu.g_z86.cpu.eu.SC, u_pc.u_cpu.g_z86.cpu.eu.ROME, u_pc.u_cpu.g_z86.cpu.eu.stall,
-                 u_pc.u_cpu.g_z86.cpu.bus_busy, u_pc.u_cpu.g_z86.cpu.tables.uc_row,
+                 u_pc.u_cpu.g_z86.cpu.eu.bus_busy, u_pc.u_cpu.g_z86.cpu.tables.uc_row,
                  u_pc.u_cpu.g_z86.cpu.eu.RNI, u_pc.u_cpu.g_z86.cpu.eu.NXT, u_pc.u_cpu.g_z86.cpu.eu.q_empty,
                  u_pc.u_cpu.g_z86.cpu.eu.q_top, u_pc.u_cpu.g_z86.cpu.eu.IR, u_pc.u_cpu.g_z86.cpu.eu.biu_ip,
                  u_pc.cpu_bus_t, u_pc.u_cpu.g_z86.cpu.eu.irq_take, u_pc.u_cpu.g_z86.cpu.eu.int_cond,

@@ -1245,3 +1245,46 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
     writes, 0 differ.
   - tb/cga PASS, tb/mda PASS, tb/fdc PASS (208 checks), tb/hdc PASS (3,184
     checks); tb/shell PASS.
+
+## 2026-10-22 - biu88 with the real chip's EU/BIU interface (branch `z86`, phase B)
+
+- **biu88** (`rtl/cpu/biu88.sv`, new): MartyPC's BIU model (the one the MCL86
+  biu88 carried: T-states, address cycle, fetch policy, request phases, the
+  abort, word transfers as byte cycles), stepped once per 8088 clock and
+  changing state only at `step`. The EU's events of its last clock (queue
+  read, request, FLUSH, SUSP, HALT; LOCK) are taken at the next step before
+  the cycle, as MartyPC runs EU actions between cycles; the EU reads the
+  queue head, its IP, the T-state, `done`/`done_imm` and the read data, all
+  registers set at the step. The MCL86 command layer, end counters,
+  releases, scheduled reads, taken bytes, the cycle counters and the
+  per-core-clock fast part with its six candidate states are gone; the old
+  BIU stays with MCL86 as `biu88_mcl` (`rtl/cpu/mcl86/biu88.v`) until MCL86
+  is removed.
+- **EU:** the done tracking that the adapter did per core clock is the
+  EU's own (`bus_busy`, the XTCE resume rule from `done`/`done_imm`); the
+  segment registers are read by biu88 instead of mirrored; `cpu_z86.sv` is
+  tables + EU + biu88, no adapter.
+- **New in biu88:** the halt bus cycle (MartyPC's `biu_halt`: fetching stops,
+  the running cycle finishes, one Ti, then status 011 in a T1 with ALE, then
+  passive); the INTA "word" as {2nd, 1st} for the genuine 8088 microcode (the
+  overlay gets the vector in the low byte); the reset jump to FFFF:0000 as a
+  flush in the EU's first clock, as the adapter did. Not compared with a
+  trace: HLT (not in the suite, GLaBIOS does not halt in the traced time).
+- **Timing:** `cpu8088.xdc`: every EU or biu88 register to every EU or biu88
+  register is a 3-clock path (biu88 -> EU is EU_DELAY = 3 clk, the others at
+  least 18). Out of context (`rooc.sh z86b-b`, 100.2273 MHz): WNS +2.800 ns
+  (was +0.492), WHS +0.112 ns; the CPU is 2,749 LUTs (biu88 483, EU 1,479,
+  tables 766 of which 576 LUTRAM), 793 FFs, 1.5 BRAM tiles (phase A: 4,702
+  LUTs, 2,444 FFs; biu88_mcl alone was 2,820 LUTs). The longest paths in
+  clocks: EU -> EU 18.1 ns, EU -> biu88 18.1 ns, biu88 -> biu88 17.7 ns,
+  biu88 -> EU 11.1 ns, i.e. single-cycle at 28.636 MHz (34.9 ns).
+- **Gates** (the same as phase A, unchanged numbers):
+  - SST full (`z86e-88`): state 3,007,000 (100.00%), trace 3,006,693
+    (99.99%), C6 only (307); no file worse than phase A (`z86d-88`) or y5.
+    8086 bundle + overlay (`z86e-86`): the same.
+  - Floppy boot: C0 H0 S1/S2 at 9,005 ms, "Booted from floppy A:", the CGA
+    oracle 134 reads and 14,147 writes, 0 differ.
+  - MartyPC trace: first difference 2,227,925 (MartyPC's LOOP); with the
+    LOOP-fixed reference 2,439,294 (SW1 0x6D) and 2,439,417 with MartyPC's
+    switches (`-d EE`), as phase A; the `-C` oracle 13,305 writes, 0 differ.
+  - tb/cga, tb/mda, tb/fdc (208 checks), tb/hdc (3,184 checks) PASS.

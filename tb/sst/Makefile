@@ -18,7 +18,7 @@ Z86_UCODE ?= $(HOME)/pcxt-work/ucode/8088.bin
 Z86  = ../../rtl/cpu/z8086
 ifeq ($(CPU),z86)
 SRC  = tb_z86.v $(Z86)/z86_eu.sv $(Z86)/z86_tables.sv $(Z86)/alu.sv \
-       $(Z86)/cpu_z86.sv $(RTL)/biu88.v
+       $(Z86)/cpu_z86.sv ../../rtl/cpu/biu88.sv
 CDEF = -CFLAGS -DBIU88 -CFLAGS -DZ86 -CFLAGS -DZ86_UCODE='\"$(Z86_UCODE)\"' -CFLAGS -I$(abspath ../common) \
        -I$(Z86)
 OBJ  ?= obj_z86

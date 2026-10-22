@@ -16,11 +16,11 @@ KF   = $(RTL)/system/kf
 ROMHEX ?= $(abspath $(MCL))/microcode.hex
 CPU  ?= z86
 Z86_UCODE ?= $(HOME)/pcxt-work/ucode/8088.bin
+CPUSRC = $(MCL)/eu.v $(MCL)/biu88.v $(MCL)/eu_rom.v \
+         $(Z86)/z86_eu.sv $(Z86)/z86_tables.sv $(Z86)/alu.sv $(Z86)/cpu_z86.sv $(RTL)/cpu/biu88.sv
 ifeq ($(CPU),mcl86)
-CPUSRC = $(MCL)/eu.v $(MCL)/biu88.v $(MCL)/eu_rom.v
-CPUDEF = +define+CPU_MCL86 -CFLAGS -DCPU_MCL86
+CPUDEF = -I$(Z86) +define+CPU_MCL86 -CFLAGS -DCPU_MCL86
 else
-CPUSRC = $(Z86)/z86_eu.sv $(Z86)/z86_tables.sv $(Z86)/alu.sv $(Z86)/cpu_z86.sv $(MCL)/biu88.v
 CPUDEF = -I$(Z86) -CFLAGS -DZ86_UCODE='\"$(Z86_UCODE)\"' -CFLAGS -I$(abspath ../common)
 endif
 CGA  ?= $(RTL)/video/cga/cga_crtc.sv $(RTL)/video/cga/cga_card.sv

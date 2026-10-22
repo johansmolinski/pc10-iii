@@ -124,7 +124,7 @@
 //     board, other processes on the same clock, read the values before the
 //     clock edge in simulation too, as in hardware.
 
-module biu88 (
+module biu88_mcl (
     input               CORE_CLK_INT,
     input               RESET_INT,
     input               step,               // one core clock per 8088 clock

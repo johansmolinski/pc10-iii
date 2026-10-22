@@ -82,7 +82,7 @@ mcl86_eu_core eu (
     .BIU_RETURN_DATA      (biu_return_data)
 );
 
-biu88 biu (
+biu88_mcl biu (
     .CORE_CLK_INT         (core_clk),
     .step                 (step),
     .RESET_INT            (reset),

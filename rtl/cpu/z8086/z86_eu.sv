@@ -9,19 +9,19 @@
 // "pc10-iii":
 //   - clock enable `ce`: one microinstruction per 8088 clock. Every register
 //     of this module changes only at ce (rtl/cpu/cpu8088.xdc: multicycle
-//     paths); what happens between two ce (the bus) is the adapter's
-//     (cpu_z86.sv), which hands in bus_busy/busy_hold and the read data;
+//     paths);
 //   - the Intel tables are not logic here: the microcode, its address decoder,
 //     the translation ROM and the group decode ROM are RAMs in z86_tables.sv,
 //     loaded from the microcode bundle (AGENTS.md rule 4);
-//   - the bus state machine and the 6-byte queue are gone; the queue is
-//     biu88's (q_top/q_none in, q_rd out), the EU's IP is biu88's (PC reads
-//     return it, so CORR has nothing left to correct), PC writes are handed to
-//     biu88 with FLUSH, SUSP is a biu88 request;
+//   - the bus state machine and the 6-byte queue are gone: the real chip's
+//     EU/BIU split with biu88 (rtl/cpu/biu88.sv). The queue is biu88's
+//     (q_top/q_none in, q_rd out), the EU's IP is biu88's (PC reads return
+//     it, so CORR has nothing left to correct), PC writes are handed to biu88
+//     with FLUSH; SUSP and HALT are biu88 requests; biu88 reads the segment
+//     registers;
 //   - a type 6 microinstruction becomes one biu88 request (byte or word; the
-//     8088 BIU splits a word into two byte cycles); the EU stalls until the
-//     transfer is done;
-//   - segment register writes are mirrored to biu88 (seg_wr);
+//     8088 BIU splits a word into two byte cycles); the EU stalls until biu88
+//     reports it done (bus_busy, below);
 //   - interrupts as the 8088 takes them at an instruction boundary (NMI,
 //     INTR, single step), the INT and TEST jump conditions, HLT, LOCK.
 `timescale 1ns/1ns
@@ -49,8 +49,8 @@ module z86_eu #(
     input      [7:0]  q_top,     // byte at the head of the queue
     input             q_none,    // queue empty
     input      [15:0] biu_ip,    // the EU's IP: address of q_top
-    // outputs: set at ce, valid until the next ce (the adapter takes them
-    // the clock after ce)
+    // outputs: set at ce, valid until the next ce (biu88 takes them at the
+    // next step)
     output reg        q_rd,      // the EU reads q_top
     output reg        q_rd_first,//      ... as the first byte of an instruction
     output reg        req,       // bus request
@@ -61,19 +61,16 @@ module z86_eu #(
     output reg        flush,     // jump: flush the queue, fetch from flush_ip
     output reg [15:0] flush_ip,
     output reg        susp,      // suspend prefetching
-    output reg        seg_wr,    // a segment register was written
-    output reg [1:0]  seg_wr_sel,// biu88 code
-    output reg [15:0] seg_wr_val,
+    output     [15:0] seg_cs, seg_ds, seg_es, seg_ss,
     output reg        halt_req,  // HLT: the halt bus cycle
     output reg        halted,    // HLT executed, no interrupt yet
     output reg        lock,      // LOCK prefix: the pin
     output reg        rni_pend,  // a W,RNI/R,RNI waits for its transfer
-    // the bus as the adapter tracks it between two ce
-    input             bus_busy,  // a request or SUSP is outstanding
-    input             busy_hold, // write/SUSP done at a clock edge: one more clock
-    input             rd_pend,   // read data arrived since the last ce
-    input             rd_word,
-    input      [15:0] rd_data,
+    // biu88: the transfer of the outstanding request (or SUSP) is done in
+    // this clock; done_imm: in the step that took it; the read data
+    input             bus_done,
+    input             bus_done_imm,
+    input      [15:0] bus_rdata,
     output            dbg_fc     // first clock of a new instruction (with ce)
 );
 
@@ -280,12 +277,21 @@ localparam [4:0] ALU_XI = 5'b10001;
 
 //-----------------------------------------------------------------  Bus control
 // pc10-iii: z8086's bus state machine is replaced by requests to biu88. A
-// type 6 microinstruction makes one request; the EU stalls (bus_busy) until
-// biu88's done pulse, which comes at T4 of a read's last byte cycle and at the
-// last T3/Tw of a write's (biu88's model of where the 8088's EU resumes). The
-// adapter tracks the done pulse between two ce (bus_busy, busy_hold, rd_*).
+// type 6 microinstruction (or SUSP) makes one request; the EU stalls
+// (bus_busy) until biu88 reports it done: a read in the T4 of its last byte
+// cycle, where the next microinstruction runs (XTCE); a write in its last
+// T3/Tw, and a SUSP when no code fetch runs or the running one reaches T4:
+// the EU runs a clock later (busy_hold), except the RNI of a W,RNI, which
+// reads the next opcode in that clock, and a SUSP done at once.
+reg         bus_busy;   // a request or SUSP is outstanding
+reg         wsusp;      // ... and it is a write or a SUSP
+reg         rd_word;
 reg         corr_wait;  // CORR: waiting for the bus to go idle
-wire        eu_hold = bus_busy | busy_hold | corr_wait;
+wire        done_now  = bus_busy & bus_done;
+wire        busy_hold = done_now & wsusp & ~bus_done_imm & ~rni_pend;
+wire        eu_hold   = bus_busy & ~bus_done | busy_hold | corr_wait;
+wire        rd_pend   = done_now & ~wsusp;
+wire [15:0] rd_data   = bus_rdata;
 reg  [15:0] pc_new;     // the last value written to PC (taken by FLUSH)
 reg         pc_wr_now;  // (comb) PC is written by this microinstruction
 reg  [1:0]  seg_code;   // (comb) the request's segment, biu88 code
@@ -317,7 +323,8 @@ end
 always @(posedge clk) if (ce) begin
     if (!reset_n) begin
         corr_wait <= 1'b0;
-        req <= 1'b0; flush <= 1'b0; susp <= 1'b0; seg_wr <= 1'b0;
+        bus_busy <= 1'b0;
+        req <= 1'b0; flush <= 1'b0; susp <= 1'b0;
         CS <= 16'hFFFF;
         pc_new <= 16'h0;
         AX <= 16'h0000;
@@ -328,7 +335,8 @@ always @(posedge clk) if (ce) begin
         OPR  <= 16'h0000;
     end else begin
         // the outputs to biu88 are this ce's events
-        req <= 1'b0; flush <= 1'b0; susp <= 1'b0; seg_wr <= 1'b0;
+        req <= 1'b0; flush <= 1'b0; susp <= 1'b0;
+        if (done_now) bus_busy <= 1'b0;
         // read data that arrived since the last ce (a move to OPR below wins)
         OPR <= opr_in;
 
@@ -346,9 +354,16 @@ always @(posedge clk) if (ce) begin
             req_word <= ~L8_aux;
             req_seg  <= seg_code;
             req_addr <= IND_pre_update;
+            bus_busy <= 1'b1;
+            wsusp    <= uc[6];
+            rd_word  <= ~L8_aux;
         end
 
-        if (ROME & ~stall & SUSP) susp <= 1'b1;
+        if (ROME & ~stall & SUSP) begin
+            susp     <= 1'b1;
+            bus_busy <= 1'b1;
+            wsusp    <= 1'b1;
+        end
         if (ROME & ~stall & FLUSH) begin
             flush    <= 1'b1;
             flush_ip <= pc_wr_now ? s_bus : pc_new;
@@ -418,7 +433,7 @@ wire EXEC = loader_state[1];        // sequencer has control
 // z8086 started the next instruction in the clock of the request.
 assign RNI = ROME & ~eu_hold & ~skip_rni & ~wr_m_mem &
                   T4 & uc[2:0] == 3'b000 |  // STU=0 when Typ=4
-             rni_pend & ~bus_busy;
+             rni_pend & ~(bus_busy & ~bus_done);
 // pc10-iii: NX also comes from type 4 (STU = 5 NX, STU = 1 WB,NX), as in
 // Jenner's disassembly; z8086 had it only in type 1. Before every STU = 5 word
 // the ROM has an RNI word.
@@ -936,10 +951,10 @@ task automatic write_loc(input [4:0] loc, input [15:0] value);
     begin
         case (loc)
         // Upper registers (EDCBA = 00000..00110)
-        LOC_ES:    begin ES <= value; seg_wr <= 1'b1; seg_wr_sel <= 2'b00; seg_wr_val <= value; end  // pc10-iii: mirrored to biu88                   // ES
-        LOC_CS:    begin CS <= value; seg_wr <= 1'b1; seg_wr_sel <= 2'b10; seg_wr_val <= value; end  // pc10-iii: mirrored to biu88                   // CS
-        LOC_SS:    begin SS <= value; seg_wr <= 1'b1; seg_wr_sel <= 2'b01; seg_wr_val <= value; end  // pc10-iii: mirrored to biu88                   // SS
-        LOC_DS:    begin DS <= value; seg_wr <= 1'b1; seg_wr_sel <= 2'b11; seg_wr_val <= value; end  // pc10-iii: mirrored to biu88                   // DS
+        LOC_ES:    ES <= value;                   // ES (pc10-iii: biu88 reads them)
+        LOC_CS:    CS <= value;                   // CS
+        LOC_SS:    SS <= value;                   // SS
+        LOC_DS:    DS <= value;                   // DS
         // LOC_PC:    IP <= value;                   // PC (IP)
         LOC_OPR:   OPR <= value;                  // OPR (last bus word)
         LOC_AX:    AX <= value;                   // AX
@@ -1027,5 +1042,9 @@ end
 assign dbg_fc = FC;
 
 assign req_data = ~L8_aux ? OPR : {8'b0, OPR[7:0]};
+assign seg_cs = CS;
+assign seg_ds = DS;
+assign seg_es = ES;
+assign seg_ss = SS;
 
 endmodule
