@@ -778,3 +778,72 @@ write-through). Design, timing model, the shell plan: `doc/hdc.md`.
   bitstream's wherever a clocked reader samples BIU outputs on `cpu_step`.
   The second refresh's one-clock-early HOLDA is exactly that case. Handed to
   the cpu-timing work; board calibration waits for its answer.
+
+## 2026-10-22 - IBM MDA and Hercules card (branch `mda`)
+
+`rtl/video/mda/mda_card.sv`: the display part of the IBM Monochrome Display
+and Printer Adapter and a Hercules Graphics Card mode, on the card bus.
+Design, schematic reading and every difference: `doc/mda.md`.
+- **Source:** IBM's MDA logic diagrams (Technical Reference 6361511, sheets
+  1-10) for the timing, the CPU slot, the attributes and the ROM layout.
+  MartyPC's MDA was read too: its wait states are the CGA's table indexed
+  with the MDA clock (3-8 waits, mean 5.9), so it is not used for timing;
+  its attribute table is used as a cross-check.
+- **Dot clock:** 16.257 MHz (Hercules 16.000) from `clk` with a fractional
+  accumulator (59609/367500), rising and falling edge enables; exact on
+  average, each dot 6 or 7 clk.
+- **Card logic from the schematic:** the 9-state character counter, CCLK
+  (6845 steps when it rises), the two-character display pipeline (U31/U34
+  -> U29/U30/U32), DISPEN/CURSOR delayed two characters and the syncs one
+  (HSYNC stretched by one), U101's one-dot video register, the attribute
+  decoder (no display, reverse, underline at row 12, blink, intensity,
+  background intensity with blink off), the 9th dot for C0-DF, U28's
+  cursor (16 frames) and character (32 frames) blink, the horizontal drive
+  gate (U45), the status port (bit 0 delayed HSYNC, bit 3 the video dot).
+- **CPU slot:** a VRAM or 6845 access is sampled at the 4Q edge and gets
+  IOCHRDY at the next CCLK falling edge, 5.5-14.5 dots after the strobe.
+  With `xt_board.sv`'s command edges and `biu88.v`'s READY sampling (as
+  T3/Tw begin, since 8bf11db): VRAM reads 1-4 wait states (mean 2.4),
+  6845 I/O 1-4 / 2-5 including the board's one. Without 3B8 bit 0 the dot
+  clock is not selected and such an access never ends (as IBM warns).
+- **Found: VRAM writes never wait on the current board.** MEMW starts at
+  the falling edge in T2, the edge that already decides whether T3 is the
+  last; no card can insert waits into a memory write. GLaBIOS's screen
+  stayed blank (the MDA wrote only when the slot fell inside the 349 ns
+  strobe). The card now writes at the strobe end if the slot has not come
+  (like the CGA's fallback); the board's write timing is an open point for
+  the board work (the CGA's write waits are affected the same way).
+- **Character ROM:** MK36000 A11 = RA3, A12 = jumper: the MDA font is in
+  the first 4 KB of the 5788005 image (rows 0-7 at char x 8 + row, rows
+  8-15 at 0x800 + ...). The card shares the CGA's font load port.
+- **Hercules:** 64 KB, 3BF (allow graphics, page 2), 3B8 bits 1/7,
+  720x348 graphics with 16-dot characters, status bit 7; no B8000-BFFFF
+  when a CGA is fitted.
+- `pc_system`: `CGA_FIT` (1), `MDA_FIT` (0 none / 1 MDA / 2 Hercules), new
+  outputs `mda_ce/video/intens/hsync/vsync/hblank/vblank`; the glue sets
+  `dip_sw1` bits 5-4 = 11 for a monochrome primary display.
+
+`tb/mda/` (Verilator, the board's bus timing, a C++ model of the schematic
+reading `mda_model.h` stepped on the same clk; MartyPC's 6845 from
+`tb/cga/cga_model.h`). `make -C tb/mda run`, about 3 minutes:
+- IOCHRDY equal at every clk; 3,000 random accesses (wait distribution
+  above); ~29,000 reads equal (bus, 3BA, 6845);
+- mode 7, all characters and attributes: 2 frames dot-exact, 882 dots x 370
+  lines (18.432 kHz, 49.82 Hz), text at dots 154-873 / lines 20-369;
+- torture (3 x 4 frames of random 6845/3B8/VRAM writes), status, 104
+  frames of blink (also with VSYNC in the display), horizontal drive gate,
+  the HRES hang: all equal; Hercules text, 720x348 graphics on both pages,
+  3BF gating, CGA coexistence, status bit 7: all equal;
+- attribute decoder vs. MartyPC's `MDA_ATTR_TABLE`: 512 cases equal except
+  the 128 with background intensity (blink off, bit 7), which MartyPC lacks;
+- `mut.py`: 35 mutants, all killed. The first run found one hole (the
+  blink counter's edge is invisible while VSYNC is in the blanking), closed.
+
+`tb/sys` (`make MDA=1`, `sys_run -m -F font -o image`): GLaBIOS 0.4.2 8X
+with the MDA fitted next to the CGA and the mono DIP setting: mode 7 at
+518 ms, the banner on the MDA at 0.8 s simulated (text dump and PNG).
+With the Hercules card (`make MDA=2`): banner and RAM count at 2.6 s (the
+HGC detection message after the RAM test not reached in that run).
+
+Open: the board's write timing (above); a Vivado out-of-context run; the
+printer port; Hercules details without a schematic (doc/mda.md section 10).

@@ -43,10 +43,11 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
  +- the "ISA slots": modules on the card bus (section 3)
      +- system RAM (planar, behind the abstract memory port)
      +- BIOS ROM (F0000-FFFFF, behind the ROM port)
-     +- cga_card    rtl/video/cga/cga_card.sv
+     +- cga_card    rtl/video/cga/cga_card.sv     (CGA_FIT)
+     +- mda_card    rtl/video/mda/mda_card.sv     (MDA_FIT: MDA or Hercules)
      +- fdc_card    rtl/fdc/fdc_card.sv: the diskette adapter (765), doc/fdc.md
      +- xtide_card  rtl/hdc/xtide_card.sv: XTIDE hard disk card + option ROM socket, doc/hdc.md
-     +- later: MDA/Hercules, COM/LPT
+     +- later: COM/LPT
 ```
 
 ## 3. The card bus (ISA, as seen inside `pc_system`)
@@ -93,7 +94,9 @@ the CGA depend on it):
 
 ```systemverilog
 module pc_system #(
-    parameter int RAM_KB = 640
+    parameter int RAM_KB  = 640,
+    parameter bit CGA_FIT = 1'b1,     // the CGA is in the machine
+    parameter int MDA_FIT = 0         // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
 ) (
     input  logic        clk,          // 100.2273 MHz
     input  logic        reset,        // synchronous, active high, >= 1 CPU clock
@@ -120,8 +123,20 @@ module pc_system #(
     output logic        vid_hblank,
     output logic        vid_vblank,
 
-    // CGA character ROM, loaded by the glue: 8 KB in the layout of IBM's
-    // 5788005 (8x8 font at 0x1800, thin font at 0x1000; char * 8 + row)
+    // MDA / Hercules video (MDA_FIT != 0), doc/mda.md section 6: one dot per
+    // mda_ce (16.257 MHz / Hercules 16.000 MHz on average, 6 or 7 clk);
+    // 882 x 370 dots per frame, 18.43 kHz, 49.8 Hz
+    output logic        mda_ce,
+    output logic        mda_video,    // +VIDEO
+    output logic        mda_intens,   // +INTENSITY
+    output logic        mda_hsync,    // active high
+    output logic        mda_vsync,    // active high
+    output logic        mda_hblank,
+    output logic        mda_vblank,
+
+    // character ROM, loaded by the glue: 8 KB in the layout of IBM's
+    // 5788005 (CGA: 8x8 font at 0x1800, thin font at 0x1000, char * 8 + row;
+    // MDA: 0x0000-0x0FFF, rows 0-7 at char * 8 + row, rows 8-15 at 0x0800 +)
     input  logic        font_we,
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
@@ -172,7 +187,9 @@ module pc_system #(
 
     // Configuration (from the OSM)
     input  logic [7:0]  dip_sw1       // SW1 of the 5160 as the 8255 reads it
-                                      // (1 = switch off); bit 0 = switch 1
+                                      // (1 = switch off); bit 0 = switch 1;
+                                      // bits 5-4: 11 MDA/Hercules, 10 CGA 80,
+                                      // 01 CGA 40 (the primary display)
 );
 ```
 
@@ -198,8 +215,17 @@ Notes (2026-10-22, hard disk):
   `hdc_enable` to 0 and the drives off (doc/hdc.md section 8 is the plan).
 - `tb/sys` serves the hard disk from image files (`-X`, `-H`, `-J`, `-V`).
 
-Not yet in the contract: serial/parallel, MDA, composite video, turbo. They
-get added here when their module exists.
+Notes (2026-10-22, MDA):
+- The MDA has its own crystal: the card makes 16.257 MHz from `clk` with a
+  fractional accumulator (doc/mda.md section 2), so `mda_ce` is not a
+  `pc_clocks` enable.
+- Both video cards can be fitted (as in a real PC with two monitors). A
+  Hercules card never answers at B8000-BFFFF when `CGA_FIT` is set.
+- The floppy ports (`drv_*`, `img_*`, `sp_*`) are in `pc_system.sv`;
+  doc/fdc.md.
+
+Not yet in the contract: serial/parallel, composite video, turbo. They get
+added here when their module exists.
 
 ## 5. Verification
 
@@ -207,4 +233,5 @@ get added here when their module exists.
 - System: `tb/sys/` - Verilator model of `pc_system` with RAM/ROM models,
   runs a BIOS, dumps CGA frames as PNG and a bus trace. The bus trace is the
   thing to compare cycle by cycle against MartyPC.
-- Cards: each card has its own TB under `tb/`.
+- Cards: each card has its own TB under `tb/` (`tb/cga`, `tb/mda`,
+  `tb/fdc`).

@@ -29,6 +29,7 @@ PC = (["../rtl/cpu/mcl86/eu.v", "../rtl/cpu/mcl86/biu88.v", "../rtl/cpu/mcl86/eu
       + [f for d in KF_DIRS for f in rtl("rtl/system/kf/%s/*.sv" % d)]
       + ["../rtl/system/pc_clocks.sv", "../rtl/system/xt_board.sv", "../rtl/system/pc_system.sv",
          "../rtl/video/cga/cga_crtc.sv", "../rtl/video/cga/cga_card.sv",
+         "../rtl/video/mda/mda_card.sv",
          "../rtl/fdc/upd765.sv", "../rtl/fdc/fdc_secbuf.sv", "../rtl/fdc/fdc_card.sv",
          "../rtl/hdc/hdc_secbuf.sv", "../rtl/hdc/ata_dev.sv", "../rtl/hdc/xtide_card.sv"])
 STUB = ["stub/pc_system.sv"]
