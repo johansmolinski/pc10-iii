@@ -1,8 +1,8 @@
 # PC10-III core - architecture
 
-Status: 2026-10-21, the contract between the parallel work tracks (CPU,
-system board, CGA, MEGA65 shell). Change it only together with every module
-it names.
+Status: 2026-10-22, the contract between the parallel work tracks (CPU,
+system board, CGA, floppy, hard disk, MEGA65 shell). Change it only together
+with every module it names.
 
 ## 1. Clocks
 
@@ -44,7 +44,9 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
      +- system RAM (planar, behind the abstract memory port)
      +- BIOS ROM (F0000-FFFFF, behind the ROM port)
      +- cga_card    rtl/video/cga/cga_card.sv
-     +- later: MDA/Hercules, FDC (765), XTIDE, COM/LPT
+     +- fdc_card    rtl/fdc/fdc_card.sv: the diskette adapter (765), doc/fdc.md
+     +- xtide_card  rtl/hdc/xtide_card.sv: XTIDE hard disk card + option ROM socket, doc/hdc.md
+     +- later: MDA/Hercules, COM/LPT
 ```
 
 ## 3. The card bus (ISA, as seen inside `pc_system`)
@@ -72,6 +74,10 @@ The bus a card sees, all on `clk`. Signals are levels, valid for the many
 
 A card's read data must be valid within 2 `clk` of the strobe going low and
 held while it stays low.
+
+Memory map of the cards: CGA B8000-BBFFF (mirrored to BFFFF), the XTIDE
+card's option ROM C8000-CBFFF (16 KB; the BIOS's option ROM scan finds it).
+I/O: FDC 3F0-3F7, XTIDE 300-31F (variant 0) or 300-30F (variants 1/2).
 
 Bus timing (`xt_board.sv`, the 8288 function; marked CAL there, cards such as
 the CGA depend on it):
@@ -121,6 +127,41 @@ module pc_system #(
     input  logic [7:0]  font_data,
     input  logic        font_thin,    // jumper P3: the thin font
 
+    // Floppy drives A: and B: (rtl/fdc, doc/fdc.md sections 5-6): image
+    // geometry per drive, LED outputs, the sector port to the image backend
+    input  logic [1:0]       drv_80trk, img_present, img_wp,
+    input  logic [1:0][7:0]  img_tracks,
+    input  logic [1:0][1:0]  img_heads,
+    input  logic [1:0][5:0]  img_spt,
+    output logic [1:0]       drv_motor,
+    output logic             fdc_active,
+    output logic        sp_req, sp_write, sp_drive,
+    output logic [7:0]  sp_cyl,  output logic sp_head,  output logic [7:0] sp_sector,
+    output logic [15:0] sp_lba,
+    input  logic        sp_rd_valid,  input logic [7:0] sp_rd_data,
+    output logic        sp_wr_valid,  output logic [7:0] sp_wr_data,
+    input  logic        sp_wr_ready, sp_done, sp_err,
+
+    // Hard disk card (rtl/hdc, doc/hdc.md): the XTIDE card's option ROM
+    // socket C8000-CBFFF, owned by the glue like the BIOS ROM (QNICE loads
+    // it; 0xFF where no image is), two drives and their sector port (the
+    // floppy's protocol with an LBA28 address, doc/hdc.md section 5)
+    input  logic             hdc_enable,      // the card is in a slot
+    input  logic [1:0]       hdc_variant,     // 0 XT-CF/Lo-tech, 1 XTIDE rev 1, 2 XTIDE rev 2
+    output logic [13:0]      hdc_rom_addr,
+    input  logic [7:0]       hdc_rom_rdata,   // 1 clk latency
+    input  logic [1:0]       hd_present,      // [0] master, [1] slave
+    input  logic [1:0][27:0] hd_sectors,      // LBA capacity
+    input  logic [1:0][15:0] hd_cyls,         // default geometry for IDENTIFY / CHS
+    input  logic [1:0][4:0]  hd_heads,        // 1-16
+    input  logic [1:0][5:0]  hd_spt,          // 1-63
+    output logic             hd_active,       // LED: a command runs or a sector moves
+    output logic        hd_sp_req, hd_sp_write, hd_sp_drive,
+    output logic [27:0] hd_sp_lba,
+    input  logic        hd_sp_rd_valid,  input logic [7:0] hd_sp_rd_data,
+    output logic        hd_sp_wr_valid,  output logic [7:0] hd_sp_wr_data,
+    input  logic        hd_sp_wr_ready, hd_sp_done, hd_sp_err,
+
     // Keyboard: XT (set 1) scan codes from the glue
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,    // one-clk strobe; dropped if kbd_busy
@@ -148,8 +189,17 @@ Notes (2026-10-21, from the shell build):
   2.6 ns (EU); the BIU's state only advances on `cpu_step`, so it can be
   restructured into multicycle paths without changing its behaviour.
 
-Not yet in the contract: floppy, hard disk, serial/parallel, MDA,
-composite video, turbo. They get added here when their module exists.
+Notes (2026-10-22, hard disk):
+- The option ROM socket belongs to the XTIDE card (a real XTIDE carries its
+  EEPROM): the card decodes MEMR at C8000-CBFFF and returns `hdc_rom_rdata`,
+  read one clk after `hdc_rom_addr` like the BIOS ROM. With `hdc_enable` = 0
+  neither the ROM nor the I/O ports answer.
+- The shell does not wire the card yet: `CORE/sv/pc_system_flat.sv` ties
+  `hdc_enable` to 0 and the drives off (doc/hdc.md section 8 is the plan).
+- `tb/sys` serves the hard disk from image files (`-X`, `-H`, `-J`, `-V`).
+
+Not yet in the contract: serial/parallel, MDA, composite video, turbo. They
+get added here when their module exists.
 
 ## 5. Verification
 

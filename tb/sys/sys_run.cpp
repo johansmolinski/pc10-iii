@@ -2,22 +2,81 @@
 // sys_run.cpp - Verilator driver for the pc_system simulation.
 //   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-i itrace.txt from_ms] [-q]
 //           [-a floppy.img] [-d dip_sw1] [-L ram_latency_clk]
+//           [-X xub.bin] [-H disk.img] [-J slave.img] [-G c,h,s] [-V variant]
+//           [-W out.img] [-K backend_us] [-S ms,ms,...]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
+//
+// Hard disk (rtl/hdc, doc/hdc.md): -X puts an option ROM (the XTIDE Universal
+// BIOS) into the card's socket at C8000, -H/-J attach master/slave images
+// (geometry from -G, else from the image's partition table, else 16 heads x
+// 63 sectors), -V picks the card's register map (0 XT-CF/Lo-tech, 1 XTIDE
+// rev 1, 2 XTIDE rev 2), -W writes the master image to a file at the end,
+// -K sets the backend's latency per sector, -S dumps the screen at the given
+// times as well.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include "Vtb_sys.h"
 #include "Vtb_sys___024root.h"
 #include "verilated.h"
 
 static const double CLK_HZ = 100227272.7;
 
+// A hard disk image and its geometry: -G, else the end CHS of the MBR's
+// partitions (heads = end head + 1, spt = end sector), else 16 x 63.
+struct HdImage {
+    std::vector<unsigned char> d;
+    unsigned cyls = 0, heads = 0, spt = 0, sectors = 0;
+    bool load(const char *fn, const char *geo) {
+        FILE *f = fopen(fn, "rb");
+        if (!f) { perror(fn); return false; }
+        fseek(f, 0, SEEK_END); d.resize(ftell(f)); fseek(f, 0, SEEK_SET);
+        if (fread(d.data(), 1, d.size(), f) != d.size()) { perror(fn); fclose(f); return false; }
+        fclose(f);
+        sectors = d.size() / 512;
+        if (geo) sscanf(geo, "%u,%u,%u", &cyls, &heads, &spt);
+        else {
+            if (d.size() >= 512 && d[510] == 0x55 && d[511] == 0xAA)
+                for (int p = 0; p < 4; p++) {
+                    const unsigned char *e = &d[446 + 16 * p];
+                    if (e[4] == 0) continue;
+                    unsigned h = e[5] + 1, s = e[6] & 63;
+                    if (s && h > heads) { heads = h; spt = s; }
+                }
+            if (!heads || !spt || heads > 16) { heads = 16; spt = 63; }
+            cyls = std::min(sectors / (heads * spt), 65535u);
+        }
+        printf("hard disk %s: %u sectors, CHS %u/%u/%u\n", fn, sectors, cyls, heads, spt);
+        return true;
+    }
+};
+
+static void dump_screen(Vtb_sys *tb, const char *title) {
+    auto *r = tb->rootp;
+    printf("---- %s ----\n", title);
+    for (int y = 0; y < 25; y++) {
+        char line[81];
+        for (int x = 0; x < 80; x++) {
+            unsigned char c = r->tb_sys__DOT__u_pc__DOT__u_cga__DOT__vram[(y * 80 + x) * 2];
+            line[x] = (c >= 32 && c < 127) ? c : (c == 0 ? ' ' : '.');
+        }
+        line[80] = 0;
+        int e = 79; while (e >= 0 && line[e] == ' ') line[e--] = 0;
+        printf("%s\n", line);
+    }
+}
+
 int main(int argc, char **argv) {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
+    const char *xub = nullptr, *hdimg[2] = {nullptr, nullptr}, *hdgeo = nullptr, *hdout = nullptr;
+    unsigned variant = 0;
+    double hd_lat_us = 20;
+    std::vector<double> shots;
     double itrace_from = 0.0;
     double secs = 1.0;
     bool quiet = false;
@@ -32,6 +91,17 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-a") && i + 1 < argc) fdimg = argv[++i];
         else if (!strcmp(argv[i], "-L") && i + 1 < argc) ramlat = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
+        else if (!strcmp(argv[i], "-X") && i + 1 < argc) xub = argv[++i];
+        else if (!strcmp(argv[i], "-H") && i + 1 < argc) hdimg[0] = argv[++i];
+        else if (!strcmp(argv[i], "-J") && i + 1 < argc) hdimg[1] = argv[++i];
+        else if (!strcmp(argv[i], "-G") && i + 1 < argc) hdgeo = argv[++i];
+        else if (!strcmp(argv[i], "-V") && i + 1 < argc) variant = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-W") && i + 1 < argc) hdout = argv[++i];
+        else if (!strcmp(argv[i], "-K") && i + 1 < argc) hd_lat_us = atof(argv[++i]);
+        else if (!strcmp(argv[i], "-S") && i + 1 < argc) {
+            for (char *t = strtok(argv[++i], ","); t; t = strtok(nullptr, ",")) shots.push_back(atof(t));
+            std::sort(shots.begin(), shots.end());
+        }
     }
     if (!bios) { fprintf(stderr, "usage: sys_run -b bios.rom [-s secs] [-t trace]\n"); return 1; }
 
@@ -51,8 +121,26 @@ int main(int argc, char **argv) {
 
     std::string plus = "+rom=" + hex;
     std::string plat = "+ramlat=" + std::to_string(ramlat);
-    const char *vargs[] = {argv[0], plus.c_str(), plat.c_str()};
-    Verilated::commandArgs(3, vargs);
+    // the option ROM socket: the image from offset 0, 0xFF above it
+    std::string xhex, xplus;
+    if (xub) {
+        std::vector<unsigned char> x(16384, 0xFF);
+        FILE *xf = fopen(xub, "rb");
+        if (!xf) { perror(xub); return 1; }
+        size_t xn = fread(x.data(), 1, x.size(), xf);
+        fclose(xf);
+        unsigned sum = 0;
+        for (size_t k = 0; k < xn; k++) sum += x[k];
+        printf("option ROM %s: %zu bytes, header %02X%02X size %u KB, checksum %s\n", xub, xn, x[0], x[1],
+               x[2] / 2, (sum & 0xFF) == 0 ? "ok" : "BAD");
+        xhex = hex + ".xub";
+        FILE *xh = fopen(xhex.c_str(), "w");
+        for (int k = 0; k < 16384; k++) fprintf(xh, "%02x\n", x[k]);
+        fclose(xh);
+        xplus = "+xub=" + xhex;
+    }
+    const char *vargs[] = {argv[0], plus.c_str(), plat.c_str(), xplus.c_str()};
+    Verilated::commandArgs(xub ? 4 : 3, vargs);
     Vtb_sys *tb = new Vtb_sys;
     FILE *tf = trace ? fopen(trace, "w") : nullptr;
     FILE *itf = itrace ? fopen(itrace, "w") : nullptr;
@@ -84,10 +172,29 @@ int main(int argc, char **argv) {
     } else
         tb->img_present = 0;
     int sp_state = 0, sp_n = 0;     // 0 idle, 1 reading, 2 writing, 3 done pulse
+
+    // hard disks
+    HdImage hd[2];
+    for (int k = 0; k < 2; k++)
+        if (hdimg[k] && !hd[k].load(hdimg[k], k == 0 ? hdgeo : nullptr)) return 1;
+    tb->hdc_enable  = xub || hdimg[0] || hdimg[1];
+    tb->hdc_variant = variant;
+    tb->hd_present  = (hdimg[0] ? 1 : 0) | (hdimg[1] ? 2 : 0);
+    tb->hd_sectors  = ((uint64_t)hd[1].sectors << 28) | hd[0].sectors;
+    tb->hd_cyls     = (hd[1].cyls << 16) | hd[0].cyls;
+    tb->hd_heads    = (hd[1].heads << 5) | hd[0].heads;
+    tb->hd_spt      = (hd[1].spt << 6) | hd[0].spt;
+    // backend: hd_lat_us per sector, then one byte per clk
+    int hs = 0, hn = 0, hdrv = 0;   // 0 idle, 1 latency, 2 data, 3 write latency, 4 wait for req low
+    unsigned long long hwhen = 0, hd_reads = 0, hd_writes = 0;
+    unsigned hlba = 0;
+    bool herr = false;
+    size_t shot = 0;
     tb->kbd_valid = 0;
     tb->reset = 1;
     for (int i = 0; i < 200; i++) { tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval(); }
     if (!trace) unlink(hex.c_str());       // the ROM is loaded (initial block ran)
+    if (xub) unlink(xhex.c_str());
     tb->reset = 0;
 
     unsigned long long total = (unsigned long long)(secs * CLK_HZ), cyc = 0;
@@ -120,6 +227,33 @@ int main(int argc, char **argv) {
             }
         } else if (sp_state == 3 && !tb->sp_req)
             sp_state = 0;
+        // the hard disk backend
+        tb->hd_sp_rd_valid = 0; tb->hd_sp_wr_ready = 0; tb->hd_sp_done = 0; tb->hd_sp_err = 0;
+        if (hs == 0 && tb->hd_sp_req) {
+            hdrv = tb->hd_sp_drive; hlba = tb->hd_sp_lba; hn = 0;
+            herr = hlba >= hd[hdrv].sectors;
+            hs = tb->hd_sp_write ? 2 : 1;
+            hwhen = cyc + (unsigned long long)(hd_lat_us * 1e-6 * CLK_HZ);
+            (tb->hd_sp_write ? hd_writes : hd_reads)++;
+            if (!quiet) printf("[%9.3f ms] HD %s drive %d lba %u\n", cyc / CLK_HZ * 1e3,
+                               tb->hd_sp_write ? "write" : "read", hdrv, hlba);
+        }
+        if (hs == 1 && cyc >= hwhen) {
+            if (herr) { tb->hd_sp_done = 1; tb->hd_sp_err = 1; hs = 4; }
+            else {
+                tb->hd_sp_rd_valid = 1; tb->hd_sp_rd_data = hd[hdrv].d[(size_t)hlba * 512 + hn];
+                if (++hn == 512) { tb->hd_sp_done = 1; hs = 4; }
+            }
+        } else if (hs == 2) {
+            tb->hd_sp_wr_ready = 1;
+            if (tb->hd_sp_wr_valid) {
+                if (!herr) hd[hdrv].d[(size_t)hlba * 512 + hn] = tb->hd_sp_wr_data;
+                if (++hn == 512) { hs = 3; hwhen = cyc + (unsigned long long)(hd_lat_us * 1e-6 * CLK_HZ); }
+            }
+        } else if (hs == 3 && cyc >= hwhen) {
+            tb->hd_sp_done = 1; tb->hd_sp_err = herr; hs = 4;
+        } else if (hs == 4 && !tb->hd_sp_req)
+            hs = 0;
         tb->eval();
         // sample before the edge (the BIU changes its pins on the edge)
         if (tb->cpu_step) {
@@ -173,21 +307,24 @@ int main(int argc, char **argv) {
         tb->clk = 1; tb->eval();
         if (cyc % report == 0 && !quiet)
             printf("[%9.3f ms] CS:IP %04X:%04X\n", cyc / CLK_HZ * 1e3, tb->cs, tb->ip);
+        if (shot < shots.size() && cyc / CLK_HZ * 1e3 >= shots[shot]) {
+            char t[64];
+            snprintf(t, sizeof t, "screen at %.0f ms, CS:IP %04X:%04X", shots[shot], tb->cs, tb->ip);
+            dump_screen(tb, t);
+            shot++;
+        }
+    }
+    if (tb->hdc_enable)
+        printf("hard disk backend: %llu sector reads, %llu sector writes\n", hd_reads, hd_writes);
+    if (hdout && hdimg[0]) {
+        FILE *o = fopen(hdout, "wb");
+        if (!o || fwrite(hd[0].d.data(), 1, hd[0].d.size(), o) != hd[0].d.size()) perror(hdout);
+        if (o) fclose(o);
+        printf("master image written to %s\n", hdout);
     }
 
     // CGA text screen (80x25 at B8000)
-    auto *r = tb->rootp;
-    printf("---- screen ----\n");
-    for (int y = 0; y < 25; y++) {
-        char line[81];
-        for (int x = 0; x < 80; x++) {
-            unsigned char c = r->tb_sys__DOT__u_pc__DOT__u_cga__DOT__vram[(y * 80 + x) * 2];
-            line[x] = (c >= 32 && c < 127) ? c : (c == 0 ? ' ' : '.');
-        }
-        line[80] = 0;
-        int e = 79; while (e >= 0 && line[e] == ' ') line[e--] = 0;
-        printf("%s\n", line);
-    }
+    dump_screen(tb, "screen");
     if (tf) fclose(tf);
     if (itf) fclose(itf);
     delete tb;

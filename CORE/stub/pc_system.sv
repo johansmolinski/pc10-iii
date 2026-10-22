@@ -72,6 +72,27 @@ module pc_system #(
     input  logic        sp_wr_ready,
     input  logic        sp_done,
     input  logic        sp_err,
+    input  logic             hdc_enable,
+    input  logic [1:0]       hdc_variant,
+    output logic [13:0]      hdc_rom_addr,
+    input  logic [7:0]       hdc_rom_rdata,
+    input  logic [1:0]       hd_present,
+    input  logic [1:0][27:0] hd_sectors,
+    input  logic [1:0][15:0] hd_cyls,
+    input  logic [1:0][4:0]  hd_heads,
+    input  logic [1:0][5:0]  hd_spt,
+    output logic             hd_active,
+    output logic        hd_sp_req,
+    output logic        hd_sp_write,
+    output logic        hd_sp_drive,
+    output logic [27:0] hd_sp_lba,
+    input  logic        hd_sp_rd_valid,
+    input  logic [7:0]  hd_sp_rd_data,
+    output logic        hd_sp_wr_valid,
+    output logic [7:0]  hd_sp_wr_data,
+    input  logic        hd_sp_wr_ready,
+    input  logic        hd_sp_done,
+    input  logic        hd_sp_err,
 
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
@@ -164,6 +185,10 @@ module pc_system #(
     assign fdc_active = 1'b0;
     assign {sp_req, sp_write, sp_drive, sp_head, sp_wr_valid} = '0;
     assign {sp_cyl, sp_sector, sp_lba, sp_wr_data} = '0;
+    // no hard disk card in the stand-in
+    assign hdc_rom_addr = '0;
+    assign {hd_active, hd_sp_req, hd_sp_write, hd_sp_drive, hd_sp_wr_valid} = '0;
+    assign {hd_sp_lba, hd_sp_wr_data} = '0;
 
     function automatic logic [7:0] hexc(input logic [3:0] n);
         hexc = (n < 4'd10) ? (8'h30 + {4'h0, n}) : (8'h37 + {4'h0, n});

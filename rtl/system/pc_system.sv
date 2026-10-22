@@ -57,6 +57,31 @@ module pc_system #(
     input  logic        sp_done,
     input  logic        sp_err,
 
+    // hard disk card (rtl/hdc, doc/hdc.md): an XTIDE-compatible card with
+    // its option ROM socket at C8000-CBFFF (16 KB, the glue's block RAM, read
+    // like the BIOS ROM), two drives and their sector port
+    input  logic             hdc_enable,
+    input  logic [1:0]       hdc_variant,   // 0 XT-CF / Lo-tech, 1 XTIDE rev 1, 2 XTIDE rev 2
+    output logic [13:0]      hdc_rom_addr,
+    input  logic [7:0]       hdc_rom_rdata, // 1 clk latency
+    input  logic [1:0]       hd_present,
+    input  logic [1:0][27:0] hd_sectors,
+    input  logic [1:0][15:0] hd_cyls,
+    input  logic [1:0][4:0]  hd_heads,
+    input  logic [1:0][5:0]  hd_spt,
+    output logic             hd_active,
+    output logic        hd_sp_req,
+    output logic        hd_sp_write,
+    output logic        hd_sp_drive,
+    output logic [27:0] hd_sp_lba,
+    input  logic        hd_sp_rd_valid,
+    input  logic [7:0]  hd_sp_rd_data,
+    output logic        hd_sp_wr_valid,
+    output logic [7:0]  hd_sp_wr_data,
+    input  logic        hd_sp_wr_ready,
+    input  logic        hd_sp_done,
+    input  logic        hd_sp_err,
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -255,10 +280,50 @@ fdc_card #(.REG_DECODE(1'b1)) u_fdc (
     .sp_err      (sp_err)
 );
 
-assign isa_din   = (cga_dsel ? cga_din : 8'h00) | (fdc_dsel ? fdc_din : 8'h00);
-assign isa_dsel  = cga_dsel | fdc_dsel;
-assign isa_ready = cga_ready & fdc_ready;
-assign isa_irq   = fdc_irq;
+logic [7:0] hdc_din;
+logic       hdc_dsel, hdc_ready;
+logic [7:2] hdc_irq;
+
+xtide_card u_hdc (
+    .clk         (clk),
+    .reset       (reset),
+    .isa_addr    (isa_addr),
+    .isa_dout    (isa_dout),
+    .isa_din     (hdc_din),
+    .isa_dsel    (hdc_dsel),
+    .isa_memr_n  (isa_memr_n),
+    .isa_ior_n   (isa_ior_n),
+    .isa_iow_n   (isa_iow_n),
+    .isa_aen     (isa_aen),
+    .isa_ready   (hdc_ready),
+    .isa_irq     (hdc_irq),
+    .enable      (hdc_enable),
+    .variant     (hdc_variant),
+    .rom_addr    (hdc_rom_addr),
+    .rom_rdata   (hdc_rom_rdata),
+    .hd_present  (hd_present),
+    .hd_sectors  (hd_sectors),
+    .hd_cyls     (hd_cyls),
+    .hd_heads    (hd_heads),
+    .hd_spt      (hd_spt),
+    .hd_active   (hd_active),
+    .sp_req      (hd_sp_req),
+    .sp_write    (hd_sp_write),
+    .sp_drive    (hd_sp_drive),
+    .sp_lba      (hd_sp_lba),
+    .sp_rd_valid (hd_sp_rd_valid),
+    .sp_rd_data  (hd_sp_rd_data),
+    .sp_wr_valid (hd_sp_wr_valid),
+    .sp_wr_data  (hd_sp_wr_data),
+    .sp_wr_ready (hd_sp_wr_ready),
+    .sp_done     (hd_sp_done),
+    .sp_err      (hd_sp_err)
+);
+
+assign isa_din   = (cga_dsel ? cga_din : 8'h00) | (fdc_dsel ? fdc_din : 8'h00) | (hdc_dsel ? hdc_din : 8'h00);
+assign isa_dsel  = cga_dsel | fdc_dsel | hdc_dsel;
+assign isa_ready = cga_ready & fdc_ready & hdc_ready;
+assign isa_irq   = fdc_irq | hdc_irq;
 assign isa_drq   = fdc_drq;
 
 endmodule

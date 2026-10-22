@@ -710,3 +710,41 @@ bus (b292ea6).
 - Left: MUL/DIV/AAM/AAD timing, ADC/SBB/SUB imm to memory, C6/C7 to memory.
   All three need EU or BIU changes (a cycle counter, a carry-in add, queue
   strobes for bytes the BIU has already read that complete in the same clk).
+
+## 2026-10-22 - XTIDE hard disk card (branch `xtide`)
+
+`rtl/hdc/`: an 8-bit XTIDE-compatible ISA card for the XTIDE Universal BIOS
+(XUB): the option ROM socket C8000-CBFFF (the glue's ROM, read like the BIOS
+ROM), two ATA drives (`ata_dev`: task file, IDENTIFY, READ/WRITE SECTORS and
+MULTIPLE up to 8-sector blocks, SET MULTIPLE, VERIFY, INITIALIZE DEVICE
+PARAMETERS, SET FEATURES 8-bit, CHS and LBA28, SRST, INTRQ) and an 8-slot
+sector buffer behind the floppy's sector-port protocol with an LBA28 address
+(`hdc_secbuf`: reads prefetched ahead of the host, writes committed behind it,
+write-through). Design, timing model, the shell plan: `doc/hdc.md`.
+
+- **Variant:** the XT-CF / Lo-tech register map (XUB device type 9, "PIO16
+  with BIU offload"): `in ax,dx`/`stosw` and `lodsw`/`out dx,ax`, the fastest
+  PIO on an 8088 both ways, with a plain 16-bit drive; the same decoder runs
+  XUB's default type 7 (XT-CF 8-bit). XTIDE rev 1 and rev 2 maps as run-time
+  variants 1/2 (for existing XUB images, the 4 KB tiny build, MartyPC's rev 2).
+- **XUB:** GPL-2.0-or-later; r638 binaries and source from
+  xtideuniversalbios.org in `~/pcxt-work/xtide/` (not in the repository).
+  `tools/xubcfg.py` configures an image (device type, port, slave detection,
+  padding, checksum) as XTIDECFG does.
+- **tb/hdc:** 3184 checks over the three register maps (random backend
+  latency), 20 of 20 mutants killed (`mut.py`).
+- **tb/sys:** `-X xub -H img -V variant -W out`, RAM_KB (128 KB: GLaBIOS's
+  memory test 0.25 s instead of 5 s), screen snapshots. A 20 MB test image
+  (615/4/17, FAT16 partition, `tb/sys/hd/mkhdimg.py`) with an MBR that tests
+  INT 13h AH=08h/02h/03h. Four 10 s runs (Fedora host, ~35 minutes each):
+  XUB `ide_xt` type 9 without and with (empty) floppy drives, type 7 (8-bit),
+  `ide_tiny` on rev 2: GLaBIOS finds the ROM, XUB identifies "PC10-III
+  XTIDE disk image" as master, the slave "not found", boots C: (at 6.7 s;
+  tiny 4.8 s), the MBR reads (sum F600 OK) and writes (read back OK); the
+  images afterwards: exactly the four written sectors changed.
+- **Measured** (XUB's loops on the cycle-exact CPU, per sector): Lo-tech read
+  1.77 ms (33 clocks/word, 289 KB/s), write 1.81 ms; XT-CF 8-bit 2.44/2.48
+  ms; rev 2 read 1.82 ms, write 3.59 ms.
+- `pc_system`/contract: `hdc_enable`, `hdc_variant`, `hdc_rom_addr/rdata`,
+  `hd_*`, `hd_sp_*`; the shell ties the card off (`hdc_enable = 0`) until
+  the SD backend exists (doc/hdc.md section 8).
