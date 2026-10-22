@@ -20,7 +20,9 @@ R = 'cga_crtc.sv'
 MUTANTS = [
     ('read lead', C, "parameter int RD_LEAD  = 6,", "parameter int RD_LEAD  = 5,", 'waits'),
     ('write lead', C, "parameter int WR_LEAD  = 3,", "parameter int WR_LEAD  = 4,", 'waits'),
-    ('slot phase', C, "dc == 4'd14 && el", "dc == 4'd13 && el", 'waits'),
+    ('slot phase', C, "dc == 4'd14 && el", "dc == 4'd13 && el", 'waits snow'),
+    ('release phase', C, "dc == 4'd12 && el", "dc == 4'd13 && el", 'waits'),
+    ('release lead', C, "el >= lead + 5'd7", "el >= lead + 5'd8", 'waits'),
     ('ce delay 7', C, "parameter int CE_DELAY = 6,", "parameter int CE_DELAY = 7,", 'status waits'),
     ('ce delay 2', C, "parameter int CE_DELAY = 6,", "parameter int CE_DELAY = 2,", 'torture'),
     ('hsync not lchar-aligned', C, "        post_lclk <= cclk && dn == 4'd0;",

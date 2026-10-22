@@ -31,6 +31,7 @@ module xt_board #(
     input  logic        reset,
     input  logic        cpu_step,
     input  logic        cpu_fall,
+    input  logic        rdy_ce,         // 2 clk before cpu_step (pc_clocks)
     input  logic        pit_clk,
 
     // the CPU
@@ -101,6 +102,17 @@ wire [7:0] cpu_dout = cpu_ad[7:0];      // write data from T2 on
 // Read commands and INTA: from the CLK falling edge in T1 to the start of T4.
 // Write commands: from the falling edge in T2 (write data is on the bus from
 // T2). CAL: the exact edges relative to OSC matter for the CGA's wait states.
+//
+// The writes are the 8288's ADVANCED commands (AMWC, AIOWC), as on the 5160:
+// IBM wires AMWC/AIOWC to -MEMW/-IOW and leaves MWTC/IOWC unused (so does
+// KFPC-XT, built from the 5160 logic: Bus_Arbiter.sv), MartyPC asserts
+// AMWC/AIOWC from T2 (cpu_808x/cycle.rs; MWTC/IOWC from T3) and fixes a
+// write's wait states at T2 like a read's, from the same CGA table. The
+// normal commands would start at the falling edge in T3, after the RDY
+// sample that decides T3 (READY below): no card could stretch a write.
+// The reads start one CPU clock before the 8288's MRDC/IORC/INTA (MartyPC:
+// from T2); kept, the cards' wait logic and the trace are calibrated on it
+// (doc/architecture.md section 3).
 //
 // Timing (pc10-iii, doc/timing.md): one command register per bus status
 // instead of cmd_rd/cmd_wr ANDed with the CPU's live bus status, so the
@@ -624,18 +636,39 @@ always_ff @(posedge clk)
 `endif
 
 // ------------------------------------------------------------ READY
-// 8284 READY: IOCHRDY and the DMA wait are synchronized on the falling CLK
-// edge. The BIU samples READY as it enters T3 and each Tw (bus_t is still T2
-// or T3/Tw then) to know whether that state is the last. Every CPU I/O cycle
-// gets one wait state: its T3 is never the last.
+// The 5160's 8284 synchronizes RDY in two stages: the first flip-flop on the
+// rising CLK edge, the second on the falling edge; the 8088 samples READY at
+// the next rising edge, the one that ends T3/Tw, and enters a Tw if it is
+// low. So whether T3 is the last state is decided by RDY at the rising edge
+// that ends T2, whether a Tw is the last by RDY at the edge that ends the
+// state before it. biu88 knows it already at that edge (it decides at the
+// step that starts T3/Tw whether that state is the last, as MartyPC fixes the
+// wait states at T2). It reads READY_IN on the step's clock (st_t3last; its
+// copy p1_ready for the step logic two clocks later), so READY is a register
+// loaded on rdy_ce, 2 clk before cpu_step (about the 8284's RDY setup time):
+// stable over the clock before the step and the step's own.
+//
+// A card sees MEMW/IOW (falling edge in T2, AMWC/AIOWC) 12 clk and MEMR/IOR
+// 33 clk before that sample, so a card that pulls IOCHRDY low on the strobe
+// stretches writes as well as reads (IBM: "drive it low immediately upon
+// detecting a valid address and a read or write command"). CAL: the CGA's
+// release (cga_card.sv) and MartyPC's WAIT_TABLE; doc/architecture.md
+// section 3.
+//
+// (Until 2026-10-22 IOCHRDY was synchronized at cpu_fall, the falling edge 7
+// clk into the state, with biu88 deciding at the next step: the same edge at
+// which MEMW/IOW start, so no write could wait.)
+//
+// The DMA wait (aen | dma_wait) changes only on cpu_step, so sampling it on
+// rdy_ce gives the value it had at cpu_fall: from the CPU clock where AEN
+// rises (S1) to one clock after it falls. CAL: MartyPC (DMA wait states from
+// S1). Every CPU I/O cycle gets one wait state (the T2 term, decided at the
+// step that ends T2, and io_wait below when a DMA wait held that state).
 logic rdy_sync, dma_rdy_sync;
 always_ff @(posedge clk)
     if (reset) begin
         rdy_sync <= 1'b1;  dma_rdy_sync <= 1'b1;
-    end
-    // the DMA wait: from the CPU clock where AEN rises (S1) to one clock
-    // after it falls. CAL: MartyPC (DMA wait states from S1).
-    else if (cpu_fall) begin
+    end else if (rdy_ce) begin
         rdy_sync     <= isa_ready & ~(aen | dma_wait);
         dma_rdy_sync <= ~(aen | dma_wait);
     end
@@ -659,5 +692,17 @@ always_ff @(posedge clk)
         io_wait <= cpu_bus_t == T2 ? io_cycle : in_t3tw && io_wait_n;
     end
 assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle) && !(in_t3tw && io_wait_n);
+
+`ifndef SYNTHESIS
+// the DMA term on rdy_ce equals its value at cpu_fall (it changes on cpu_step
+// only), so the DMA wait states are those of the cpu_fall synchronizer
+logic dma_rdy_fall;
+always_ff @(posedge clk)
+    if (reset) dma_rdy_fall <= 1'b1;
+    else if (cpu_fall) dma_rdy_fall <= ~(aen | dma_wait);
+always_ff @(posedge clk)
+    if (!reset && rdy_ce && dma_rdy_fall != ~(aen | dma_wait))
+        $fatal(1, "xt_board: the DMA wait changed between cpu_fall and rdy_ce");
+`endif
 
 endmodule

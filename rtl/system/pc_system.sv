@@ -107,13 +107,14 @@ module pc_system #(
 );
 
 // ------------------------------------------------------------ clocks
-logic ce_14m, cpu_step, cpu_fall, ce_pclk, pit_clk;
+logic ce_14m, cpu_step, cpu_fall, rdy_ce, ce_pclk, pit_clk;
 pc_clocks u_clocks (
     .clk      (clk),
     .reset    (reset),
     .ce_14m   (ce_14m),
     .cpu_step (cpu_step),
     .cpu_fall (cpu_fall),
+    .rdy_ce   (rdy_ce),
     .ce_pclk  (ce_pclk),
     .pit_clk  (pit_clk)
 );
@@ -161,6 +162,7 @@ xt_board #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW)) u_board (
     .reset        (reset),
     .cpu_step     (cpu_step),
     .cpu_fall     (cpu_fall),
+    .rdy_ce       (rdy_ce),
     .pit_clk      (pit_clk),
     .cpu_ad       (cpu_ad),
     .cpu_din      (cpu_din),

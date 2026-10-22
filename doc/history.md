@@ -987,3 +987,82 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   reads its immediate a cycle late. Register-form ALU instructions need a
   shorter path (operand fetch/writeback through the register tables,
   CALC_EA's ModR/M decode for register operands, the main loop): open.
+
+## 2026-10-22 - READY sampled like the 8284 (branch `board-ready`); CGA writes wait
+
+- **Board rule:** `xt_board.sv` sampled IOCHRDY at `cpu_fall`, the falling
+  CLK edge 7 clk into a state, and biu88 (since 8bf11db) decides at the next
+  step whether the T3/Tw it enters is the last: T3 was decided at the edge
+  where MEMW/IOW start, so no card could stretch a write (the CGA and MDA
+  wrote at the strobe end as a workaround). The 5160's 8284 takes RDY in two
+  stages (rising edge, then falling edge) and the 8088 samples READY at the
+  next rising edge, the one that ends T3/Tw: RDY at the rising edge that ends
+  T2 decides T3. Now IOCHRDY is sampled on `rdy_ce`, a new `pc_clocks`
+  register enable 2 clk before `cpu_step` (about the RDY setup time), into
+  the register that drives READY_IN: stable over the clock before the step
+  and the step's own (biu88 reads READY_IN on the step's clock; it has no
+  `sn_*` copy of it). The DMA wait term changes only on steps, so it is the
+  same as before (checked with a `$fatal` comparison against a `cpu_fall`
+  copy); the I/O wait state is unchanged.
+- **Commands:** MEMW/IOW at the falling edge in T2 are the 8288's advanced
+  commands AMWC/AIOWC, which is what the 5160 uses (IBM wires AMWC/AIOWC to
+  -MEMW/-IOW; KFPC-XT, built from the 5160 logic, the same; MartyPC asserts
+  AMWC/AIOWC from T2, MWTC/IOWC from T3, and its raw trace shows `I:.A.` from
+  T2). They stay; a card now sees MEMW 12 clk and MEMR 33 clk before the
+  sample that decides T3. MEMR/IOR/INTA start one CPU clock before MartyPC's
+  MRDC/IORC (in T1, not T2): kept and documented as an open point.
+- **CGA:** IOCHRDY goes high 2 ticks before the CPU slot (lchar phase 12,
+  `LEAD + 7` ticks after the strobe), the access (write, snow capture) stays
+  at the slot (phase 14), inside the strobe. `RD_LEAD`/`WR_LEAD` unchanged.
+  The write fallback (`acc_abort`) is gone; a `$fatal` guards against a
+  strobe that ends before the slot, except when AEN cuts the CPU's command
+  for a refresh while the CPU waits (HOLDA in T3/Tw): the card drops the
+  access and restarts it when the strobe returns (found in the first system
+  run: the assertion stopped GLaBIOS at its third CGA write).
+- **MDA:** the card is unchanged except that its fallback (`wr_early`) is
+  gone (same `$fatal` and AEN exception). With the new sample: VRAM reads 1-3
+  wait states (mean 1.89), writes 2-4 (2.97), 6845 writes 2-4, 6845 reads
+  after the 3B4 write 1-2; every write lands in the slot. GLaBIOS's banner on
+  the MDA in `tb/sys` (`make MDA=1`, 1.0 s) without the fallback.
+- **tb/cga:** the board model samples on `rdy_ce` and decides T3/Tw as biu88
+  does. `waits` now also adds random gaps until every phase has 8 reads and
+  8 writes (416 accesses): all equal; the old card on the new board: 370 of
+  544 differ (one wait too many at 11 phases). Mutants 25 -> 27 (release
+  phase and lead), all killed.
+- **tb/mda:** board model as tb/cga's; `waits` expectations from the new
+  sampling (above; the old ones encoded "writes never wait"); the model
+  counts lost writes and every test requires none. Mutant "no write after an
+  early strobe end" dropped: 34, all killed.
+- **In-system oracle:** `sys_run -C [max]` checks every CPU memory cycle in
+  B8000-BFFFF against MartyPC's count, `WAIT_TABLE[(dc + 1) & 15]` ticks
+  rounded up to clocks with `dc` the card's phase at the end of T2; cycles
+  stretched by a DMA wait are counted apart; exit code 3 on a mismatch.
+  `tb/sys/cgawait_rom.py` makes a test ROM (no BIOS) with byte/word moves,
+  REP MOVSB, LODSB/STOSB and pseudo-random delays, so reads and writes meet
+  all 16 phases.
+
+  | Build | GLaBIOS writes (1.0-1.27 s) | test ROM reads | test ROM writes |
+  |---|---|---|---|
+  | main 7437964 | 14,639 of 14,639 differ (0 Tw) | 2,026 of 2,026 differ | 2,025 of 2,025 differ (0 Tw) |
+  | new board, old CGA | 9,580 of 13,175 differ | 1,446 of 1,989 | 1,523 of 1,989 |
+  | this branch | 0 of 13,335 | 0 of 2,001 | 0 of 2,001 |
+
+  GLaBIOS 0.4.2 reads no CGA memory in its first 4 s (fedora run: 13,371
+  writes, all equal, 3,342 DMA-stretched); the reads were checked with the
+  test ROM. The DMA-stretched cycles are not compared (MartyPC's refresh and
+  the CGA's restart would need a model of their own).
+- **Gates:** MartyPC trace (`DRQ0_SKEW=7`, 1.27 s): first difference at
+  reference clock 1,041,809 before the merge of main 93831be (cpu-y), as on
+  main 7437964, and at 2,439,285 after it, as on main 93831be; no `$fatal`.
+  The `-C` oracle in the same runs: 13,335 / 13,313 CGA writes, all equal.
+  tb/cga PASS, tb/mda PASS (MDA and Hercules), tb/fdc PASS (208 checks),
+  tb/hdc PASS (3,184 checks). Merged with main: the I/O wait's DMA sample
+  (`dma_rdy_sync`) is taken on `rdy_ce` too (the same value).
+- **Floppy boot** (`sys_run -a hello360.img -s 10`, fedora): fails, and
+  already on main. A run of each first-parent commit since the first floppy
+  boot: 8c0461f to 22f9853 boot ("Booted from floppy A:"), 387e87e (refresh
+  DMA against MartyPC), 14edb29 and b327eaf end with an empty screen, main
+  7437964 with "POST Error 1000 FDC", main 93831be with "POST Error 0800
+  FDD" (seek test), this branch before the merge the same, after it "FDD
+  [ 0 ]" with POST still running at 10 s (its CGA writes now wait). Not
+  caused by the READY rework; open (it starts with the refresh DMA work).

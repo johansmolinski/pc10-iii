@@ -23,6 +23,11 @@
 // MartyPC's WAIT_TABLE written as a rule. RD_LEAD/WR_LEAD = ticks from the
 // card seeing MEMR/MEMW fall to that reference; the defaults fit xt_board.sv
 // (MEMR from the CLK falling edge in T1, MEMW from the falling edge in T2).
+// IOCHRDY goes high 2 ticks before the slot (lchar phase 12): xt_board.sv
+// samples it 2 clk before the rising CLK edge that ends the state BEFORE a
+// T3/Tw (the 8284's RDY), i.e. 1 tick before that state begins, and MartyPC's
+// last T3/Tw is the one that the slot falls into or 1 tick before. The VRAM
+// access (write, snow capture) is done at the slot, inside the strobe.
 //
 // GPL-3.0-or-later, pc10-iii.
 
@@ -215,15 +220,16 @@ end
 // ============================================================ CPU memory access
 // The access waits for the CPU slot: the instant the lchar phase becomes 14,
 // at least LEAD + 9 ticks after the strobe was seen (doc/cga.md section 4).
-logic        acc, acc_done, acc_wr;
+// IOCHRDY is released 2 ticks earlier (rel_due: phase 12, LEAD + 7) and stays
+// high (rel) to the slot.
+logic        acc, acc_done, acc_wr, rel;
 logic [4:0]  el;                        // ticks since the strobe was seen
 logic [4:0]  lead;
 logic [13:0] acc_a;
 logic [7:0]  acc_d;
 wire         mem_any   = mem_rd || mem_wr;
 wire         slot      = acc && mem_any && dc == 4'd14 && el >= lead + 5'd9;
-// a board that ends the strobe early (ignoring IOCHRDY) still gets its write
-wire         acc_abort = acc && !mem_any;
+wire         rel_due   = dc == 4'd12 && el >= lead + 5'd7;
 // pc10-iii (timing): with REG_READY, IOCHRDY uses mem_any one clk ahead in a
 // register (equal in every clk but a reset's first, where the board's READY
 // and the 8237 are in reset themselves; doc/timing.md 2.11). The card's own
@@ -231,12 +237,23 @@ wire         acc_abort = acc && !mem_any;
 logic        mem_any_q;
 always_ff @(posedge clk)
     mem_any_q <= isa_addr_next[19:15] == 5'b10111 && (!isa_memr_n_next || !isa_memw_n_next);
-wire         slot_due  = dc == 4'd14 && el >= lead + 5'd9;
-assign       isa_ready = REG_READY ? !(acc && mem_any_q && !slot_due) : !(acc && mem_any && !slot);
+assign       isa_ready = REG_READY ? !(acc && mem_any_q && !rel && !rel_due) : !(acc && mem_any && !rel && !rel_due);
 `ifndef SYNTHESIS
 always_ff @(posedge clk)
     if (REG_READY && !reset && mem_any_q !== mem_any)
         $fatal(1, "cga_card: registered memory select differs from the bus");
+// A strobe outlasts the slot on this bus: the board's READY sees the
+// release 1 tick before the last T3/Tw at the latest and ends the strobe with
+// T4, 3 ticks after that state began; the 8237 samples IOCHRDY at the end of
+// SW and ends MEMW 2 ticks later, with the step in S4. The one exception is
+// a DMA transfer while the CPU waits (HOLDA in T3/Tw): AEN takes the CPU's
+// command away (8288 AEN) and gives it back after the transfer. The card
+// drops the access then (the select is gone) and starts a new one when the
+// strobe returns, which does the access at its own slot. Any other strobe
+// that ended before the slot would lose the access, as on the real card.
+always_ff @(posedge clk)
+    if (!reset && acc && !mem_any && !isa_aen)
+        $fatal(1, "cga_card: memory strobe ended before the CPU slot (access lost)");
 `endif
 
 // snow: the byte of the last CPU access replaces the next odd hchar's
@@ -244,7 +261,7 @@ always_ff @(posedge clk)
 logic       snow_pend;
 logic [7:0] snow_byte;
 
-assign va_we   = acc_wr && (slot || acc_abort);
+assign va_we   = acc_wr && slot;
 assign va_addr = va_we ? acc_a : isa_addr[13:0];
 assign va_d    = acc_d;
 
@@ -360,6 +377,7 @@ always_ff @(posedge clk) begin
         acc       <= 1'b0;
         acc_done  <= 1'b0;
         acc_wr    <= 1'b0;
+        rel       <= 1'b0;
         el        <= 5'd0;
         lead      <= 5'd0;
         snow_pend <= 1'b0;
@@ -441,6 +459,7 @@ always_ff @(posedge clk) begin
         if (!mem_any) begin
             acc      <= 1'b0;
             acc_done <= 1'b0;
+            rel      <= 1'b0;
         end else if (!acc && !acc_done) begin
             acc    <= 1'b1;
             acc_wr <= mem_wr;
@@ -450,7 +469,9 @@ always_ff @(posedge clk) begin
             el     <= 5'd0;
         end else if (tick && el != 5'd31)
             el <= el + 5'd1;
+        if (acc && mem_any && rel_due) rel <= 1'b1;
         if (slot) begin
+            rel       <= 1'b0;
             acc       <= 1'b0;
             acc_done  <= 1'b1;
             snow_pend <= 1'b1;

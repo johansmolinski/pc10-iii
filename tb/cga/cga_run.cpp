@@ -1,9 +1,11 @@
 // cga_run.cpp - Verilator testbench for rtl/video/cga (doc/cga.md section 9).
 //
 // The card is driven by a model of the pc10-iii system board's bus timing
-// (rtl/system/xt_board.sv: the 8288 command edges, IOCHRDY synchronised on
-// the falling CLK edge, one wait state on CPU I/O cycles) with the clock
-// enables of pc_clocks.sv. Next to it runs cga_model.h, a C++ transliteration
+// (rtl/system/xt_board.sv: the 8288 command edges, IOCHRDY sampled on rdy_ce,
+// 2 clk before the rising CLK edge that ends a state, one wait state on CPU
+// I/O cycles) and of biu88.v's READY rule (at the edge that starts T3/Tw the
+// CPU knows from READY whether that state is the last) with the clock enables
+// of pc_clocks.sv. Next to it runs cga_model.h, a C++ transliteration
 // of MartyPC's CGA, ticked on the board's 14.318 MHz instants. Checked:
 //   waits   wait states of a CPU read/write at each of the 16 lchar phases
 //           against MartyPC's WAIT_TABLE (mmio.rs + the CPU's conversion);
@@ -71,6 +73,7 @@ struct Sim {
     Op cur{Op::IDLE, 0, 0, 0, nullptr};
     int idle_left = 0;
     bool cmd_rd = false, cmd_wr = false, rdy_sync = true;
+    bool t3_last = false;                // biu88: the running T3/Tw is the last
     int tw = 0;
     int exp_tw = -1;                     // MartyPC wait states for this access
     bool gpend = false;
@@ -133,7 +136,7 @@ struct Sim {
 
     // one clk
     void step() {
-        bool ce = c7 == 0, cs = c21 == 0, cf = c21 == 7;
+        bool ce = c7 == 0, cs = c21 == 0, cf = c21 == 7, cr = c21 == 19;
         top->ce_14m = ce;
         top->clk = 0;
         top->eval();
@@ -163,9 +166,9 @@ struct Sim {
             if (ts == T1 && is_read(cur)) ncmd_rd = true;
             if (ts == T2 && is_write(cur)) ncmd_wr = true;
         }
-        if (cf) rdy_sync = ready;
+        if (cr) rdy_sync = ready;        // xt_board.sv: rdy_ce
         if (cs) {
-            bool cpu_ready = rdy_sync && !(ts == T3 && is_io(cur));
+            bool cpu_ready = rdy_sync && !(ts == T2 && is_io(cur));
             switch (ts) {
             case TI:
             case T4:
@@ -184,6 +187,7 @@ struct Sim {
                 break;
             case T2:
                 ts = T3;
+                t3_last = cpu_ready;
                 if (cur.t == Op::MEMR || cur.t == Op::MEMW) {
                     // MartyPC: phase = CGA ticks at the end of T2 + 1
                     uint64_t p = g.cycles + 1;
@@ -196,7 +200,7 @@ struct Sim {
                 break;
             case T3:
             case TW:
-                if (cpu_ready) {
+                if (t3_last) {
                     ts = T4;
                     if (cur.t == Op::IOW) {
                         if (getenv("CGAIOLOG")) printf("    IOW %03X %02X at %llu (sel %d)\n", cur.a, cur.d, (unsigned long long)g.cycles, g.crtc.sel);
@@ -223,6 +227,7 @@ struct Sim {
                     if (cur.cb) cur.cb(din);
                 } else {
                     ts = TW;
+                    t3_last = cpu_ready;
                     tw++;
                     CHECK(tw < 40, "bus hangs at %05X", cur.a);
                 }
@@ -430,20 +435,36 @@ static void test_waits(const std::vector<uint8_t> &font) {
             s.memw(0xBC000 + k * 2, k);
         }
     s.run_ops();
-    int tab_r[16], tab_w[16];
-    for (int i = 0; i < 16; i++) tab_r[i] = tab_w[i] = -1;
-    bool wr = false;
-    for (auto &e : s.wait_log) {
-        (wr ? tab_w : tab_r)[e.first] = e.second;
-        wr = !wr;
+    int tab_r[16], tab_w[16], n_r[16], n_w[16];
+    auto tally = [&]() {
+        for (int i = 0; i < 16; i++) { tab_r[i] = tab_w[i] = -1; n_r[i] = n_w[i] = 0; }
+        bool wr = false;
+        for (auto &e : s.wait_log) {
+            (wr ? tab_w : tab_r)[e.first] = e.second;
+            (wr ? n_w : n_r)[e.first]++;
+            wr = !wr;
+        }
+        for (int p = 0; p < 16; p++) if (n_r[p] < 8 || n_w[p] < 8) return false;
+        return true;
+    };
+    // then random gaps until every phase has 8 reads and 8 writes
+    std::mt19937 rng(5160);
+    for (int round = 0; round < 40 && !tally(); round++) {
+        for (int k = 0; k < 16; k++) {
+            s.idle(rng() % 17);
+            s.memr(0xB8000 + (rng() & 0x3FFF));
+            s.idle(rng() % 17);
+            s.memw(0xB8000 + (rng() & 0x3FFF), rng() & 0xFF);
+        }
+        s.run_ops();
     }
-    printf("  phase  MartyPC  card-read  card-write\n");
+    printf("  phase  MartyPC  card-read  card-write  (accesses: reads/writes)\n");
     int seen = 0;
     for (int p = 0; p < 16; p++) {
-        printf("  %5d  %7d  %9d  %10d\n", p, (WAIT_TABLE[p] + 2) / 3, tab_r[p], tab_w[p]);
-        if (tab_r[p] >= 0 && tab_w[p] >= 0) seen++;
+        printf("  %5d  %7d  %9d  %10d  (%d/%d)\n", p, (WAIT_TABLE[p] + 2) / 3, tab_r[p], tab_w[p], n_r[p], n_w[p]);
+        if (n_r[p] >= 8 && n_w[p] >= 8) seen++;
     }
-    CHECK(seen == 16, "waits: only %d phases covered", seen);
+    CHECK(seen == 16, "waits: only %d phases covered by 8 reads and 8 writes", seen);
     printf("  %d accesses checked\n", s.waits_checked);
 }
 

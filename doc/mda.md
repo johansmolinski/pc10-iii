@@ -185,36 +185,46 @@ character.
 ### 4.2 Resulting wait states
 
 The board (`xt_board.sv`) asserts MEMR and IOR at the falling CLK edge in
-T1, MEMW and IOW at the falling edge in T2, and synchronizes IOCHRDY at each
-falling CLK edge. Since commit 8bf11db the BIU (`biu88.v`) samples READY as
-T3 and each Tw begin: the falling edge *before* a state decides whether it
-is the last. Every CPU I/O cycle gets one extra wait from the board. That
-gives (measured in `tb/mda`, test `waits`, 3,000 accesses; the same in a
-`tb/sys` run of a test ROM):
+T1, MEMW and IOW at the falling edge in T2 (the 8288's advanced write
+commands, as on the 5160), and samples IOCHRDY on `rdy_ce`, 2 clk before
+each rising CLK edge, as the 8284's first RDY stage: IOCHRDY 2 clk before the
+edge that ends T2 decides whether T3 is the last state, before the edge that
+ends T3 whether the first Tw is, and so on (doc/architecture.md section 3).
+The card sees MEMR/IOR 32 clk before the first of these samples and MEMW/IOW
+11 clk before it; IOCHRDY rises 5.5 to 14.5 dots (34 to 89 clk) after the
+strobe. Every CPU I/O cycle gets one extra wait from the board. That gives
+(measured in `tb/mda`, test `waits`, 3,000 accesses):
 
 | Access | Wait states | Mean |
 |---|---|---|
-| VRAM read (MEMR) | 1-4 | 2.4 |
-| VRAM write (MEMW) | 0 | 0 |
-| 6845 read (IOR, incl. the board's 1) | 1-4 | 2.5 |
-| 6845 write (IOW, incl. the board's 1) | 2-5 | 3.6 |
+| VRAM read (MEMR) | 1-3 | 1.89 |
+| VRAM write (MEMW) | 2-4 | 2.97 |
+| 6845 read (IOR, incl. the board's 1; right after the 3B4 write) | 1-2 | 1.20 |
+| 6845 write (IOW, incl. the board's 1) | 2-4 | 3.01 |
 | 3BA read | 1 (the board's) | 1.0 |
 
-Reads fit IBM's "at least one wait state will be inserted": IOCHRDY is never
-high at the falling edge in T2 (the request is at most 209 ns old there).
+Reads fit IBM's "at least one wait state will be inserted": IOCHRDY is
+never high at the first sample (the request is at most 32 clk = 319 ns old
+there, the slot needs 338 ns).
 
-**Writes get no wait states with this board.** MEMW goes low at the
-falling edge in T2, and that same edge already decides whether T3 is the
-last state; IOCHRDY cannot be low there for any card that starts its wait
-from MEMW. On the MDA the write would then be lost (the RAM write enable
-needs the slot while MEMW is low), and GLaBIOS showed a blank screen. The
-card therefore writes at the end of the strobe when the strobe ends before
-the slot (`wr_early`, the same fallback the CGA has). With a board that
-lets a write strobe insert waits (a real PC does: the CGA's write waits in
-MartyPC's table were measured on hardware), the write happens in the slot
-and the fallback is never used. **This is a board issue to settle in
-`xt_board.sv`/`biu88.v`** (the CGA's writes are affected the same way; its
-TB still models the older "READY at the end of T3" sampling).
+**Writes wait for the slot, and the write is done in it.** The card pulls
+IOCHRDY low as soon as MEMW is there (the request is combinational), 11 clk
+before the sample that decides T3, and releases it only after -WE in its
+CCLK-high half, so the board keeps MEMW low past the write. Until
+2026-10-22 the board sampled IOCHRDY at the falling edge in T2, the very
+edge at which MEMW starts: writes got 0 wait states, the real card would
+have lost most of them (GLaBIOS showed a blank screen), and the card wrote at
+the strobe end as a workaround (`wr_early`). That fallback is gone: a write
+whose strobe ends before the slot is lost, as on the real card, and the
+simulation stops with `$fatal` (the TB model counts such writes and requires
+none). The exception is a refresh DMA while the CPU waits: AEN takes MEMW
+away for the transfer, the request is gone (U4 preset), and the returning
+strobe is a new request that writes in its own slot.
+
+The reads start one CPU clock before the 8288's MRDC/IORC on this board
+(doc/architecture.md section 3); on a real 5160 the read strobe comes 21 clk
+later relative to the samples, so a real MDA's reads would get about one
+wait state more than these (open point, section 10).
 
 ### 4.3 MartyPC
 
@@ -321,7 +331,7 @@ every read.
 
 | Test | What | Result |
 |---|---|---|
-| `waits` | 3,000 random VRAM reads/writes (all of B0000-B7FFF), 6845 and 3BA accesses | IOCHRDY equal at every clk; waits as in section 4.2; 2,031 reads equal (they also check the writes) |
+| `waits` | 3,000 random VRAM reads/writes (all of B0000-B7FFF), 6845 and 3BA accesses | IOCHRDY equal at every clk; waits as in section 4.2; no write lost; 2,031 reads equal (they also check the writes) |
 | `text` | IBM BIOS mode 7 (3B8 = 01, 6845 table 61 50 52 0F 19 06 19 19 02 0D 0B 0C, 3B8 = 29), all 256 characters, attributes 07 0F 01 09 70 78 87 F0 00 7F 8F 71, cursor; 2 frames | 654,680 dots equal; 882 dots x 370 lines; text at dots 154-873, lines 20-369 |
 | `attrs` | the attribute decoder against MartyPC's `MDA_ATTR_TABLE`, blink on and off (512 cases) | equal except the 128 cases of background intensity with blink off (section 10) |
 | `status` | 3BA back-to-back for one frame, half the screen lit | 19,136 reads equal; bit 0 in 16.3 % (16/98) |
@@ -335,8 +345,8 @@ every read.
 
 Runtime about 3 minutes (`make -C tb/mda run`).
 
-Mutants (`mut.py`, 35): each breaks one behaviour (slot sample and end
-points, the write after an early strobe end, 6845 without slot, 3B8 with slot, dot clock rate, the HRES stop, the
+Mutants (`mut.py`, 34): each breaks one behaviour (slot sample and end
+points, 6845 without slot, 3B8 with slot, dot clock rate, the HRES stop, the
 U55 stages, the HSYNC stretch, the status bits, the horizontal drive gate,
 the 9th dot, underline row, reverse, no-display, both intensities, blink
 under the cursor, both blink rates, the U28 counting edge, the U101 delay,
@@ -359,9 +369,9 @@ mono DIP setting (`dip_sw1` = 7D): POST sets 3B8 = 01 at 0.09 ms, mode 7
 simulated (`~/pcxt-work/mda/sys_mda.png`: "GLaBIOS [.] Reboot the Past",
 "(C) 2022-26 640KB Released under GPLv3", "Ver: 0.4.2-8X" in the last
 row, cursor blinking). The first run showed a blank screen: the board's
-write timing (section 4.2). A test ROM in `tb/sys` gave the wait states of
-section 4.2 (reads 2-3, 6845 writes 2-3, VRAM writes 0) with the real
-`xt_board.sv` and `biu88.v`. With the Hercules card
+write timing (section 4.2; then worked around with the write fallback). With
+the board's READY sample of 2026-10-22 and no fallback, the same boot shows
+the banner at 1.0 s simulated with every write in its slot (no `$fatal`). With the Hercules card
 (`make MDA=2`) the same boot shows the banner and the RAM count running
 ("RAM [ 176 KB OK ]" at 2.6 s simulated); GLaBIOS's HGC detection (status
 bit 7) comes after the RAM test and was not reached in that run (the
@@ -371,8 +381,6 @@ POST takes hours of simulation on the shared host.
 ## 10. Differences and open points
 
 Deliberate differences from the real card:
-- a write whose strobe ends before the slot is still done, at the strobe
-  end (section 4.2);
 - the intensity output is registered with the video dot (section 3.2).
 
 Deliberate differences from MartyPC:
@@ -398,8 +406,9 @@ Open points:
 - Hercules: no schematic was read; slot timing, status bits 6-4, light
   pen, text page addressing are assumptions (section 7);
 - the 5151's response to intensity without video;
-- the board's READY sampling against MEMW (section 4.2): with it, VRAM
-  writes never wait.
+- the board's read strobes (MEMR/IOR) start one CPU clock before the
+  8288's MRDC/IORC (section 4.2): the read wait states are probably about one
+  lower than on a real 5160.
 
 ## 11. For the shell (MEGA65 glue)
 
