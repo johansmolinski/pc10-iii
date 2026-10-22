@@ -215,10 +215,18 @@ assign crtc_din = io_d;
 logic          cap, ack;
 wire           req = mem_any || crtc_io;
 assign isa_ready = !(req && !ack);
-// the write (-WE, U6) in the CPU's CCLK-high half; done at its end
-assign va_we     = ev_ack && cap && mem_wr;
-assign va_addr   = cpu_off;
-assign va_d      = isa_dout;
+// The write (-WE, U6) in the CPU's CCLK-high half; done at its end. A board
+// that ends MEMW before the slot (one that samples IOCHRDY before MEMW can
+// pull it low, as xt_board.sv does now; doc/mda.md 4.2) still gets its write,
+// at the end of the strobe; the real card would lose it.
+logic          wr_q, wr_done;
+logic [VW-1:0] wr_a;
+logic [7:0]    wr_d;
+wire           wr_slot  = ev_ack && cap && mem_wr;
+wire           wr_early = wr_q && !mem_wr && !wr_done;
+assign va_we     = wr_slot || wr_early;
+assign va_addr   = wr_early ? wr_a : cpu_off;
+assign va_d      = wr_early ? wr_d : isa_dout;
 
 // ============================================================ display
 // stage 1 (U31 attribute, U34 character): the RAM word at the 6845 address,
@@ -313,7 +321,7 @@ always_ff @(posedge clk) begin
         mode <= 8'h00; cfg <= 2'b00; hs_ok <= 1'b0;
         ph <= 4'd0; gfx_c <= 1'b0;
         io_rd_q <= 1'b0; io_wr_q <= 1'b0;
-        cap <= 1'b0; ack <= 1'b0;
+        cap <= 1'b0; ack <= 1'b0; wr_q <= 1'b0; wr_done <= 1'b0;
         s1 <= '0; s2 <= '0; fs <= 3'd0;
         de1 <= 1'b0; de2 <= 1'b0; cur1 <= 1'b0; cur2 <= 1'b0;
         hs1 <= 1'b0; hs2 <= 1'b0; vs1 <= 1'b0;
@@ -332,6 +340,14 @@ always_ff @(posedge clk) begin
                 cap <= 1'b0;
             end
         end
+
+        wr_q <= mem_wr;
+        if (mem_wr) begin
+            wr_a <= cpu_off;
+            wr_d <= isa_dout;
+        end
+        if (!mem_wr) wr_done <= 1'b0;
+        if (wr_slot) wr_done <= 1'b1;
 
         // ---------------------------------------------- display fetch
         // after the CPU slot (CCLK low): character and attribute at the

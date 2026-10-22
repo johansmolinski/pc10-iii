@@ -66,6 +66,8 @@ MUTANTS = [
      'waits', 0),
     ('mode bit 5 ignored', "mode <= {HERC && (cfg[1] ? io_d[7] : mode[7]), 1'b0, io_d[5], 1'b0,",
      "mode <= {HERC && (cfg[1] ? io_d[7] : mode[7]), 1'b0, 1'b1, 1'b0,", 'torture', 0),
+    ('no write after an early strobe end', "assign va_we     = wr_slot || wr_early;",
+     "assign va_we     = wr_slot;", 'waits', 0),
     ('HGC graphics without 3BF', "HERC && (cfg[0] ? io_d[1] : mode[1]), io_d[0]};",
      "HERC && io_d[1], io_d[0]};", 'hgc', 1),
     ('HGC B8000 with a CGA', "cfg[1] && !cga_fitted;", "cfg[1];", 'hgc', 1),

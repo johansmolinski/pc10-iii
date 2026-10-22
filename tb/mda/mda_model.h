@@ -35,8 +35,11 @@ struct MdaModel {
     int ph = 0;                          // dot in the character; 0 = CCLK rises
     bool wide = false;                   // 16-dot characters (HGC graphics)
 
-    // CPU slot (U4a, U4b)
+    // CPU slot (U4a, U4b); a write whose strobe ends before the slot
     bool cap = false, ack = false;
+    bool wr_prev = false, wr_done = false;
+    int wr_off = 0;
+    uint8_t wr_dat = 0;
 
     // display pipeline
     uint8_t s1_chr = 0, s1_att = 0;      // U34, U31
@@ -153,7 +156,7 @@ struct MdaModel {
         if (req && cap) {
             ack = true;
             cap = false;
-            if (memw && mem_off(a) >= 0) mem[mem_off(a)] = d;
+            if (memw && mem_off(a) >= 0) { mem[mem_off(a)] = d; wr_done = true; }
         }
         unsigned ma = crtc.vma, ra = crtc.ra();
         unsigned addr = wide ? (((m_page() ? 1u : 0u) << 15) | ((ra & 3) << 13) | ((ma & 0xFFF) << 1))
@@ -176,6 +179,12 @@ struct MdaModel {
         rise = rise && run;
         fall = fall && run;
         bool req = is_req(memr, memw, ior, iow, a);
+        bool mw = memw && mem_off(a) >= 0;
+        // the strobe ended before the slot: write now (doc/mda.md 4.2)
+        if (wr_prev && !mw && !wr_done) mem[wr_off] = wr_dat;
+        if (!mw) wr_done = false;
+        wr_prev = mw;
+        if (mw) { wr_off = mem_off(a); wr_dat = d; }
 
         if (fall) {
             bool hs = (hs1 || hs2) && hs_ok;

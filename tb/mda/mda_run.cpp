@@ -2,8 +2,9 @@
 //
 // The card is driven by a model of the pc10-iii system board's bus timing
 // (rtl/system/xt_board.sv: 8288 command edges, IOCHRDY synchronised on the
-// falling CLK edge, one wait state on CPU I/O cycles) with the clock enables
-// of pc_clocks.sv. Next to it runs mda_model.h, a C++ model written from the
+// falling CLK edge, one wait state on CPU I/O cycles; biu88.v: READY sampled
+// as T3 and each Tw begin, so the falling edge before a state decides whether
+// it is the last) with the clock enables of pc_clocks.sv. Next to it runs mda_model.h, a C++ model written from the
 // IBM logic diagrams, stepped on the same clk. Every clk, the card's IOCHRDY
 // is compared with the model; every dot (video, intensity, syncs, window)
 // and every read are compared too. Tests (MDA build):
@@ -74,6 +75,7 @@ struct Sim {
     int idle_left = 0;
     bool cmd_rd = false, cmd_wr = false, rdy_sync = true;
     int tw = 0;
+    bool t3_last = true;                 // biu88: READY sampled as T3/Tw begin
     uint64_t t2_dots = 0;
     bool prev_ior = false, prev_iow = false;
     uint32_t io_a = 0;
@@ -192,7 +194,7 @@ struct Sim {
         }
         if (cf) rdy_sync = ready;
         if (cs) {
-            bool cpu_ready = rdy_sync && !(ts == T3 && is_io(cur));
+            bool cpu_ready = rdy_sync;
             switch (ts) {
             case TI:
             case T4:
@@ -209,10 +211,11 @@ struct Sim {
             case T2:
                 ts = T3;
                 t2_dots = dots;
+                t3_last = rdy_sync && !is_io(cur);
                 break;
             case T3:
             case TW:
-                if (cpu_ready) {
+                if (t3_last) {
                     ts = T4;
                     tw_hist[kind()][tw]++;
                     if (cur.t == Op::MEMR || cur.t == Op::MEMW) {
@@ -234,6 +237,7 @@ struct Sim {
                 } else {
                     ts = TW;
                     tw++;
+                    t3_last = cpu_ready;
                     if (!hang_ok && tw == 40) {
                         CHECK(false, "bus hangs at %05X", cur.a);
                         printf("FAILED: bus hangs\n");
@@ -424,10 +428,14 @@ static void test_waits(const std::vector<uint8_t> &font) {
         }
         printf("   (mean %.2f)\n", (double)sum / n);
         // the slot: IOCHRDY 5.5 to 14.5 dots after the strobe; with the
-        // board's MEMR at the falling edge in T1 and MEMW in T2 (doc/mda.md 4.2)
-        if (h.first == "MEMR") CHECK(lo == 0 && hi == 3, "MEMR waits %d-%d, expected 0-3", lo, hi);
-        if (h.first == "MEMW") CHECK(lo == 1 && hi == 4, "MEMW waits %d-%d, expected 1-4", lo, hi);
+        // board's MEMR at the falling edge in T1 and READY sampled at the
+        // falling edge before each T3/Tw: 1-4. MEMW starts at the falling
+        // edge in T2, which already decides T3: never a wait (doc/mda.md 4.2)
+        if (h.first == "MEMR") CHECK(lo == 1 && hi == 4, "MEMR waits %d-%d, expected 1-4", lo, hi);
+        if (h.first == "MEMW") CHECK(lo == 0 && hi == 0, "MEMW waits %d-%d, expected 0", lo, hi);
         if (h.first == "IOR 3B8-F") CHECK(lo == 1 && hi == 1, "3BA waits %d-%d, expected 1 (the board's)", lo, hi);
+        if (h.first == "IOR 6845") CHECK(lo == 1 && hi == 4, "6845 IOR waits %d-%d, expected 1-4", lo, hi);
+        if (h.first == "IOW 6845") CHECK(lo == 2 && hi == 5, "6845 IOW waits %d-%d, expected 2-5", lo, hi);
     }
     int n = 0, sum = 0;
     printf("  MartyPC   ");
@@ -621,12 +629,13 @@ static void test_hres(const std::vector<uint8_t> &font) {
     s.memw(0xB0000, 0x41);
     s.run_ops();
     printf("  with bit 0: a VRAM write done\n");
+    CHECK(s.g.mem[0] == 0x41 && s.top->rootp->mda_card__DOT__vram[0] == 0x41, "hres: write lost");
     s.iow(0x3B8, 0x28);
-    s.memw(0xB0002, 0x42);
+    s.memr(0xB0002);
     s.hang_ok = true;
     for (int i = 0; i < 20000; i++) s.step();
-    CHECK(s.ts == Sim::TW && s.cur.t == Op::MEMW, "hres: the VRAM write ended without the dot clock");
-    printf("  without bit 0: the write is still waiting after 20000 clk (%d wait states)\n", s.tw);
+    CHECK(s.ts == Sim::TW && s.cur.t == Op::MEMR, "hres: the VRAM read ended without the dot clock");
+    printf("  without bit 0: the read is still waiting after 20000 clk (%d wait states)\n", s.tw);
     CHECK(s.rdy_bad == 0, "hres: IOCHRDY differs");
 }
 

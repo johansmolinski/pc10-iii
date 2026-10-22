@@ -195,6 +195,23 @@ int main(int argc, char **argv) {
             if (vidlog && ((tb->io_addr & 0x3F0) == 0x3B0 || (tb->io_addr & 0x3F0) == 0x3D0))
                 printf("[%9.3f ms] OUT %03X %02X\n", cyc / CLK_HZ * 1e3, tb->io_addr & 0x3FF, tb->io_data);
         }
+        if (vidlog) {
+            // CPU writes to B0000-B7FFF, as the card sees them: the strobe and
+            // the card's RAM write
+            static bool mw_d = false;
+            static unsigned long long nmw = 0, nwe = 0;
+            bool mw = !r->tb_sys__DOT__u_pc__DOT__isa_memw_n && (r->tb_sys__DOT__u_pc__DOT__isa_addr >> 15) == 0x16;
+            if (mw && !mw_d && ++nmw <= 12)
+                printf("[%9.3f ms] MEMW %05X %02X\n", cyc / CLK_HZ * 1e3, r->tb_sys__DOT__u_pc__DOT__isa_addr,
+                       r->tb_sys__DOT__u_pc__DOT__isa_dout);
+            mw_d = mw;
+            if (r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__va_we) nwe++;
+            if (cyc % report == 0 && nmw)
+                printf("[%9.3f ms] %llu MDA memory writes, %llu RAM writes, mode %02X, B0000: %02X %02X %02X %02X\n",
+                       cyc / CLK_HZ * 1e3, nmw, nwe, r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__mode,
+                       r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA0], r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA1],
+                       r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA2], r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA3]);
+        }
         if (tb->mda_ce)
             mring[mdots++ & (mring.size() - 1)] = tb->mda_video | tb->mda_intens << 1 | tb->mda_hsync << 2 |
                                                   tb->mda_vsync << 3 | (!tb->mda_hblank && !tb->mda_vblank) << 4;
