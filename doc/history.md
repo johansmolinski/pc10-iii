@@ -1302,3 +1302,22 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   history.
 - Checks after the removal: tb/sys's trace against MartyPC identical over the
   2M-clock reference, tb/shell PASS; the full gates in the entry below.
+
+## 2026-10-22 - Clock plan: the PC on 28.63636 MHz (phase C, assessment only)
+
+- doc/clock-plan.md: what it takes to run the whole PC on the PC10-III's
+  master clock instead of 100.2273 MHz. The FE2010A (no datasheet found;
+  Sergey Kiselev's reverse-engineered notes for the Micro 8088) makes 4.77,
+  7.15 and 9.54 MHz from a 28.63636 MHz crystal (XSEL), 9.54 MHz with a 50%
+  duty cycle; the PC10-III's 9.54 MHz needs that crystal, so its master clock
+  is 28.63636 MHz = 2 x OSC (not verified on a PC10-III board). The MMCM
+  already makes it (M2M's video clock, VCO 1102.5 / 38.5; 100 x 31.5 / 5 / 22
+  is equivalent).
+- Every constant in clk units is listed with its value at 28.6 MHz:
+  `pc_clocks` (84/21/7 -> 24/6,4,3/2), `xt_board` (`cmd_en`, DRQ0_SKEW, the
+  RAM answer, the keyboard delays in CPU clocks), the CPU (`EU_DELAY` 1, the
+  multicycle constraints go: the longest EU/biu88 paths are 18 ns), CGA
+  (`CE_DELAY`), MDA (`DOT_INC/DOT_MOD`), FDC/XTIDE (`US_NUM/US_DEN` 11/315),
+  `pc_ram` (6-clk latency must shrink for 9.54 MHz), the video crossing in
+  `main.vhd` (gone), the duty cycles (1/3 at /6; /4 undocumented; /3 at 50%
+  is off the clock grid) and the turbo switch. Not implemented.
