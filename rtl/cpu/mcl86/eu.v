@@ -37,7 +37,8 @@
 //               EU_SINCE_READ; e.g. a displacement after the ModR/M byte), or
 //   bits 15:14 = 11: n 8088 clocks have passed since the last EU bus
 //               transfer ended (input EU_SINCE_DONE).
-// Type 0 with immediate 0 stays a NOP. Note that the microcode addresses
+// Type 0 with immediate 0 stays a NOP. pc10-iii (2026-10-22): an ADD (type 2)
+// with bit 31 set adds the carry flag too (carry-in). Note that the microcode addresses
 // 0x09C9, 0x0A03, 0x0E76, 0x0F02 and 0x0F11 are compared below; code there
 // must not move.
 //
@@ -368,9 +369,13 @@ assign eu_alu_out = (eu_opcode_type==3'h2) ? eu_alu2 :
 //      assign carry[i+1]   = (eu_operand0[i] & eu_operand1[i]) | (eu_operand0[i] & carry[i]) | (eu_operand1[i] & carry[i]);  
 //    end
 //endgenerate
-wire [16:0] adder_sum = {1'b0, eu_operand0} + {1'b0, eu_operand1};
+// pc10-iii (2026-10-22): bit 31 of an ADD word (unused by MCL86) adds the
+// carry flag (carry-in): ADC, SUB and SBB in one pass (the microcode inverts
+// CF first for SBB, sets it for SUB).
+wire        adder_cin = eu_rom_data[31] & eu_flag_c;
+wire [16:0] adder_sum = {1'b0, eu_operand0} + {1'b0, eu_operand1} + {16'h0, adder_cin};
 assign adder_out  = adder_sum[15:0];
-assign carry[0]   = 1'b0;
+assign carry[0]   = adder_cin;
 assign carry[15:1] = eu_operand0[15:1] ^ eu_operand1[15:1] ^ adder_sum[15:1];
 assign carry[16]  = adder_sum[16];
 

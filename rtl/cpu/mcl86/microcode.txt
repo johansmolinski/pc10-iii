@@ -608,9 +608,11 @@ p 01 00000 00001 52F9
 p 01 00000 00001 0000
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: XCHG AX,r16 read the next opcode in cycle 3 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 0062
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01E
+p 01 00000 00001 E003
 #
 # Jump unconditional to NOP Microcode after clock setting since it is identical
 p 00 00000 00001 0063
@@ -642,9 +644,11 @@ p 01 00000 00001 53F9
 p 01 00000 00001 0000
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: as 0x0062 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 0068
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01D
+p 01 00000 00001 E003
 #
 # Jump unconditional to NOP Microcode after clock setting since it is identical
 p 00 00000 00001 0069
@@ -676,9 +680,11 @@ p 01 00000 00001 51F9
 p 01 00000 00001 0000
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: as 0x0062 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 006E
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01D
+p 01 00000 00001 E003
 #
 # Jump unconditional to NOP Microcode after clock setting since it is identical
 p 00 00000 00001 006F
@@ -710,9 +716,11 @@ p 01 00000 00001 54F9
 p 01 00000 00001 0000
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: as 0x0062 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 0074
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01D
+p 01 00000 00001 E003
 #
 # Jump unconditional to NOP Microcode after clock setting since it is identical
 p 00 00000 00001 0075
@@ -744,9 +752,11 @@ p 01 00000 00001 55F9
 p 01 00000 00001 0000
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: as 0x0062 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 007A
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01D
+p 01 00000 00001 E003
 #
 # Jump unconditional to NOP Microcode after clock setting since it is identical
 p 00 00000 00001 007B
@@ -778,9 +788,11 @@ p 01 00000 00001 56F9
 p 01 00000 00001 0000
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: as 0x0062 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 0080
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01D
+p 01 00000 00001 E003
 #
 # Jump unconditional to NOP Microcode after clock setting since it is identical
 p 00 00000 00001 0081
@@ -812,9 +824,11 @@ p 01 00000 00001 57F9
 p 01 00000 00001 0000
 #
 # Write clock count=3 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: as 0x0062 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 0086
 p 01 00000 00001 5FFF
-p 01 00000 00001 C01D
+p 01 00000 00001 E003
 #
 # Jump unconditional to NOP Microcode after clock setting since it is identical 
 p 00 00000 00001 0087
@@ -1109,9 +1123,12 @@ p 01 00000 00001 1001
 p 01 00000 00001 00B4
 #
 # Write clock count=2 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: the next opcode is read in cycle 2 (the EU
+# reaches the main loop a clock late when the BIU read INC/DEC's opcode at the
+# end of the instruction before, e.g. at a write's T3)
 p 00 00000 00001 00B2
 p 01 00000 00001 5FFF
-p 01 00000 00001 C002
+p 01 00000 00001 E002
 #
 # Jump unconditional to NOP Microcode since it is identical 
 p 00 00000 00001 00B3
@@ -1124,9 +1141,10 @@ p 01 00000 00001 588F
 p 01 00000 00001 0080
 #
 # Write clock count=2 to the BIU Dataout register 
+# pc10-iii: cycle mode, absolute (as 0x00B2)
 p 00 00000 00001 00B5
 p 01 00000 00001 5FFF
-p 01 00000 00001 C002
+p 01 00000 00001 E002
 #
 # Jump unconditional to NOP Microcode since it is identical 
 p 00 00000 00001 00B6
@@ -1715,9 +1733,11 @@ p 01 00000 00001 5889
 p 01 00000 00001 0000
 #
 # Write clock count=4 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: SAHF reads the next opcode in cycle 4 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 022C
 p 01 00000 00001 5FFF
-p 01 00000 00001 C02C
+p 01 00000 00001 E004
 #
 # Jump unconditional to NOP Microcode since it is identical 
 p 00 00000 00001 022D
@@ -1731,9 +1751,11 @@ p 01 00000 00001 0041
 # -----------------------------------------------------
 #
 # Write clock count=2 to the BIU Dataout register
+# pc10-iii: cycle mode, absolute: CBW reads the next opcode in cycle 2 (the EU reaches the main
+# loop a clock late when the BIU read the opcode at the end of the instruction before)
 p 00 00000 00001 0230
 p 01 00000 00001 5FFF
-p 01 00000 00001 C008
+p 01 00000 00001 E002
 #
 # Isolate bit[7] of AX register to r0
 p 00 00000 00001 0231
@@ -2413,9 +2435,10 @@ p 01 00000 00001 400F
 p 01 00000 00001 00FF
 #
 # Unconditional Jump to Flags processing
+# pc10-iii: to AADZ (gen_muldiv.py: the end for a zero immediate)
 p 00 00000 00001 02B3
 p 01 00000 00001 1000
-p 01 00000 00001 02C0
+p 01 00000 00001 1B39
 #
 # Second opcode byte is non-zero, so we can proceed
 #
@@ -2437,9 +2460,11 @@ p 01 00000 00001 5AF4
 p 01 00000 00001 0000
 #
 # Jump unconditional over first iteration of the loop
+# pc10-iii: a NOP (the original word, 000002B9, is type 0: since the SYNC it
+# waited for cycle 0x2B9; the loop below adds r0 r1 times)
 p 00 00000 00001 02B7
 p 01 00000 00001 0000
-p 01 00000 00001 02B9
+p 01 00000 00001 0000
 #
 # Add r2= r2 + r0
 p 00 00000 00001 02B8
@@ -2473,9 +2498,10 @@ p 01 00000 00001 00FF
 #
 #
 # Write clock count=60 to the BIU Dataout register  (57 actually since flags processing adds 3 clocks)
+# pc10-iii: CALL AADEND (gen_muldiv.py: the end from the immediate's one bits)
 p 00 00000 00001 02BE
-p 01 00000 00001 5FFF
-p 01 00000 00001 C492
+p 01 00000 00001 1100
+p 01 00000 00001 1B3C
 #
 # Dummy = AX OR 0x0000 to populate last_alu for flags processing
 # pc10-iii: flags from AL (All_Flags_BYTE), as the 8088
@@ -2518,9 +2544,10 @@ p 01 00000 00001 1000
 p 01 00000 00001 1AE8
 #
 # Zero out r2
+# pc10-iii: to AAM (gen_muldiv.py: CORD, the 8088's cycle count)
 p 00 00000 00001 02CA
-p 01 00000 00001 4BBF
-p 01 00000 00001 0000
+p 01 00000 00001 1000
+p 01 00000 00001 1B24
 #
 # Two's complement r0: Invert r0  (r0 = r0 XOR FFFF)
 p 00 00000 00001 02CB
@@ -11738,44 +11765,44 @@ p 01 00000 00001 0943
 #
 # -----------------------------------------------------
 #
-# Isolate Carry flags bit[0] into r3
+# pc10-iii: r0 = r0 + r1 + CF in one pass (carry-in add, bit 31)
 p 00 00000 00001 0A03
-p 01 00000 00001 4C8F
-p 01 00000 00001 0001
-#
-# r0 = r0 + r3 
-p 00 00000 00001 0A04
-p 01 00000 00001 299C
+p 01 00000 00001 A99A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_BYTE
-p 00 00000 00001 0A05
+p 00 00000 00001 0A04
 p 01 00000 00001 1100
 p 01 00000 00001 0990
 #
-# r0 = r0 + r1
-p 00 00000 00001 0A06
-p 01 00000 00001 299A
-p 01 00000 00001 0000
-#
-# r2 <= last_alu result - This is done to prepare for flag calculation
-p 00 00000 00001 0A07
-p 01 00000 00001 5BFD
-p 01 00000 00001 0000
-#
-# Zero out the P, Z, S bit fields in Flag register in case they were set by intermediate result
-p 00 00000 00001 0A08
-p 01 00000 00001 488F
-p 01 00000 00001 FF3B
-#
-# CALL CALCULATE_FLAGS_BYTE_NO_FLAGS_ZEROING
-p 00 00000 00001 0A09
-p 01 00000 00001 1100
-p 01 00000 00001 0992
-#
 # Return to calling code
-p 00 00000 00001 0A0A
+p 00 00000 00001 0A05
 p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A06
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A07
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A08
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A09
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A0A
+p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
 #
@@ -11788,44 +11815,44 @@ p 01 00000 00001 0000
 #
 # -----------------------------------------------------
 #
-# Isolate Carry flags bit[0] into r3
+# pc10-iii: r0 = r0 + r1 + CF in one pass (carry-in add, bit 31)
 p 00 00000 00001 0A12
-p 01 00000 00001 4C8F
-p 01 00000 00001 0001
-#
-# r0 = r0 + r3
-p 00 00000 00001 0A13
-p 01 00000 00001 299C
+p 01 00000 00001 A99A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_WORD
-p 00 00000 00001 0A14
+p 00 00000 00001 0A13
 p 01 00000 00001 1100
 p 01 00000 00001 03D3
 #
-# r0 = r0 + r1
-p 00 00000 00001 0A15
-p 01 00000 00001 299A
-p 01 00000 00001 0000
-#
-# r2 <= last_alu result - This is done to prepare for flag calculation
-p 00 00000 00001 0A16
-p 01 00000 00001 5BFD
-p 01 00000 00001 0000
-#
-# Zero out the P, Z, S bit fields in Flag register in case they were set by intermediate result
-p 00 00000 00001 0A17
-p 01 00000 00001 488F
-p 01 00000 00001 FF3B
-#
-# CALL CALCULATE_FLAGS_WORD_NO_FLAGS_ZEROING
-p 00 00000 00001 0A18
-p 01 00000 00001 1100
-p 01 00000 00001 03D5
-#
 # Return to calling code
-p 00 00000 00001 0A19
+p 00 00000 00001 0A14
 p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A15
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A16
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A17
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A18
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A19
+p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
 #
@@ -12092,49 +12119,49 @@ p 01 00000 00001 0944
 #
 # -----------------------------------------------------
 #
-# Two's complement r1: Invert r1  (r1 = r1 XOR FFFF)
+# One's complement r1: Invert r1  (r1 = r1 XOR FFFF)
 p 00 00000 00001 0A46
 p 01 00000 00001 6AAF
 p 01 00000 00001 FFFF
 #
-# r0 = r0 + r1
+# pc10-iii: CF = 1 (the carry-in that completes the two's complement)
 p 00 00000 00001 0A47
-p 01 00000 00001 299A
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# pc10-iii: r0 = r0 + r1 + CF in one pass (carry-in add, bit 31)
+p 00 00000 00001 0A48
+p 01 00000 00001 A99A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_BYTE
-p 00 00000 00001 0A48
+p 00 00000 00001 0A49
 p 01 00000 00001 1100
 p 01 00000 00001 0990
 #
-# Finish the Two's complement r0: r0 = r0 + 1
-p 00 00000 00001 0A49
-p 01 00000 00001 299F
-p 01 00000 00001 0001
-#
-# r2 <= last_alu result - This is done to prepare for flag calculation
-p 00 00000 00001 0A4A
-p 01 00000 00001 5BFD
-p 01 00000 00001 0000
-#
-# Zero out the P, Z, S bit fields in Flag register in case they were set by intermediate result
-p 00 00000 00001 0A4B
-p 01 00000 00001 488F
-p 01 00000 00001 FF3B
-#
-# CALL CALCULATE_FLAGS_BYTE_NO_FLAGS_ZEROING
-p 00 00000 00001 0A4C
-p 01 00000 00001 1100
-p 01 00000 00001 0992
-#
 # Invert the Carry and Aux Carry bit - Flags[4,0] - since this is subtraction
-p 00 00000 00001 0A4D
+p 00 00000 00001 0A4A
 p 01 00000 00001 688F
 p 01 00000 00001 0011
 #
 # Return to calling code
-p 00 00000 00001 0A4E
+p 00 00000 00001 0A4B
 p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A4C
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A4D
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A4E
+p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
 #
@@ -12148,49 +12175,49 @@ p 01 00000 00001 0000
 # -----------------------------------------------------
 #
 #
-# Two's complement r1: Invert r1  (r1 = r1 XOR FFFF)
+# One's complement r1: Invert r1  (r1 = r1 XOR FFFF)
 p 00 00000 00001 0A52
 p 01 00000 00001 6AAF
 p 01 00000 00001 FFFF
 #
-# r0 = r0 + r1
+# pc10-iii: CF = 1 (the carry-in that completes the two's complement)
 p 00 00000 00001 0A53
-p 01 00000 00001 299A
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# pc10-iii: r0 = r0 + r1 + CF in one pass (carry-in add, bit 31)
+p 00 00000 00001 0A54
+p 01 00000 00001 A99A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_WORD
-p 00 00000 00001 0A54
+p 00 00000 00001 0A55
 p 01 00000 00001 1100
 p 01 00000 00001 03D3
 #
-# Finish the Two's complement r0: r0 = r0 + 1
-p 00 00000 00001 0A55
-p 01 00000 00001 299F
-p 01 00000 00001 0001
-#
-# r2 <= last_alu result - This is done to prepare for flag calculation
-p 00 00000 00001 0A56
-p 01 00000 00001 5BFD
-p 01 00000 00001 0000
-#
-# Zero out the P, Z, S bit fields in Flag register in case they were set by intermediate result
-p 00 00000 00001 0A57
-p 01 00000 00001 488F
-p 01 00000 00001 FF3B
-#
-# CALL CALCULATE_FLAGS_WORD_NO_FLAGS_ZEROING
-p 00 00000 00001 0A58
-p 01 00000 00001 1100
-p 01 00000 00001 03D5
-#
 # Invert the Carry and Aux Carry bit - Flags[4,0] - since this is subtraction
-p 00 00000 00001 0A59
+p 00 00000 00001 0A56
 p 01 00000 00001 688F
 p 01 00000 00001 0011
 #
 # Return to calling code
-p 00 00000 00001 0A5A
+p 00 00000 00001 0A57
 p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A58
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A59
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0A5A
+p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
 #
@@ -12703,60 +12730,60 @@ p 00 00000 00001 0AAE
 p 01 00000 00001 6AAF
 p 01 00000 00001 FFFF
 #
-# r0 = r0 + r1
+# pc10-iii: CF = NOT CF (the carry-in of r0 + ~r1 is the inverted borrow)
 p 00 00000 00001 0AAF
-p 01 00000 00001 299A
-p 01 00000 00001 0000
-#
-# Isolate Carry flags bit[0] into r1
-p 00 00000 00001 0AB0
-p 01 00000 00001 4A8F
+p 01 00000 00001 688F
 p 01 00000 00001 0001
 #
-# Dummy = r0 to re-establish last_result for flags calculation
-p 00 00000 00001 0AB1
-p 01 00000 00001 5EF9
+# pc10-iii: r0 = r0 + r1 + CF in one pass (carry-in add, bit 31)
+p 00 00000 00001 0AB0
+p 01 00000 00001 A99A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_BYTE
-p 00 00000 00001 0AB2
+p 00 00000 00001 0AB1
 p 01 00000 00001 1100
 p 01 00000 00001 0990
 #
-# Dummy = r1
+# Invert the Carry and Aux Carry bit - Flags[4,0] - since this is subtraction
+p 00 00000 00001 0AB2
+p 01 00000 00001 688F
+p 01 00000 00001 0011
+#
+# Return to calling code
 p 00 00000 00001 0AB3
-p 01 00000 00001 5EFA
+p 01 00000 00001 1030
 p 01 00000 00001 0000
 #
-# If last_alu is non zero, jump to end
+# pc10-iii: unused
 p 00 00000 00001 0AB4
-p 01 00000 00001 1001
-p 01 00000 00001 0AC5
-#
-# No Carry, so finish the Two's complement r0: r0 = r0 + 1
-p 00 00000 00001 0AB5
-p 01 00000 00001 299F
-p 01 00000 00001 0001
-#
-# r2 <= last_alu result - This is done to prepare for flag calculation
-p 00 00000 00001 0AB6
-p 01 00000 00001 5BFD
+p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
-# Zero out the P, Z, S bit fields in Flag register in case they were set by intermediate result
+# pc10-iii: unused
+p 00 00000 00001 0AB5
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AB6
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
 p 00 00000 00001 0AB7
-p 01 00000 00001 488F
-p 01 00000 00001 FF3B
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
-# CALL CALCULATE_FLAGS_BYTE_NO_FLAGS_ZEROING
+# pc10-iii: unused
 p 00 00000 00001 0AB8
-p 01 00000 00001 1100
-p 01 00000 00001 0992
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
-# Jump unconditional to common code
+# pc10-iii: unused
 p 00 00000 00001 0AB9
-p 01 00000 00001 1000
-p 01 00000 00001 0AC5
+p 01 00000 00001 0000
+p 01 00000 00001 0000
 #
 # -----------------------------------------------------
 #
@@ -12773,64 +12800,64 @@ p 00 00000 00001 0ABA
 p 01 00000 00001 6AAF
 p 01 00000 00001 FFFF
 #
-# r0 = r0 + r1
+# pc10-iii: CF = NOT CF (the carry-in of r0 + ~r1 is the inverted borrow)
 p 00 00000 00001 0ABB
-p 01 00000 00001 299A
-p 01 00000 00001 0000
-#
-# Isolate Carry flags bit[0] into r1
-p 00 00000 00001 0ABC
-p 01 00000 00001 4A8F
+p 01 00000 00001 688F
 p 01 00000 00001 0001
 #
-# Dummy = r0 to re-establish last_result for flags calculation
-p 00 00000 00001 0ABD
-p 01 00000 00001 5EF9
+# pc10-iii: r0 = r0 + r1 + CF in one pass (carry-in add, bit 31)
+p 00 00000 00001 0ABC
+p 01 00000 00001 A99A
 p 01 00000 00001 0000
 #
 # CALL CALCULATE_FLAGS_WORD
-p 00 00000 00001 0ABE
+p 00 00000 00001 0ABD
 p 01 00000 00001 1100
 p 01 00000 00001 03D3
 #
-# Dummy = r1
-p 00 00000 00001 0ABF
-p 01 00000 00001 5EFA
-p 01 00000 00001 0000
-#
-# If last_alu is non zero, jump to end
-p 00 00000 00001 0AC0
-p 01 00000 00001 1001
-p 01 00000 00001 0AC5
-#
-# No Carry, so finish the Two's complement r0: r0 = r0 + 1
-p 00 00000 00001 0AC1
-p 01 00000 00001 299F
-p 01 00000 00001 0001
-#
-# r2 <= last_alu result - This is done to prepare for flag calculation
-p 00 00000 00001 0AC2
-p 01 00000 00001 5BFD
-p 01 00000 00001 0000
-#
-# Zero out the P, Z, S bit fields in Flag register in case they were set by intermediate result
-p 00 00000 00001 0AC3
-p 01 00000 00001 488F
-p 01 00000 00001 FF3B
-#
-# CALL CALCULATE_FLAGS_WORD_NO_FLAGS_ZEROING
-p 00 00000 00001 0AC4
-p 01 00000 00001 1100
-p 01 00000 00001 03D5
-#
 # Invert the Carry and Aux Carry bit - Flags[4,0] - since this is subtraction
-p 00 00000 00001 0AC5
+p 00 00000 00001 0ABE
 p 01 00000 00001 688F
 p 01 00000 00001 0011
 #
 # Return to calling code
-p 00 00000 00001 0AC6
+p 00 00000 00001 0ABF
 p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AC0
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AC1
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AC2
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AC3
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AC4
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AC5
+p 01 00000 00001 0000
+p 01 00000 00001 0000
+#
+# pc10-iii: unused
+p 00 00000 00001 0AC6
+p 01 00000 00001 0000
 p 01 00000 00001 0000
 #
 #
@@ -15610,9 +15637,10 @@ p 01 00000 00001 0000
 #
 # Jump unconditional to common code
 # pc10-iii: to the writeback at 0x1600
+# pc10-iii: to C6WB at 0x1F23 (memory: the write directly)
 p 00 00000 00001 0CEA
 p 01 00000 00001 1000
-p 01 00000 00001 1600
+p 01 00000 00001 1F23
 #
 
 # -----------------------------------------------------
@@ -15640,9 +15668,10 @@ p 01 00000 00001 0000
 #
 # Jump unconditional to common code
 # pc10-iii: to the writeback at 0x1602
+# pc10-iii: to C7WB at 0x1F15 (memory: the write directly)
 p 00 00000 00001 0CEE
 p 01 00000 00001 1000
-p 01 00000 00001 1602
+p 01 00000 00001 1F15
 #
 # -----------------------------------------------------
 #
@@ -17157,24 +17186,28 @@ p 01 00000 00001 1000
 p 01 00000 00001 0E28
 #
 # MUL REG8/MEM8
+# pc10-iii: to MUL8 (gen_muldiv.py)
 p 00 00000 00001 0E1C
 p 01 00000 00001 1000
-p 01 00000 00001 0E40
+p 01 00000 00001 1B45
 #
 # IMUL REG8/MEM8
+# pc10-iii: to IMUL8 (gen_muldiv.py)
 p 00 00000 00001 0E1D
 p 01 00000 00001 1000
-p 01 00000 00001 0E30
+p 01 00000 00001 1B9F
 #
 # DIV REG8/MEM8
+# pc10-iii: to DIV8 (gen_muldiv.py)
 p 00 00000 00001 0E1E
 p 01 00000 00001 1000
-p 01 00000 00001 0E52
+p 01 00000 00001 1B85
 #
 # IDIV REG8/MEM8
+# pc10-iii: to IDIV8 (gen_muldiv.py)
 p 00 00000 00001 0E1F
 p 01 00000 00001 1000
-p 01 00000 00001 0E54
+p 01 00000 00001 1BFB
 #
 #
 # -----------------------------------------------------
@@ -17801,24 +17834,28 @@ p 01 00000 00001 1000
 p 01 00000 00001 0E96
 #
 # MUL REG16/MEM16
+# pc10-iii: to MUL16 (gen_muldiv.py)
 p 00 00000 00001 0E8C
 p 01 00000 00001 1000
-p 01 00000 00001 0EAE
+p 01 00000 00001 1C4E
 #
 # IMUL REG16/MEM16
+# pc10-iii: to IMUL16 (gen_muldiv.py)
 p 00 00000 00001 0E8D
 p 01 00000 00001 1000
-p 01 00000 00001 0E9E
+p 01 00000 00001 1CA4
 #
 # DIV REG16/MEM16
+# pc10-iii: to DIV16 (gen_muldiv.py)
 p 00 00000 00001 0E8E
 p 01 00000 00001 1000
-p 01 00000 00001 0EE4
+p 01 00000 00001 1C8B
 #
 # IDIV REG16/MEM16
+# pc10-iii: to IDIV16 (gen_muldiv.py)
 p 00 00000 00001 0E8F
 p 01 00000 00001 1000
-p 01 00000 00001 0ED0
+p 01 00000 00001 1CFB
 #
 #
 # -----------------------------------------------------
@@ -24008,9 +24045,10 @@ p 01 00000 00001 1001
 p 01 00000 00001 15C5
 #
 # CALL the fetch procedure (the byte(s) are read already)
+# pc10-iii: to C6MEM at 0x1F0F
 p 00 00000 00001 15C7
-p 01 00000 00001 1100
-p 01 00000 00001 02A5
+p 01 00000 00001 1000
+p 01 00000 00001 1F0F
 #
 # biu_dataout = 0003 (release: 3 cycles after the last queue read)
 p 00 00000 00001 15C8
@@ -24115,9 +24153,10 @@ p 01 00000 00001 1001
 p 01 00000 00001 15E5
 #
 # CALL the fetch procedure (the byte(s) are read already)
+# pc10-iii: to C7MEM at 0x1F00 (the immediate from the queue view, no fetch procedure)
 p 00 00000 00001 15E7
-p 01 00000 00001 1100
-p 01 00000 00001 02E5
+p 01 00000 00001 1000
+p 01 00000 00001 1F00
 #
 # biu_dataout = 0003 (release: 3 cycles after the last queue read)
 p 00 00000 00001 15E8
@@ -24213,10 +24252,10 @@ p 00 00000 00001 1610
 p 01 00000 00001 4E8F
 p 01 00000 00001 4000
 #
-# Jump if last_alu is non-zero to the register path
+# Jump if last_alu is non-zero to the register path (pc10-iii: at 0x1B00)
 p 00 00000 00001 1611
 p 01 00000 00001 1001
-p 01 00000 00001 1618
+p 01 00000 00001 1B00
 #
 # SYNC: 2 cycles after the operand read ended
 p 00 00000 00001 1612
@@ -24249,6 +24288,7 @@ p 01 00000 00001 1030
 p 01 00000 00001 0000
 #
 # SYNC: 2 cycles after the last queue read
+# pc10-iii: 0x1618-0x161D are unused since the path at 0x1B00
 p 00 00000 00001 1618
 p 01 00000 00001 0000
 p 01 00000 00001 4002
@@ -24501,15 +24541,15 @@ p 00 00000 00001 1650
 p 01 00000 00001 59FF
 p 01 00000 00001 0000
 #
-# Initialize REPZ and REPNZ flags to zero
+# pc10-iii: CALL the armed ModR/M entry (F6) first (gen_muldiv.py: it saves the REP bits)
 p 00 00000 00001 1651
-p 01 00000 00001 488F
-p 01 00000 00001 3FFF
-#
-# CALL the armed ModR/M entry (F6, reg field)
-p 00 00000 00001 1652
 p 01 00000 00001 1100
 p 01 00000 00001 16B0
+#
+# pc10-iii: Initialize REPZ and REPNZ flags to zero (after the entry, gen_muldiv.py)
+p 00 00000 00001 1652
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
 #
 # Jump unconditional to the rest of CALC_EA (it returns to the caller)
 p 00 00000 00001 1653
@@ -24523,15 +24563,15 @@ p 00 00000 00001 1654
 p 01 00000 00001 59FF
 p 01 00000 00001 0008
 #
-# Initialize REPZ and REPNZ flags to zero
+# pc10-iii: CALL the armed ModR/M entry (F7) first (gen_muldiv.py: it saves the REP bits)
 p 00 00000 00001 1655
-p 01 00000 00001 488F
-p 01 00000 00001 3FFF
-#
-# CALL the armed ModR/M entry (F7, reg field)
-p 00 00000 00001 1656
 p 01 00000 00001 1100
 p 01 00000 00001 16D0
+#
+# pc10-iii: Initialize REPZ and REPNZ flags to zero (after the entry, gen_muldiv.py)
+p 00 00000 00001 1656
+p 01 00000 00001 488F
+p 01 00000 00001 3FFF
 #
 # Jump unconditional to the rest of CALC_EA (it returns to the caller)
 p 00 00000 00001 1657
@@ -24799,9 +24839,10 @@ p 01 00000 00001 6EAF
 p 01 00000 00001 00C0
 #
 # Jump if last_alu is non-zero (memory operand) to the return
+# pc10-iii: memory operand: to REPSAVE, which returns (gen_muldiv.py)
 p 00 00000 00001 16B9
 p 01 00000 00001 1001
-p 01 00000 00001 16C1
+p 01 00000 00001 1B20
 #
 # r1 = r3 AND 0030 (REG bits 5:4)
 p 00 00000 00001 16BA
@@ -24819,9 +24860,10 @@ p 01 00000 00001 6EAF
 p 01 00000 00001 0010
 #
 # Jump if last_alu is non-zero (MUL/DIV) to the return
+# pc10-iii: MUL/DIV: to REPSAVE, which returns (gen_muldiv.py)
 p 00 00000 00001 16BD
 p 01 00000 00001 1001
-p 01 00000 00001 16C1
+p 01 00000 00001 1B20
 #
 # biu_dataout = A002 (NOT/NEG end: 2 cycles after the ModR/M read)
 p 00 00000 00001 16BE
@@ -24911,9 +24953,10 @@ p 01 00000 00001 6EAF
 p 01 00000 00001 00C0
 #
 # Jump if last_alu is non-zero (memory operand) to the return
+# pc10-iii: memory operand: to REPSAVE, which returns (gen_muldiv.py)
 p 00 00000 00001 16D9
 p 01 00000 00001 1001
-p 01 00000 00001 16E1
+p 01 00000 00001 1B20
 #
 # r1 = r3 AND 0030 (REG bits 5:4)
 p 00 00000 00001 16DA
@@ -24931,9 +24974,10 @@ p 01 00000 00001 6EAF
 p 01 00000 00001 0010
 #
 # Jump if last_alu is non-zero (MUL/DIV) to the return
+# pc10-iii: MUL/DIV: to REPSAVE, which returns (gen_muldiv.py)
 p 00 00000 00001 16DD
 p 01 00000 00001 1001
-p 01 00000 00001 16E1
+p 01 00000 00001 1B20
 #
 # biu_dataout = A002 (NOT/NEG end: 2 cycles after the ModR/M read)
 p 00 00000 00001 16DE
@@ -27558,6 +27602,10 @@ p 01 00000 00001 0000
 # the opcode (0x1A80), INTO 9 (0x1A84); INTO not taken ends at cycle 4
 # (0x1A8C). IRET (0x1A50, from 0x0525): pop IP 4 after the opcode, SUSP at its
 # end, pop CS 3 after, flush at its end, pop FLAGS 2 after, end 5 after that.
+# The CS pop waits for 3 cycles after the IP pop ended (SYNC C003 at 0x1A5A;
+# was 3 cycles from the SYNC, which the EU reached near a clock edge: one
+# test in ~20 was a cycle late, depending on the CLK phase). The SUSP never
+# waits there (the suite's IRET schedule is uniform).
 #
 p 00 00000 00001 1A00
 p 01 00000 00001 2999
@@ -27821,7 +27869,7 @@ p 01 00000 00001 4003
 #
 p 00 00000 00001 1A5A
 p 01 00000 00001 0000
-p 01 00000 00001 8003
+p 01 00000 00001 C003
 #
 p 00 00000 00001 1A5B
 p 01 00000 00001 1100
@@ -28264,9 +28312,10 @@ p 01 00000 00001 59FF
 p 01 00000 00001 0000
 #
 # Jump to the interrupt processing (as 0x0F11)
+# pc10-iii: to AAMERR (gen_muldiv.py: the INT 0 vector read released as the 8088's)
 p 00 00000 00001 1AEF
 p 01 00000 00001 1000
-p 01 00000 00001 055C
+p 01 00000 00001 1B35
 #
 # pc10-iii: NEG r/m8 as (x XOR FF) + 1 with one flag pass. MCL86 ran
 # SUB_BYTE (two additions, flags twice) and the write came a cycle late.
@@ -28295,3 +28344,5050 @@ p 01 00000 00001 0011
 p 00 00000 00001 1AF4
 p 01 00000 00001 1000
 p 01 00000 00001 1690
+#
+# --------------------------------------------------------------------
+# pc10-iii (2026-10-22): TEST r8,imm8 register path (from 0x1611). The BIU
+# reads the immediate itself (the read scheduled at 0x16C2); the end is armed as
+# soon as that read has happened, before the EU looks at the byte (0x1618 armed
+# it after the fetch procedure, which the EU reached near the end cycle: about
+# one test in 20 ended a cycle late, depending on the CLK phase). The byte is
+# then taken from the queue view without the fetch procedure's SYNC (a SYNC
+# after the end has fired would hold the EU into the next instruction).
+#
+# Isolate System Signals[14] - the scheduled read is pending
+p 00 00000 00001 1B00
+p 01 00000 00001 4EEF
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to retest
+p 00 00000 00001 1B01
+p 01 00000 00001 1001
+p 01 00000 00001 1B00
+#
+# biu_dataout = A002 (end: 2 cycles after the last queue read, the immediate)
+p 00 00000 00001 1B02
+p 01 00000 00001 5FFF
+p 01 00000 00001 A002
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1B03
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1B04
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Strobe BIU - Fetch Opcode and set QS[1:0] to Subsequent Byte of Opcode
+p 00 00000 00001 1B05
+p 01 00000 00001 5DDF
+p 01 00000 00001 100C
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1B06
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Zero out r3
+p 00 00000 00001 1B07
+p 01 00000 00001 4CCF
+p 01 00000 00001 0000
+#
+# r3 = 0000 OR prefetch_queue_byte (the immediate, read already)
+p 00 00000 00001 1B08
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# Zero out r3[15:8]
+p 00 00000 00001 1B09
+p 01 00000 00001 4CCF
+p 01 00000 00001 00FF
+#
+# Return to calling code
+p 00 00000 00001 1B0A
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# pc10-iii gen_muldiv.py: BEGIN (generated, do not edit by hand)
+#
+# MUL/IMUL/DIV/IDIV r/m8 and r/m16 (from the F6/F7 jump tables) as the
+# 8088 computes them, with its cycle count; see tools/gen_muldiv.py.
+#   1B20 REPSAVE
+#   1B23 REPSAVE_0
+#   1B24 AAM
+#   1B35 AAMERR
+#   1B39 AADZ
+#   1B3C AADEND
+#   1B3E AADEND_L
+#   1B41 AADEND_0
+#   1B45 MUL8
+#   1B4E MUL8_CP
+#   1B5B NEG8MUL8X_C0
+#   1B5E NEG8MUL8X_C1
+#   1B66 NEG8MUL8X_BN
+#   1B6C NEG8MUL8X_END
+#   1B6C MUL8_NN
+#   1B74 MUL8_Z
+#   1B75 MUL8_WB
+#   1B80 END_1_MEM
+#   1B82 END_1_ARM
+#   1B85 DIV8
+#   1B9A END_2_MEM
+#   1B9C END_2_ARM
+#   1B9F IMUL8
+#   1BA8 IMUL8_CP
+#   1BB1 IMUL8_AP
+#   1BB2 IMUL8_N
+#   1BB8 NEG8IMUL8_BN
+#   1BBE NEG8IMUL8_END
+#   1BCB NEG8IMUL8X_C0
+#   1BCE NEG8IMUL8X_C1
+#   1BD6 NEG8IMUL8X_BN
+#   1BDC NEG8IMUL8X_END
+#   1BDC IMUL8_NN
+#   1BE5 IMUL8_S0
+#   1BE7 IMUL8_OV
+#   1BEA IMUL8_FIT
+#   1BEB IMUL8_WB
+#   1BF6 END_3_MEM
+#   1BF8 END_3_ARM
+#   1BFB IDIV8
+#   1C0B NEG8IDIV8P_BN
+#   1C11 NEG8IDIV8P_END
+#   1C12 IDIV8_NEG
+#   1C19 NEG8IDIV8N_C0
+#   1C1C NEG8IDIV8N_C1
+#   1C24 NEG8IDIV8N_BN
+#   1C2A NEG8IDIV8N_END
+#   1C2A IDIV8_CORD
+#   1C36 IDIV8_RP
+#   1C3B IDIV8_QC
+#   1C3C IDIV8_WB
+#   1C47 END_4_MEM
+#   1C49 END_4_ARM
+#   1C4C IDIVERR8
+#   1C4E MUL16
+#   1C57 MUL16_CP
+#   1C63 NEG16MUL16X_C0
+#   1C65 NEG16MUL16X_C1
+#   1C6D NEG16MUL16X_BN
+#   1C72 NEG16MUL16X_END
+#   1C72 MUL16_NN
+#   1C7A MUL16_Z
+#   1C7B MUL16_WB
+#   1C86 END_5_MEM
+#   1C88 END_5_ARM
+#   1C8B DIV16
+#   1C9F END_6_MEM
+#   1CA1 END_6_ARM
+#   1CA4 IMUL16
+#   1CAD IMUL16_CP
+#   1CB5 IMUL16_AP
+#   1CB6 IMUL16_N
+#   1CBC NEG16IMUL16_BN
+#   1CC1 NEG16IMUL16_END
+#   1CCD NEG16IMUL16X_C0
+#   1CCF NEG16IMUL16X_C1
+#   1CD7 NEG16IMUL16X_BN
+#   1CDC NEG16IMUL16X_END
+#   1CDC IMUL16_NN
+#   1CE5 IMUL16_S0
+#   1CE7 IMUL16_OV
+#   1CEA IMUL16_FIT
+#   1CEB IMUL16_WB
+#   1CF6 END_7_MEM
+#   1CF8 END_7_ARM
+#   1CFB IDIV16
+#   1D0A NEG16IDIV16P_BN
+#   1D0F NEG16IDIV16P_END
+#   1D10 IDIV16_NEG
+#   1D16 NEG16IDIV16N_C0
+#   1D18 NEG16IDIV16N_C1
+#   1D20 NEG16IDIV16N_BN
+#   1D25 NEG16IDIV16N_END
+#   1D25 IDIV16_CORD
+#   1D30 IDIV16_RP
+#   1D34 IDIV16_QC
+#   1D35 IDIV16_WB
+#   1D40 END_8_MEM
+#   1D42 END_8_ARM
+#   1D45 IDIVERR16
+#   1D47 CORX8
+#   1D4D rcr0b_10
+#   1D4F rcr1_9
+#   1D53 rcr1b_11
+#   1D54 rcrd_12
+#   1D56 CORX8_LOOP
+#   1D5E cf0_13
+#   1D5F cfd_14
+#   1D62 CORX8_NOADD
+#   1D63 CORX8_SHIFT
+#   1D69 rcr0b_16
+#   1D6B rcr1_15
+#   1D6F rcr1b_17
+#   1D70 rcrd_18
+#   1D76 rcr0b_20
+#   1D78 rcr1_19
+#   1D7C rcr1b_21
+#   1D7D rcrd_22
+#   1D83 CORX8_DONE
+#   1D85 CORD8
+#   1D93 CORD8_LOOP
+#   1D98 cf0_23
+#   1D99 cfd_24
+#   1D9F cf0_25
+#   1DA0 cfd_26
+#   1DAD CORD8_CMP
+#   1DBD CORD8_BORROW
+#   1DC4 CORD8_LAST2
+#   1DC5 CORD8_END
+#   1DCA cf0_27
+#   1DCB cfd_28
+#   1DD0 CORD8_C0
+#   1DD5 CORD8_ERRN
+#   1DD8 CORD8_ERR
+#   1DDA DIVERR8
+#   1DE3 DIVERR8_MEM
+#   1DE4 DIVERR8_REL
+#   1DE7 DIVERR8_FL
+#   1DED DIVERR8C
+#   1DF6 DIVERR8C_MEM
+#   1DF7 DIVERR8C_REL
+#   1DFA DIVERR8C_FL
+#   1E01 CORX16
+#   1E07 rcr0b_30
+#   1E09 rcr1_29
+#   1E0D rcr1b_31
+#   1E0E rcrd_32
+#   1E10 CORX16_LOOP
+#   1E18 cf0_33
+#   1E19 cfd_34
+#   1E1B CORX16_NOADD
+#   1E1C CORX16_SHIFT
+#   1E22 rcr0b_36
+#   1E24 rcr1_35
+#   1E28 rcr1b_37
+#   1E29 rcrd_38
+#   1E2F rcr0b_40
+#   1E31 rcr1_39
+#   1E35 rcr1b_41
+#   1E36 rcrd_42
+#   1E3C CORX16_DONE
+#   1E3E CORD16
+#   1E4B CORD16_LOOP
+#   1E50 cf0_43
+#   1E51 cfd_44
+#   1E56 cf0_45
+#   1E57 cfd_46
+#   1E62 CORD16_CMP
+#   1E71 CORD16_BORROW
+#   1E78 CORD16_LAST2
+#   1E79 CORD16_END
+#   1E7E cf0_47
+#   1E7F cfd_48
+#   1E83 CORD16_C0
+#   1E87 CORD16_ERRN
+#   1E89 CORD16_ERR
+#   1E8B DIVERR16
+#   1E94 DIVERR16_MEM
+#   1E95 DIVERR16_REL
+#   1E98 DIVERR16_FL
+#   1E9E DIVERR16C
+#   1EA7 DIVERR16C_MEM
+#   1EA8 DIVERR16C_REL
+#   1EAB DIVERR16C_FL
+#
+# Isolate the REPZ and REPNZ bits
+p 00 00000 00001 1B20
+p 01 00000 00001 4E8F
+p 01 00000 00001 C000
+#
+# Jump if zero over the next
+p 00 00000 00001 1B21
+p 01 00000 00001 1002
+p 01 00000 00001 1B23
+#
+# Flag bit 1 = 1 (the negate flag)
+p 00 00000 00001 1B22
+p 01 00000 00001 588F
+p 01 00000 00001 0002
+#
+# Return to calling code (from the armed ModR/M entry)
+p 00 00000 00001 1B23
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# tmpb = the immediate
+p 00 00000 00001 1B24
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# tmpc = AL
+p 00 00000 00001 1B25
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# tmpa = 0
+p 00 00000 00001 1B26
+p 01 00000 00001 5BFF
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1B27
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 3 cycles
+p 00 00000 00001 1B28
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# CALL CORD8 (no error: tmpa = 0 < tmpb)
+p 00 00000 00001 1B29
+p 01 00000 00001 1100
+p 01 00000 00001 1D85
+#
+# r3 += 1 cycles
+p 00 00000 00001 1B2A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# quotient = NOT tmpc
+p 00 00000 00001 1B2B
+p 01 00000 00001 6AAF
+p 01 00000 00001 00FF
+#
+# quotient << 8 (byte swap)
+p 00 00000 00001 1B2C
+p 01 00000 00001 3AAF
+p 01 00000 00001 0000
+#
+# AX = quotient:remainder
+p 00 00000 00001 1B2D
+p 01 00000 00001 50BA
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B2E
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B2F
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B30
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B31
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B32
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# biu_dataout = A000 + cycles + 1 (end: after the immediate)
+p 00 00000 00001 1B33
+p 01 00000 00001 2FCF
+p 01 00000 00001 A001
+#
+# Jump to the flags (from AL) and the multibyte ending
+p 00 00000 00001 1B34
+p 01 00000 00001 1000
+p 01 00000 00001 02D7
+#
+# biu_dataout = 000C (release: 12 cycles after the immediate)
+p 00 00000 00001 1B35
+p 01 00000 00001 5FFF
+p 01 00000 00001 000C
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1B36
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1B37
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Jump to the interrupt processing (after INT n's release)
+p 00 00000 00001 1B38
+p 01 00000 00001 1000
+p 01 00000 00001 055D
+#
+# r3 = 0 (the immediate)
+p 00 00000 00001 1B39
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# CALL AADEND
+p 00 00000 00001 1B3A
+p 01 00000 00001 1100
+p 01 00000 00001 1B3C
+#
+# Jump to the flags (from AL: 0x02BF sets last_alu)
+p 00 00000 00001 1B3B
+p 01 00000 00001 1000
+p 01 00000 00001 02BF
+#
+# r1 = the immediate
+p 00 00000 00001 1B3C
+p 01 00000 00001 4ACF
+p 01 00000 00001 00FF
+#
+# r0 = A000 + 57 (end: after the immediate)
+p 00 00000 00001 1B3D
+p 01 00000 00001 59FF
+p 01 00000 00001 A039
+#
+# Isolate bit 0
+p 00 00000 00001 1B3E
+p 01 00000 00001 4EAF
+p 01 00000 00001 0001
+#
+# Jump if zero
+p 00 00000 00001 1B3F
+p 01 00000 00001 1002
+p 01 00000 00001 1B41
+#
+# r0 = r0 + 1 (an addition in CORX)
+p 00 00000 00001 1B40
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# r1 >> 1
+p 00 00000 00001 1B41
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Jump if bits are left
+p 00 00000 00001 1B42
+p 01 00000 00001 1001
+p 01 00000 00001 1B3E
+#
+# biu_dataout = r0
+p 00 00000 00001 1B43
+p 01 00000 00001 5FF9
+p 01 00000 00001 0000
+#
+# Return to calling code
+p 00 00000 00001 1B44
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# tmpb = the operand
+p 00 00000 00001 1B45
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# tmpc = AL
+p 00 00000 00001 1B46
+p 01 00000 00001 4A0F
+p 01 00000 00001 00FF
+#
+# tmpa = 0
+p 00 00000 00001 1B47
+p 01 00000 00001 5BFF
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1B48
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 2 cycles
+p 00 00000 00001 1B49
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CF = 0
+p 00 00000 00001 1B4A
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Isolate the sign of tmpc
+p 00 00000 00001 1B4B
+p 01 00000 00001 4EAF
+p 01 00000 00001 0080
+#
+# Jump if zero
+p 00 00000 00001 1B4C
+p 01 00000 00001 1002
+p 01 00000 00001 1B4E
+#
+# CF = the sign of tmpc
+p 00 00000 00001 1B4D
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 2 cycles
+p 00 00000 00001 1B4E
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORX8
+p 00 00000 00001 1B4F
+p 01 00000 00001 1100
+p 01 00000 00001 1D47
+#
+# r3 += 1 cycles
+p 00 00000 00001 1B50
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate the negate flag
+p 00 00000 00001 1B51
+p 01 00000 00001 4E8F
+p 01 00000 00001 0002
+#
+# Jump if zero: no negation
+p 00 00000 00001 1B52
+p 01 00000 00001 1002
+p 01 00000 00001 1B6C
+#
+# r3 += 1 cycles
+p 00 00000 00001 1B53
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate tmpc
+p 00 00000 00001 1B54
+p 01 00000 00001 4EAF
+p 01 00000 00001 00FF
+#
+# Jump if zero: tmpc stays 0, tmpa is negated
+p 00 00000 00001 1B55
+p 01 00000 00001 1002
+p 01 00000 00001 1B5B
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1B56
+p 01 00000 00001 6AAF
+p 01 00000 00001 00FF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1B57
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# tmpc &= 00FF
+p 00 00000 00001 1B58
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# tmpa = NOT tmpa (the borrow of tmpc)
+p 00 00000 00001 1B59
+p 01 00000 00001 6BBF
+p 01 00000 00001 00FF
+#
+# Jump over the next
+p 00 00000 00001 1B5A
+p 01 00000 00001 1000
+p 01 00000 00001 1B5E
+#
+# tmpa = NOT tmpa
+p 00 00000 00001 1B5B
+p 01 00000 00001 6BBF
+p 01 00000 00001 00FF
+#
+# tmpa = tmpa + 1 (two's complement)
+p 00 00000 00001 1B5C
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# tmpa &= 00FF
+p 00 00000 00001 1B5D
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# r3 += 5 cycles
+p 00 00000 00001 1B5E
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1B5F
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1B60
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1B61
+p 01 00000 00001 4E9F
+p 01 00000 00001 0080
+#
+# Jump if negative
+p 00 00000 00001 1B62
+p 01 00000 00001 1001
+p 01 00000 00001 1B66
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1B63
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1B64
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1B65
+p 01 00000 00001 1000
+p 01 00000 00001 1B6C
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1B66
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1B67
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1B68
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# tmpb &= 00FF
+p 00 00000 00001 1B69
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1B6A
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1B6B
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 1 cycles
+p 00 00000 00001 1B6C
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# CF = OF = 0
+p 00 00000 00001 1B6D
+p 01 00000 00001 488F
+p 01 00000 00001 F7FE
+#
+# r3 += 6 cycles
+p 00 00000 00001 1B6E
+p 01 00000 00001 2CCF
+p 01 00000 00001 00C0
+#
+# Isolate tmpa (the high half)
+p 00 00000 00001 1B6F
+p 01 00000 00001 4EBF
+p 01 00000 00001 00FF
+#
+# Jump if zero
+p 00 00000 00001 1B70
+p 01 00000 00001 1002
+p 01 00000 00001 1B74
+#
+# r3 += 3 cycles
+p 00 00000 00001 1B71
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# CF = OF = 1
+p 00 00000 00001 1B72
+p 01 00000 00001 588F
+p 01 00000 00001 0801
+#
+# Jump to the writeback
+p 00 00000 00001 1B73
+p 01 00000 00001 1000
+p 01 00000 00001 1B75
+#
+# r3 += 4 cycles
+p 00 00000 00001 1B74
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# tmpa << 8 (byte swap)
+p 00 00000 00001 1B75
+p 01 00000 00001 3BBF
+p 01 00000 00001 0000
+#
+# AX = tmpa:tmpc
+p 00 00000 00001 1B76
+p 01 00000 00001 50BA
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B77
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B78
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B79
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B7A
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B7B
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1B7C
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1B7D
+p 01 00000 00001 1002
+p 01 00000 00001 1B80
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1B7E
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1B7F
+p 01 00000 00001 1000
+p 01 00000 00001 1B82
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1B80
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1B81
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1B82
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1B83
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1B84
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# tmpb = the operand
+p 00 00000 00001 1B85
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# tmpc = AL
+p 00 00000 00001 1B86
+p 01 00000 00001 4A0F
+p 01 00000 00001 00FF
+#
+# tmpa = AH << 8
+p 00 00000 00001 1B87
+p 01 00000 00001 4B0F
+p 01 00000 00001 FF00
+#
+# tmpa = AH (byte swap)
+p 00 00000 00001 1B88
+p 01 00000 00001 3BBF
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1B89
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 3 cycles
+p 00 00000 00001 1B8A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# r3 += 2 cycles
+p 00 00000 00001 1B8B
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORD8
+p 00 00000 00001 1B8C
+p 01 00000 00001 1100
+p 01 00000 00001 1D85
+#
+# r3 += 2 cycles
+p 00 00000 00001 1B8D
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# quotient = NOT tmpc
+p 00 00000 00001 1B8E
+p 01 00000 00001 6AAF
+p 01 00000 00001 00FF
+#
+# remainder << 8 (byte swap)
+p 00 00000 00001 1B8F
+p 01 00000 00001 3BBF
+p 01 00000 00001 0000
+#
+# AX = remainder:quotient
+p 00 00000 00001 1B90
+p 01 00000 00001 50BA
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B91
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B92
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B93
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B94
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1B95
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1B96
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1B97
+p 01 00000 00001 1002
+p 01 00000 00001 1B9A
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1B98
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1B99
+p 01 00000 00001 1000
+p 01 00000 00001 1B9C
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1B9A
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1B9B
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1B9C
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1B9D
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1B9E
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# tmpb = the operand
+p 00 00000 00001 1B9F
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# tmpc = AL
+p 00 00000 00001 1BA0
+p 01 00000 00001 4A0F
+p 01 00000 00001 00FF
+#
+# tmpa = 0
+p 00 00000 00001 1BA1
+p 01 00000 00001 5BFF
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1BA2
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 2 cycles
+p 00 00000 00001 1BA3
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CF = 0
+p 00 00000 00001 1BA4
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Isolate the sign of tmpc
+p 00 00000 00001 1BA5
+p 01 00000 00001 4EAF
+p 01 00000 00001 0080
+#
+# Jump if zero
+p 00 00000 00001 1BA6
+p 01 00000 00001 1002
+p 01 00000 00001 1BA8
+#
+# CF = the sign of tmpc
+p 00 00000 00001 1BA7
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 3 cycles
+p 00 00000 00001 1BA8
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate CF (tmpc negative)
+p 00 00000 00001 1BA9
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero: tmpc positive
+p 00 00000 00001 1BAA
+p 01 00000 00001 1002
+p 01 00000 00001 1BB1
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1BAB
+p 01 00000 00001 6AAF
+p 01 00000 00001 00FF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1BAC
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# tmpc &= 00FF
+p 00 00000 00001 1BAD
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1BAE
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1BAF
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to NEGATE
+p 00 00000 00001 1BB0
+p 01 00000 00001 1000
+p 01 00000 00001 1BB2
+#
+# r3 += 1 cycles
+p 00 00000 00001 1BB1
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# r3 += 3 cycles
+p 00 00000 00001 1BB2
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1BB3
+p 01 00000 00001 4E9F
+p 01 00000 00001 0080
+#
+# Jump if negative
+p 00 00000 00001 1BB4
+p 01 00000 00001 1001
+p 01 00000 00001 1BB8
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1BB5
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1BB6
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1BB7
+p 01 00000 00001 1000
+p 01 00000 00001 1BBE
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1BB8
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1BB9
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1BBA
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# tmpb &= 00FF
+p 00 00000 00001 1BBB
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1BBC
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1BBD
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 2 cycles
+p 00 00000 00001 1BBE
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORX8
+p 00 00000 00001 1BBF
+p 01 00000 00001 1100
+p 01 00000 00001 1D47
+#
+# r3 += 1 cycles
+p 00 00000 00001 1BC0
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate the negate flag
+p 00 00000 00001 1BC1
+p 01 00000 00001 4E8F
+p 01 00000 00001 0002
+#
+# Jump if zero: no negation
+p 00 00000 00001 1BC2
+p 01 00000 00001 1002
+p 01 00000 00001 1BDC
+#
+# r3 += 1 cycles
+p 00 00000 00001 1BC3
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate tmpc
+p 00 00000 00001 1BC4
+p 01 00000 00001 4EAF
+p 01 00000 00001 00FF
+#
+# Jump if zero: tmpc stays 0, tmpa is negated
+p 00 00000 00001 1BC5
+p 01 00000 00001 1002
+p 01 00000 00001 1BCB
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1BC6
+p 01 00000 00001 6AAF
+p 01 00000 00001 00FF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1BC7
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# tmpc &= 00FF
+p 00 00000 00001 1BC8
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# tmpa = NOT tmpa (the borrow of tmpc)
+p 00 00000 00001 1BC9
+p 01 00000 00001 6BBF
+p 01 00000 00001 00FF
+#
+# Jump over the next
+p 00 00000 00001 1BCA
+p 01 00000 00001 1000
+p 01 00000 00001 1BCE
+#
+# tmpa = NOT tmpa
+p 00 00000 00001 1BCB
+p 01 00000 00001 6BBF
+p 01 00000 00001 00FF
+#
+# tmpa = tmpa + 1 (two's complement)
+p 00 00000 00001 1BCC
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# tmpa &= 00FF
+p 00 00000 00001 1BCD
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# r3 += 5 cycles
+p 00 00000 00001 1BCE
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1BCF
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1BD0
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1BD1
+p 01 00000 00001 4E9F
+p 01 00000 00001 0080
+#
+# Jump if negative
+p 00 00000 00001 1BD2
+p 01 00000 00001 1001
+p 01 00000 00001 1BD6
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1BD3
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1BD4
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1BD5
+p 01 00000 00001 1000
+p 01 00000 00001 1BDC
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1BD6
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1BD7
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1BD8
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# tmpb &= 00FF
+p 00 00000 00001 1BD9
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1BDA
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1BDB
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 1 cycles
+p 00 00000 00001 1BDC
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# CF = OF = 0
+p 00 00000 00001 1BDD
+p 01 00000 00001 488F
+p 01 00000 00001 F7FE
+#
+# r3 += 4 cycles
+p 00 00000 00001 1BDE
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# Isolate the sign of tmpc (low half)
+p 00 00000 00001 1BDF
+p 01 00000 00001 4EAF
+p 01 00000 00001 0080
+#
+# Jump if zero
+p 00 00000 00001 1BE0
+p 01 00000 00001 1002
+p 01 00000 00001 1BE5
+#
+# Dummy = tmpa + 1
+p 00 00000 00001 1BE1
+p 01 00000 00001 2EBF
+p 01 00000 00001 0001
+#
+# Isolate the carry: tmpa was all ones
+p 00 00000 00001 1BE2
+p 01 00000 00001 4EEF
+p 01 00000 00001 2000
+#
+# Jump if the product fits the low half
+p 00 00000 00001 1BE3
+p 01 00000 00001 1001
+p 01 00000 00001 1BEA
+#
+# Jump: it does not
+p 00 00000 00001 1BE4
+p 01 00000 00001 1000
+p 01 00000 00001 1BE7
+#
+# Isolate tmpa
+p 00 00000 00001 1BE5
+p 01 00000 00001 4EBF
+p 01 00000 00001 00FF
+#
+# Jump if zero: the product fits the low half
+p 00 00000 00001 1BE6
+p 01 00000 00001 1002
+p 01 00000 00001 1BEA
+#
+# r3 += 5 cycles
+p 00 00000 00001 1BE7
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# CF = OF = 1
+p 00 00000 00001 1BE8
+p 01 00000 00001 588F
+p 01 00000 00001 0801
+#
+# Jump to the writeback
+p 00 00000 00001 1BE9
+p 01 00000 00001 1000
+p 01 00000 00001 1BEB
+#
+# r3 += 6 cycles
+p 00 00000 00001 1BEA
+p 01 00000 00001 2CCF
+p 01 00000 00001 00C0
+#
+# tmpa << 8 (byte swap)
+p 00 00000 00001 1BEB
+p 01 00000 00001 3BBF
+p 01 00000 00001 0000
+#
+# AX = tmpa:tmpc
+p 00 00000 00001 1BEC
+p 01 00000 00001 50BA
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1BED
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1BEE
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1BEF
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1BF0
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1BF1
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1BF2
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1BF3
+p 01 00000 00001 1002
+p 01 00000 00001 1BF6
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1BF4
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1BF5
+p 01 00000 00001 1000
+p 01 00000 00001 1BF8
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1BF6
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1BF7
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1BF8
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1BF9
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1BFA
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# tmpb = the operand
+p 00 00000 00001 1BFB
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# tmpc = AL
+p 00 00000 00001 1BFC
+p 01 00000 00001 4A0F
+p 01 00000 00001 00FF
+#
+# tmpa = AH << 8
+p 00 00000 00001 1BFD
+p 01 00000 00001 4B0F
+p 01 00000 00001 FF00
+#
+# tmpa = AH (byte swap)
+p 00 00000 00001 1BFE
+p 01 00000 00001 3BBF
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1BFF
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C00
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C01
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpa (the dividend)
+p 00 00000 00001 1C02
+p 01 00000 00001 4EBF
+p 01 00000 00001 0080
+#
+# Jump if negative
+p 00 00000 00001 1C03
+p 01 00000 00001 1001
+p 01 00000 00001 1C12
+#
+# r3 += 1 cycles
+p 00 00000 00001 1C04
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C05
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1C06
+p 01 00000 00001 4E9F
+p 01 00000 00001 0080
+#
+# Jump if negative
+p 00 00000 00001 1C07
+p 01 00000 00001 1001
+p 01 00000 00001 1C0B
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1C08
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C09
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1C0A
+p 01 00000 00001 1000
+p 01 00000 00001 1C11
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1C0B
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1C0C
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1C0D
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# tmpb &= 00FF
+p 00 00000 00001 1C0E
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1C0F
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C10
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Jump to CORD
+p 00 00000 00001 1C11
+p 01 00000 00001 1000
+p 01 00000 00001 1C2A
+#
+# Isolate tmpc
+p 00 00000 00001 1C12
+p 01 00000 00001 4EAF
+p 01 00000 00001 00FF
+#
+# Jump if zero: tmpc stays 0, tmpa is negated
+p 00 00000 00001 1C13
+p 01 00000 00001 1002
+p 01 00000 00001 1C19
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1C14
+p 01 00000 00001 6AAF
+p 01 00000 00001 00FF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1C15
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# tmpc &= 00FF
+p 00 00000 00001 1C16
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# tmpa = NOT tmpa (the borrow of tmpc)
+p 00 00000 00001 1C17
+p 01 00000 00001 6BBF
+p 01 00000 00001 00FF
+#
+# Jump over the next
+p 00 00000 00001 1C18
+p 01 00000 00001 1000
+p 01 00000 00001 1C1C
+#
+# tmpa = NOT tmpa
+p 00 00000 00001 1C19
+p 01 00000 00001 6BBF
+p 01 00000 00001 00FF
+#
+# tmpa = tmpa + 1 (two's complement)
+p 00 00000 00001 1C1A
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# tmpa &= 00FF
+p 00 00000 00001 1C1B
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# r3 += 5 cycles
+p 00 00000 00001 1C1C
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1C1D
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C1E
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1C1F
+p 01 00000 00001 4E9F
+p 01 00000 00001 0080
+#
+# Jump if negative
+p 00 00000 00001 1C20
+p 01 00000 00001 1001
+p 01 00000 00001 1C24
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1C21
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C22
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1C23
+p 01 00000 00001 1000
+p 01 00000 00001 1C2A
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1C24
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1C25
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1C26
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# tmpb &= 00FF
+p 00 00000 00001 1C27
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1C28
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C29
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C2A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORD8
+p 00 00000 00001 1C2B
+p 01 00000 00001 1100
+p 01 00000 00001 1D85
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C2C
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C2D
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Isolate CF (the final carry)
+p 00 00000 00001 1C2E
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero: the quotient does not fit
+p 00 00000 00001 1C2F
+p 01 00000 00001 1002
+p 01 00000 00001 1C4C
+#
+# r3 += 9 cycles
+p 00 00000 00001 1C30
+p 01 00000 00001 2CCF
+p 01 00000 00001 0120
+#
+# Isolate the sign of AH (the dividend)
+p 00 00000 00001 1C31
+p 01 00000 00001 4E0F
+p 01 00000 00001 8000
+#
+# Jump if zero: the remainder stays
+p 00 00000 00001 1C32
+p 01 00000 00001 1002
+p 01 00000 00001 1C36
+#
+# tmpa (the remainder) = NOT tmpa (the remainder)
+p 00 00000 00001 1C33
+p 01 00000 00001 6BBF
+p 01 00000 00001 00FF
+#
+# tmpa (the remainder) = tmpa (the remainder) + 1 (two's complement)
+p 00 00000 00001 1C34
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# tmpa (the remainder) &= 00FF
+p 00 00000 00001 1C35
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# Isolate the negate flag
+p 00 00000 00001 1C36
+p 01 00000 00001 4E8F
+p 01 00000 00001 0002
+#
+# Jump if zero: quotient = NOT tmpc
+p 00 00000 00001 1C37
+p 01 00000 00001 1002
+p 01 00000 00001 1C3B
+#
+# quotient = tmpc + 1
+p 00 00000 00001 1C38
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# quotient &= 00FF
+p 00 00000 00001 1C39
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# Jump to the writeback
+p 00 00000 00001 1C3A
+p 01 00000 00001 1000
+p 01 00000 00001 1C3C
+#
+# quotient = NOT tmpc
+p 00 00000 00001 1C3B
+p 01 00000 00001 6AAF
+p 01 00000 00001 00FF
+#
+# remainder << 8 (byte swap)
+p 00 00000 00001 1C3C
+p 01 00000 00001 3BBF
+p 01 00000 00001 0000
+#
+# AX = remainder:quotient
+p 00 00000 00001 1C3D
+p 01 00000 00001 50BA
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C3E
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C3F
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C40
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C41
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C42
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1C43
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1C44
+p 01 00000 00001 1002
+p 01 00000 00001 1C47
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1C45
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1C46
+p 01 00000 00001 1000
+p 01 00000 00001 1C49
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1C47
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1C48
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1C49
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1C4A
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1C4B
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# r3 += 1 cycles (the jump to INT0)
+p 00 00000 00001 1C4C
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the divide error (after CORD)
+p 00 00000 00001 1C4D
+p 01 00000 00001 1000
+p 01 00000 00001 1DED
+#
+# tmpb = the operand
+p 00 00000 00001 1C4E
+p 01 00000 00001 499F
+p 01 00000 00001 FFFF
+#
+# tmpc = AX
+p 00 00000 00001 1C4F
+p 01 00000 00001 4A0F
+p 01 00000 00001 FFFF
+#
+# tmpa = 0
+p 00 00000 00001 1C50
+p 01 00000 00001 5BFF
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1C51
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C52
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CF = 0
+p 00 00000 00001 1C53
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Isolate the sign of tmpc
+p 00 00000 00001 1C54
+p 01 00000 00001 4EAF
+p 01 00000 00001 8000
+#
+# Jump if zero
+p 00 00000 00001 1C55
+p 01 00000 00001 1002
+p 01 00000 00001 1C57
+#
+# CF = the sign of tmpc
+p 00 00000 00001 1C56
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C57
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORX16
+p 00 00000 00001 1C58
+p 01 00000 00001 1100
+p 01 00000 00001 1E01
+#
+# r3 += 1 cycles
+p 00 00000 00001 1C59
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate the negate flag
+p 00 00000 00001 1C5A
+p 01 00000 00001 4E8F
+p 01 00000 00001 0002
+#
+# Jump if zero: no negation
+p 00 00000 00001 1C5B
+p 01 00000 00001 1002
+p 01 00000 00001 1C72
+#
+# r3 += 1 cycles
+p 00 00000 00001 1C5C
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate tmpc
+p 00 00000 00001 1C5D
+p 01 00000 00001 4EAF
+p 01 00000 00001 FFFF
+#
+# Jump if zero: tmpc stays 0, tmpa is negated
+p 00 00000 00001 1C5E
+p 01 00000 00001 1002
+p 01 00000 00001 1C63
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1C5F
+p 01 00000 00001 6AAF
+p 01 00000 00001 FFFF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1C60
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# tmpa = NOT tmpa (the borrow of tmpc)
+p 00 00000 00001 1C61
+p 01 00000 00001 6BBF
+p 01 00000 00001 FFFF
+#
+# Jump over the next
+p 00 00000 00001 1C62
+p 01 00000 00001 1000
+p 01 00000 00001 1C65
+#
+# tmpa = NOT tmpa
+p 00 00000 00001 1C63
+p 01 00000 00001 6BBF
+p 01 00000 00001 FFFF
+#
+# tmpa = tmpa + 1 (two's complement)
+p 00 00000 00001 1C64
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# r3 += 5 cycles
+p 00 00000 00001 1C65
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1C66
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C67
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1C68
+p 01 00000 00001 4E9F
+p 01 00000 00001 8000
+#
+# Jump if negative
+p 00 00000 00001 1C69
+p 01 00000 00001 1001
+p 01 00000 00001 1C6D
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1C6A
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C6B
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1C6C
+p 01 00000 00001 1000
+p 01 00000 00001 1C72
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1C6D
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1C6E
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1C6F
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1C70
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C71
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 1 cycles
+p 00 00000 00001 1C72
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# CF = OF = 0
+p 00 00000 00001 1C73
+p 01 00000 00001 488F
+p 01 00000 00001 F7FE
+#
+# r3 += 6 cycles
+p 00 00000 00001 1C74
+p 01 00000 00001 2CCF
+p 01 00000 00001 00C0
+#
+# Isolate tmpa (the high half)
+p 00 00000 00001 1C75
+p 01 00000 00001 4EBF
+p 01 00000 00001 FFFF
+#
+# Jump if zero
+p 00 00000 00001 1C76
+p 01 00000 00001 1002
+p 01 00000 00001 1C7A
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C77
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# CF = OF = 1
+p 00 00000 00001 1C78
+p 01 00000 00001 588F
+p 01 00000 00001 0801
+#
+# Jump to the writeback
+p 00 00000 00001 1C79
+p 01 00000 00001 1000
+p 01 00000 00001 1C7B
+#
+# r3 += 4 cycles
+p 00 00000 00001 1C7A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# AX = tmpc
+p 00 00000 00001 1C7B
+p 01 00000 00001 50FA
+p 01 00000 00001 0000
+#
+# DX = tmpa
+p 00 00000 00001 1C7C
+p 01 00000 00001 53FB
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C7D
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C7E
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C7F
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C80
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C81
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1C82
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1C83
+p 01 00000 00001 1002
+p 01 00000 00001 1C86
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1C84
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1C85
+p 01 00000 00001 1000
+p 01 00000 00001 1C88
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1C86
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1C87
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1C88
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1C89
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1C8A
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# tmpb = the operand
+p 00 00000 00001 1C8B
+p 01 00000 00001 499F
+p 01 00000 00001 FFFF
+#
+# tmpc = AX
+p 00 00000 00001 1C8C
+p 01 00000 00001 5A0F
+p 01 00000 00001 0000
+#
+# tmpa = DX
+p 00 00000 00001 1C8D
+p 01 00000 00001 5B3F
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1C8E
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 3 cycles
+p 00 00000 00001 1C8F
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C90
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORD16
+p 00 00000 00001 1C91
+p 01 00000 00001 1100
+p 01 00000 00001 1E3E
+#
+# r3 += 2 cycles
+p 00 00000 00001 1C92
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# quotient = NOT tmpc
+p 00 00000 00001 1C93
+p 01 00000 00001 6AAF
+p 01 00000 00001 FFFF
+#
+# AX = the quotient
+p 00 00000 00001 1C94
+p 01 00000 00001 50FA
+p 01 00000 00001 0000
+#
+# DX = the remainder
+p 00 00000 00001 1C95
+p 01 00000 00001 53FB
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C96
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C97
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C98
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C99
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1C9A
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1C9B
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1C9C
+p 01 00000 00001 1002
+p 01 00000 00001 1C9F
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1C9D
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1C9E
+p 01 00000 00001 1000
+p 01 00000 00001 1CA1
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1C9F
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1CA0
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1CA1
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1CA2
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1CA3
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# tmpb = the operand
+p 00 00000 00001 1CA4
+p 01 00000 00001 499F
+p 01 00000 00001 FFFF
+#
+# tmpc = AX
+p 00 00000 00001 1CA5
+p 01 00000 00001 4A0F
+p 01 00000 00001 FFFF
+#
+# tmpa = 0
+p 00 00000 00001 1CA6
+p 01 00000 00001 5BFF
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1CA7
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 2 cycles
+p 00 00000 00001 1CA8
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CF = 0
+p 00 00000 00001 1CA9
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Isolate the sign of tmpc
+p 00 00000 00001 1CAA
+p 01 00000 00001 4EAF
+p 01 00000 00001 8000
+#
+# Jump if zero
+p 00 00000 00001 1CAB
+p 01 00000 00001 1002
+p 01 00000 00001 1CAD
+#
+# CF = the sign of tmpc
+p 00 00000 00001 1CAC
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 3 cycles
+p 00 00000 00001 1CAD
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate CF (tmpc negative)
+p 00 00000 00001 1CAE
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero: tmpc positive
+p 00 00000 00001 1CAF
+p 01 00000 00001 1002
+p 01 00000 00001 1CB5
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1CB0
+p 01 00000 00001 6AAF
+p 01 00000 00001 FFFF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1CB1
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1CB2
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1CB3
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to NEGATE
+p 00 00000 00001 1CB4
+p 01 00000 00001 1000
+p 01 00000 00001 1CB6
+#
+# r3 += 1 cycles
+p 00 00000 00001 1CB5
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# r3 += 3 cycles
+p 00 00000 00001 1CB6
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1CB7
+p 01 00000 00001 4E9F
+p 01 00000 00001 8000
+#
+# Jump if negative
+p 00 00000 00001 1CB8
+p 01 00000 00001 1001
+p 01 00000 00001 1CBC
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1CB9
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1CBA
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1CBB
+p 01 00000 00001 1000
+p 01 00000 00001 1CC1
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1CBC
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1CBD
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1CBE
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1CBF
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1CC0
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 2 cycles
+p 00 00000 00001 1CC1
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORX16
+p 00 00000 00001 1CC2
+p 01 00000 00001 1100
+p 01 00000 00001 1E01
+#
+# r3 += 1 cycles
+p 00 00000 00001 1CC3
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate the negate flag
+p 00 00000 00001 1CC4
+p 01 00000 00001 4E8F
+p 01 00000 00001 0002
+#
+# Jump if zero: no negation
+p 00 00000 00001 1CC5
+p 01 00000 00001 1002
+p 01 00000 00001 1CDC
+#
+# r3 += 1 cycles
+p 00 00000 00001 1CC6
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate tmpc
+p 00 00000 00001 1CC7
+p 01 00000 00001 4EAF
+p 01 00000 00001 FFFF
+#
+# Jump if zero: tmpc stays 0, tmpa is negated
+p 00 00000 00001 1CC8
+p 01 00000 00001 1002
+p 01 00000 00001 1CCD
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1CC9
+p 01 00000 00001 6AAF
+p 01 00000 00001 FFFF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1CCA
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# tmpa = NOT tmpa (the borrow of tmpc)
+p 00 00000 00001 1CCB
+p 01 00000 00001 6BBF
+p 01 00000 00001 FFFF
+#
+# Jump over the next
+p 00 00000 00001 1CCC
+p 01 00000 00001 1000
+p 01 00000 00001 1CCF
+#
+# tmpa = NOT tmpa
+p 00 00000 00001 1CCD
+p 01 00000 00001 6BBF
+p 01 00000 00001 FFFF
+#
+# tmpa = tmpa + 1 (two's complement)
+p 00 00000 00001 1CCE
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# r3 += 5 cycles
+p 00 00000 00001 1CCF
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1CD0
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1CD1
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1CD2
+p 01 00000 00001 4E9F
+p 01 00000 00001 8000
+#
+# Jump if negative
+p 00 00000 00001 1CD3
+p 01 00000 00001 1001
+p 01 00000 00001 1CD7
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1CD4
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1CD5
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1CD6
+p 01 00000 00001 1000
+p 01 00000 00001 1CDC
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1CD7
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1CD8
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1CD9
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1CDA
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1CDB
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 1 cycles
+p 00 00000 00001 1CDC
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# CF = OF = 0
+p 00 00000 00001 1CDD
+p 01 00000 00001 488F
+p 01 00000 00001 F7FE
+#
+# r3 += 4 cycles
+p 00 00000 00001 1CDE
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# Isolate the sign of tmpc (low half)
+p 00 00000 00001 1CDF
+p 01 00000 00001 4EAF
+p 01 00000 00001 8000
+#
+# Jump if zero
+p 00 00000 00001 1CE0
+p 01 00000 00001 1002
+p 01 00000 00001 1CE5
+#
+# Dummy = tmpa + 1
+p 00 00000 00001 1CE1
+p 01 00000 00001 2EBF
+p 01 00000 00001 0001
+#
+# Isolate the carry: tmpa was all ones
+p 00 00000 00001 1CE2
+p 01 00000 00001 4EEF
+p 01 00000 00001 0001
+#
+# Jump if the product fits the low half
+p 00 00000 00001 1CE3
+p 01 00000 00001 1001
+p 01 00000 00001 1CEA
+#
+# Jump: it does not
+p 00 00000 00001 1CE4
+p 01 00000 00001 1000
+p 01 00000 00001 1CE7
+#
+# Isolate tmpa
+p 00 00000 00001 1CE5
+p 01 00000 00001 4EBF
+p 01 00000 00001 FFFF
+#
+# Jump if zero: the product fits the low half
+p 00 00000 00001 1CE6
+p 01 00000 00001 1002
+p 01 00000 00001 1CEA
+#
+# r3 += 5 cycles
+p 00 00000 00001 1CE7
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# CF = OF = 1
+p 00 00000 00001 1CE8
+p 01 00000 00001 588F
+p 01 00000 00001 0801
+#
+# Jump to the writeback
+p 00 00000 00001 1CE9
+p 01 00000 00001 1000
+p 01 00000 00001 1CEB
+#
+# r3 += 6 cycles
+p 00 00000 00001 1CEA
+p 01 00000 00001 2CCF
+p 01 00000 00001 00C0
+#
+# AX = tmpc
+p 00 00000 00001 1CEB
+p 01 00000 00001 50FA
+p 01 00000 00001 0000
+#
+# DX = tmpa
+p 00 00000 00001 1CEC
+p 01 00000 00001 53FB
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1CED
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1CEE
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1CEF
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1CF0
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1CF1
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1CF2
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1CF3
+p 01 00000 00001 1002
+p 01 00000 00001 1CF6
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1CF4
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1CF5
+p 01 00000 00001 1000
+p 01 00000 00001 1CF8
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1CF6
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1CF7
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1CF8
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1CF9
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1CFA
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# tmpb = the operand
+p 00 00000 00001 1CFB
+p 01 00000 00001 499F
+p 01 00000 00001 FFFF
+#
+# tmpc = AX
+p 00 00000 00001 1CFC
+p 01 00000 00001 5A0F
+p 01 00000 00001 0000
+#
+# tmpa = DX
+p 00 00000 00001 1CFD
+p 01 00000 00001 5B3F
+p 01 00000 00001 0000
+#
+# r3 = 0 (cycles, loop counter)
+p 00 00000 00001 1CFE
+p 01 00000 00001 5CFF
+p 01 00000 00001 0000
+#
+# r3 += 3 cycles
+p 00 00000 00001 1CFF
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# r3 += 3 cycles
+p 00 00000 00001 1D00
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpa (the dividend)
+p 00 00000 00001 1D01
+p 01 00000 00001 4EBF
+p 01 00000 00001 8000
+#
+# Jump if negative
+p 00 00000 00001 1D02
+p 01 00000 00001 1001
+p 01 00000 00001 1D10
+#
+# r3 += 1 cycles
+p 00 00000 00001 1D03
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# r3 += 3 cycles
+p 00 00000 00001 1D04
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1D05
+p 01 00000 00001 4E9F
+p 01 00000 00001 8000
+#
+# Jump if negative
+p 00 00000 00001 1D06
+p 01 00000 00001 1001
+p 01 00000 00001 1D0A
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1D07
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1D08
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1D09
+p 01 00000 00001 1000
+p 01 00000 00001 1D0F
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1D0A
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1D0B
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1D0C
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1D0D
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D0E
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Jump to CORD
+p 00 00000 00001 1D0F
+p 01 00000 00001 1000
+p 01 00000 00001 1D25
+#
+# Isolate tmpc
+p 00 00000 00001 1D10
+p 01 00000 00001 4EAF
+p 01 00000 00001 FFFF
+#
+# Jump if zero: tmpc stays 0, tmpa is negated
+p 00 00000 00001 1D11
+p 01 00000 00001 1002
+p 01 00000 00001 1D16
+#
+# tmpc = NOT tmpc
+p 00 00000 00001 1D12
+p 01 00000 00001 6AAF
+p 01 00000 00001 FFFF
+#
+# tmpc = tmpc + 1 (two's complement)
+p 00 00000 00001 1D13
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# tmpa = NOT tmpa (the borrow of tmpc)
+p 00 00000 00001 1D14
+p 01 00000 00001 6BBF
+p 01 00000 00001 FFFF
+#
+# Jump over the next
+p 00 00000 00001 1D15
+p 01 00000 00001 1000
+p 01 00000 00001 1D18
+#
+# tmpa = NOT tmpa
+p 00 00000 00001 1D16
+p 01 00000 00001 6BBF
+p 01 00000 00001 FFFF
+#
+# tmpa = tmpa + 1 (two's complement)
+p 00 00000 00001 1D17
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# r3 += 5 cycles
+p 00 00000 00001 1D18
+p 01 00000 00001 2CCF
+p 01 00000 00001 00A0
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1D19
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 3 cycles
+p 00 00000 00001 1D1A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate the sign of tmpb
+p 00 00000 00001 1D1B
+p 01 00000 00001 4E9F
+p 01 00000 00001 8000
+#
+# Jump if negative
+p 00 00000 00001 1D1C
+p 01 00000 00001 1001
+p 01 00000 00001 1D20
+#
+# CF = 0 (tmpb positive)
+p 00 00000 00001 1D1D
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 3 cycles
+p 00 00000 00001 1D1E
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Jump to the end
+p 00 00000 00001 1D1F
+p 01 00000 00001 1000
+p 01 00000 00001 1D25
+#
+# CF = 1 (tmpb negative)
+p 00 00000 00001 1D20
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# tmpb = NOT tmpb
+p 00 00000 00001 1D21
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# tmpb = tmpb + 1 (two's complement)
+p 00 00000 00001 1D22
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# Toggle the negate flag (flag bit 1)
+p 00 00000 00001 1D23
+p 01 00000 00001 688F
+p 01 00000 00001 0002
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D24
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D25
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# CALL CORD16
+p 00 00000 00001 1D26
+p 01 00000 00001 1100
+p 01 00000 00001 1E3E
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D27
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D28
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Isolate CF (the final carry)
+p 00 00000 00001 1D29
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero: the quotient does not fit
+p 00 00000 00001 1D2A
+p 01 00000 00001 1002
+p 01 00000 00001 1D45
+#
+# r3 += 9 cycles
+p 00 00000 00001 1D2B
+p 01 00000 00001 2CCF
+p 01 00000 00001 0120
+#
+# Isolate the sign of DX (the dividend)
+p 00 00000 00001 1D2C
+p 01 00000 00001 4E3F
+p 01 00000 00001 8000
+#
+# Jump if zero: the remainder stays
+p 00 00000 00001 1D2D
+p 01 00000 00001 1002
+p 01 00000 00001 1D30
+#
+# tmpa (the remainder) = NOT tmpa (the remainder)
+p 00 00000 00001 1D2E
+p 01 00000 00001 6BBF
+p 01 00000 00001 FFFF
+#
+# tmpa (the remainder) = tmpa (the remainder) + 1 (two's complement)
+p 00 00000 00001 1D2F
+p 01 00000 00001 2BBF
+p 01 00000 00001 0001
+#
+# Isolate the negate flag
+p 00 00000 00001 1D30
+p 01 00000 00001 4E8F
+p 01 00000 00001 0002
+#
+# Jump if zero: quotient = NOT tmpc
+p 00 00000 00001 1D31
+p 01 00000 00001 1002
+p 01 00000 00001 1D34
+#
+# quotient = tmpc + 1
+p 00 00000 00001 1D32
+p 01 00000 00001 2AAF
+p 01 00000 00001 0001
+#
+# Jump to the writeback
+p 00 00000 00001 1D33
+p 01 00000 00001 1000
+p 01 00000 00001 1D35
+#
+# quotient = NOT tmpc
+p 00 00000 00001 1D34
+p 01 00000 00001 6AAF
+p 01 00000 00001 FFFF
+#
+# AX = the quotient
+p 00 00000 00001 1D35
+p 01 00000 00001 50FA
+p 01 00000 00001 0000
+#
+# DX = the remainder
+p 00 00000 00001 1D36
+p 01 00000 00001 53FB
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1D37
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1D38
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1D39
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1D3A
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1D3B
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1D3C
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand end
+p 00 00000 00001 1D3D
+p 01 00000 00001 1002
+p 01 00000 00001 1D40
+#
+# biu_dataout = A000 + cycles + 2 (end: after the ModR/M byte)
+p 00 00000 00001 1D3E
+p 01 00000 00001 2FCF
+p 01 00000 00001 A002
+#
+# Jump to the strobe
+p 00 00000 00001 1D3F
+p 01 00000 00001 1000
+p 01 00000 00001 1D42
+#
+# SYNC: 64 cycles after the operand read ended
+p 00 00000 00001 1D40
+p 01 00000 00001 0000
+p 01 00000 00001 C040
+#
+# biu_dataout = F000 + cycles -62 (end: n cycles from now)
+p 00 00000 00001 1D41
+p 01 00000 00001 2FCF
+p 01 00000 00001 EFC2
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1D42
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1D43
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Jump to the queue strobe and the main loop
+p 00 00000 00001 1D44
+p 01 00000 00001 1000
+p 01 00000 00001 093B
+#
+# r3 += 1 cycles (the jump to INT0)
+p 00 00000 00001 1D45
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the divide error (after CORD)
+p 00 00000 00001 1D46
+p 01 00000 00001 1000
+p 01 00000 00001 1E9E
+#
+# RCR tmpc: isolate bit 0 (the new CF)
+p 00 00000 00001 1D47
+p 01 00000 00001 4EAF
+p 01 00000 00001 0001
+#
+# Jump if one
+p 00 00000 00001 1D48
+p 01 00000 00001 1001
+p 01 00000 00001 1D4F
+#
+# tmpc >> 1
+p 00 00000 00001 1D49
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1D4A
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1D4B
+p 01 00000 00001 1002
+p 01 00000 00001 1D4D
+#
+# tmpc[7] = CF
+p 00 00000 00001 1D4C
+p 01 00000 00001 5AAF
+p 01 00000 00001 0080
+#
+# CF = 0 (the bit shifted out)
+p 00 00000 00001 1D4D
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Jump to the end of the RCR
+p 00 00000 00001 1D4E
+p 01 00000 00001 1000
+p 01 00000 00001 1D54
+#
+# tmpc >> 1
+p 00 00000 00001 1D4F
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1D50
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1D51
+p 01 00000 00001 1002
+p 01 00000 00001 1D53
+#
+# tmpc[7] = CF
+p 00 00000 00001 1D52
+p 01 00000 00001 5AAF
+p 01 00000 00001 0080
+#
+# CF = 1 (the bit shifted out)
+p 00 00000 00001 1D53
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3[4:0] = 8 (the loop counter)
+p 00 00000 00001 1D54
+p 01 00000 00001 5CCF
+p 01 00000 00001 0008
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D55
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 1 cycles
+p 00 00000 00001 1D56
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate CF (the bit of tmpc shifted out)
+p 00 00000 00001 1D57
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero: no addition
+p 00 00000 00001 1D58
+p 01 00000 00001 1002
+p 01 00000 00001 1D62
+#
+# tmpa = tmpa + tmpb
+p 00 00000 00001 1D59
+p 01 00000 00001 2BB9
+p 01 00000 00001 0000
+#
+# Isolate the Carry8 signal
+p 00 00000 00001 1D5A
+p 01 00000 00001 4EEF
+p 01 00000 00001 2000
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1D5B
+p 01 00000 00001 1002
+p 01 00000 00001 1D5E
+#
+# CF = 1
+p 00 00000 00001 1D5C
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1D5D
+p 01 00000 00001 1000
+p 01 00000 00001 1D5F
+#
+# CF = 0
+p 00 00000 00001 1D5E
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# tmpa &= 00FF
+p 00 00000 00001 1D5F
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D60
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Jump to the shifts
+p 00 00000 00001 1D61
+p 01 00000 00001 1000
+p 01 00000 00001 1D63
+#
+# r3 += 1 cycles (the jump)
+p 00 00000 00001 1D62
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# RCR tmpa: isolate bit 0 (the new CF)
+p 00 00000 00001 1D63
+p 01 00000 00001 4EBF
+p 01 00000 00001 0001
+#
+# Jump if one
+p 00 00000 00001 1D64
+p 01 00000 00001 1001
+p 01 00000 00001 1D6B
+#
+# tmpa >> 1
+p 00 00000 00001 1D65
+p 01 00000 00001 7BBF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1D66
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1D67
+p 01 00000 00001 1002
+p 01 00000 00001 1D69
+#
+# tmpa[7] = CF
+p 00 00000 00001 1D68
+p 01 00000 00001 5BBF
+p 01 00000 00001 0080
+#
+# CF = 0 (the bit shifted out)
+p 00 00000 00001 1D69
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Jump to the end of the RCR
+p 00 00000 00001 1D6A
+p 01 00000 00001 1000
+p 01 00000 00001 1D70
+#
+# tmpa >> 1
+p 00 00000 00001 1D6B
+p 01 00000 00001 7BBF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1D6C
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1D6D
+p 01 00000 00001 1002
+p 01 00000 00001 1D6F
+#
+# tmpa[7] = CF
+p 00 00000 00001 1D6E
+p 01 00000 00001 5BBF
+p 01 00000 00001 0080
+#
+# CF = 1 (the bit shifted out)
+p 00 00000 00001 1D6F
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# RCR tmpc: isolate bit 0 (the new CF)
+p 00 00000 00001 1D70
+p 01 00000 00001 4EAF
+p 01 00000 00001 0001
+#
+# Jump if one
+p 00 00000 00001 1D71
+p 01 00000 00001 1001
+p 01 00000 00001 1D78
+#
+# tmpc >> 1
+p 00 00000 00001 1D72
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1D73
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1D74
+p 01 00000 00001 1002
+p 01 00000 00001 1D76
+#
+# tmpc[7] = CF
+p 00 00000 00001 1D75
+p 01 00000 00001 5AAF
+p 01 00000 00001 0080
+#
+# CF = 0 (the bit shifted out)
+p 00 00000 00001 1D76
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Jump to the end of the RCR
+p 00 00000 00001 1D77
+p 01 00000 00001 1000
+p 01 00000 00001 1D7D
+#
+# tmpc >> 1
+p 00 00000 00001 1D78
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1D79
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1D7A
+p 01 00000 00001 1002
+p 01 00000 00001 1D7C
+#
+# tmpc[7] = CF
+p 00 00000 00001 1D7B
+p 01 00000 00001 5AAF
+p 01 00000 00001 0080
+#
+# CF = 1 (the bit shifted out)
+p 00 00000 00001 1D7C
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 3 cycles
+p 00 00000 00001 1D7D
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1D7E
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1D7F
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: done
+p 00 00000 00001 1D80
+p 01 00000 00001 1002
+p 01 00000 00001 1D83
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1D81
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1D82
+p 01 00000 00001 1000
+p 01 00000 00001 1D56
+#
+# r3 += 2 cycles
+p 00 00000 00001 1D83
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Return to calling code
+p 00 00000 00001 1D84
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = tmpa (the minuend of the flag-setting subtraction)
+p 00 00000 00001 1D85
+p 01 00000 00001 5FFB
+p 01 00000 00001 0000
+#
+# Strobe BIU - set the RM register (kept for the divide error flags)
+p 00 00000 00001 1D86
+p 01 00000 00001 5DDF
+p 01 00000 00001 3040
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1D87
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# r3 += 3 cycles
+p 00 00000 00001 1D88
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate tmpb
+p 00 00000 00001 1D89
+p 01 00000 00001 4E9F
+p 01 00000 00001 00FF
+#
+# Jump if zero: division by zero
+p 00 00000 00001 1D8A
+p 01 00000 00001 1002
+p 01 00000 00001 1DD8
+#
+# r0 (-tmpb) = NOT r0 (-tmpb)
+p 00 00000 00001 1D8B
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# r0 (-tmpb) = r0 (-tmpb) + 1 (two's complement)
+p 00 00000 00001 1D8C
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# r0 (-tmpb) &= 00FF
+p 00 00000 00001 1D8D
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# Dummy = tmpa - tmpb
+p 00 00000 00001 1D8E
+p 01 00000 00001 2EB9
+p 01 00000 00001 0000
+#
+# Isolate the Carry8 signal (no borrow)
+p 00 00000 00001 1D8F
+p 01 00000 00001 4EEF
+p 01 00000 00001 2000
+#
+# Jump if no borrow: the quotient does not fit
+p 00 00000 00001 1D90
+p 01 00000 00001 1001
+p 01 00000 00001 1DD5
+#
+# CF = 1 (the borrow)
+p 00 00000 00001 1D91
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3[4:0] = 8 (the loop counter)
+p 00 00000 00001 1D92
+p 01 00000 00001 5CCF
+p 01 00000 00001 0008
+#
+# RCL tmpc: tmpc = tmpc + tmpc + CF
+p 00 00000 00001 1D93
+p 01 00000 00001 AAAA
+p 01 00000 00001 0000
+#
+# Isolate the Carry8 signal
+p 00 00000 00001 1D94
+p 01 00000 00001 4EEF
+p 01 00000 00001 2000
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1D95
+p 01 00000 00001 1002
+p 01 00000 00001 1D98
+#
+# CF = 1
+p 00 00000 00001 1D96
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1D97
+p 01 00000 00001 1000
+p 01 00000 00001 1D99
+#
+# CF = 0
+p 00 00000 00001 1D98
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# tmpc &= 00FF
+p 00 00000 00001 1D99
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# RCL tmpa: tmpa = tmpa + tmpa + CF
+p 00 00000 00001 1D9A
+p 01 00000 00001 ABBB
+p 01 00000 00001 0000
+#
+# Isolate the Carry8 signal
+p 00 00000 00001 1D9B
+p 01 00000 00001 4EEF
+p 01 00000 00001 2000
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1D9C
+p 01 00000 00001 1002
+p 01 00000 00001 1D9F
+#
+# CF = 1
+p 00 00000 00001 1D9D
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1D9E
+p 01 00000 00001 1000
+p 01 00000 00001 1DA0
+#
+# CF = 0
+p 00 00000 00001 1D9F
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# tmpa &= 00FF
+p 00 00000 00001 1DA0
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# r3 += 4 cycles
+p 00 00000 00001 1DA1
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# Isolate CF (tmpa overflowed)
+p 00 00000 00001 1DA2
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero to the trial subtraction
+p 00 00000 00001 1DA3
+p 01 00000 00001 1002
+p 01 00000 00001 1DAD
+#
+# r3 += 3 cycles (tmpa overflowed: subtract)
+p 00 00000 00001 1DA4
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# CF = 0
+p 00 00000 00001 1DA5
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# tmpa = tmpa - tmpb
+p 00 00000 00001 1DA6
+p 01 00000 00001 2BB9
+p 01 00000 00001 0000
+#
+# tmpa &= 00FF
+p 00 00000 00001 1DA7
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1DA8
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1DA9
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: the last bit
+p 00 00000 00001 1DAA
+p 01 00000 00001 1002
+p 01 00000 00001 1DC4
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1DAB
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1DAC
+p 01 00000 00001 1000
+p 01 00000 00001 1D93
+#
+# biu_dataout = tmpa (the minuend of the flag-setting subtraction)
+p 00 00000 00001 1DAD
+p 01 00000 00001 5FFB
+p 01 00000 00001 0000
+#
+# Strobe BIU - set the RM register (kept for the divide error flags)
+p 00 00000 00001 1DAE
+p 01 00000 00001 5DDF
+p 01 00000 00001 3040
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1DAF
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# r3 += 2 cycles
+p 00 00000 00001 1DB0
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Dummy = tmpa - tmpb (sets the flags on the 8088)
+p 00 00000 00001 1DB1
+p 01 00000 00001 2EB9
+p 01 00000 00001 0000
+#
+# Isolate the Carry8 signal (no borrow)
+p 00 00000 00001 1DB2
+p 01 00000 00001 4EEF
+p 01 00000 00001 2000
+#
+# Jump if zero: borrow, keep tmpa
+p 00 00000 00001 1DB3
+p 01 00000 00001 1002
+p 01 00000 00001 1DBD
+#
+# CF = 0 (no borrow)
+p 00 00000 00001 1DB4
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 2 cycles
+p 00 00000 00001 1DB5
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# tmpa = tmpa - tmpb
+p 00 00000 00001 1DB6
+p 01 00000 00001 2BB9
+p 01 00000 00001 0000
+#
+# tmpa &= 00FF
+p 00 00000 00001 1DB7
+p 01 00000 00001 4BBF
+p 01 00000 00001 00FF
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1DB8
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1DB9
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: the last bit
+p 00 00000 00001 1DBA
+p 01 00000 00001 1002
+p 01 00000 00001 1DC4
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1DBB
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1DBC
+p 01 00000 00001 1000
+p 01 00000 00001 1D93
+#
+# CF = 1 (borrow)
+p 00 00000 00001 1DBD
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 1 cycles
+p 00 00000 00001 1DBE
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1DBF
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1DC0
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: done
+p 00 00000 00001 1DC1
+p 01 00000 00001 1002
+p 01 00000 00001 1DC5
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1DC2
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1DC3
+p 01 00000 00001 1000
+p 01 00000 00001 1D93
+#
+# r3 += 2 cycles
+p 00 00000 00001 1DC4
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# RCL tmpc: tmpc = tmpc + tmpc + CF
+p 00 00000 00001 1DC5
+p 01 00000 00001 AAAA
+p 01 00000 00001 0000
+#
+# Isolate the Carry8 signal
+p 00 00000 00001 1DC6
+p 01 00000 00001 4EEF
+p 01 00000 00001 2000
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1DC7
+p 01 00000 00001 1002
+p 01 00000 00001 1DCA
+#
+# CF = 1
+p 00 00000 00001 1DC8
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1DC9
+p 01 00000 00001 1000
+p 01 00000 00001 1DCB
+#
+# CF = 0
+p 00 00000 00001 1DCA
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# tmpc &= 00FF
+p 00 00000 00001 1DCB
+p 01 00000 00001 4AAF
+p 01 00000 00001 00FF
+#
+# CF = 0
+p 00 00000 00001 1DCC
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Isolate the top bit of tmpc (the final carry)
+p 00 00000 00001 1DCD
+p 01 00000 00001 4EAF
+p 01 00000 00001 0080
+#
+# Jump if zero
+p 00 00000 00001 1DCE
+p 01 00000 00001 1002
+p 01 00000 00001 1DD0
+#
+# CF = 1
+p 00 00000 00001 1DCF
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 4 cycles
+p 00 00000 00001 1DD0
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# r0 (tmpb again) = NOT r0 (tmpb again)
+p 00 00000 00001 1DD1
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# r0 (tmpb again) = r0 (tmpb again) + 1 (two's complement)
+p 00 00000 00001 1DD2
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# r0 (tmpb again) &= 00FF
+p 00 00000 00001 1DD3
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# Return to calling code
+p 00 00000 00001 1DD4
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# r0 (tmpb again) = NOT r0 (tmpb again)
+p 00 00000 00001 1DD5
+p 01 00000 00001 699F
+p 01 00000 00001 00FF
+#
+# r0 (tmpb again) = r0 (tmpb again) + 1 (two's complement)
+p 00 00000 00001 1DD6
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# r0 (tmpb again) &= 00FF
+p 00 00000 00001 1DD7
+p 01 00000 00001 499F
+p 01 00000 00001 00FF
+#
+# r3 += 1 cycles (the jump)
+p 00 00000 00001 1DD8
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the divide error
+p 00 00000 00001 1DD9
+p 01 00000 00001 1000
+p 01 00000 00001 1DDA
+#
+# r3 >> 1
+p 00 00000 00001 1DDA
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DDB
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DDC
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DDD
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DDE
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1DDF
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand release
+p 00 00000 00001 1DE0
+p 01 00000 00001 1002
+p 01 00000 00001 1DE3
+#
+# biu_dataout = cycles + 6 (release: after the ModR/M byte)
+p 00 00000 00001 1DE1
+p 01 00000 00001 2FCF
+p 01 00000 00001 0006
+#
+# Jump to the strobe
+p 00 00000 00001 1DE2
+p 01 00000 00001 1000
+p 01 00000 00001 1DE4
+#
+# biu_dataout = 2000 + cycles + 6 (release: after the operand read)
+p 00 00000 00001 1DE3
+p 01 00000 00001 2FCF
+p 01 00000 00001 2006
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1DE4
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1DE5
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Jump to the flags
+p 00 00000 00001 1DE6
+p 01 00000 00001 1000
+p 01 00000 00001 1DE7
+#
+# r1 = tmpb
+p 00 00000 00001 1DE7
+p 01 00000 00001 5AF9
+p 01 00000 00001 0000
+#
+# r0 = the saved minuend (the BIU RM register)
+p 00 00000 00001 1DE8
+p 01 00000 00001 59F5
+p 01 00000 00001 0000
+#
+# CALL SUB_BYTE
+p 00 00000 00001 1DE9
+p 01 00000 00001 1100
+p 01 00000 00001 0A46
+#
+# Clear flag bits 15-13 (the register operand marker would push IP-1)
+p 00 00000 00001 1DEA
+p 01 00000 00001 488F
+p 01 00000 00001 1FFF
+#
+# r0 = 0 (interrupt type 0)
+p 00 00000 00001 1DEB
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Jump to the interrupt processing (after INT n's release)
+p 00 00000 00001 1DEC
+p 01 00000 00001 1000
+p 01 00000 00001 055D
+#
+# r3 >> 1
+p 00 00000 00001 1DED
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DEE
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DEF
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DF0
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1DF1
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1DF2
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand release
+p 00 00000 00001 1DF3
+p 01 00000 00001 1002
+p 01 00000 00001 1DF6
+#
+# biu_dataout = cycles + 6 (release: after the ModR/M byte)
+p 00 00000 00001 1DF4
+p 01 00000 00001 2FCF
+p 01 00000 00001 0006
+#
+# Jump to the strobe
+p 00 00000 00001 1DF5
+p 01 00000 00001 1000
+p 01 00000 00001 1DF7
+#
+# biu_dataout = 2000 + cycles + 6 (release: after the operand read)
+p 00 00000 00001 1DF6
+p 01 00000 00001 2FCF
+p 01 00000 00001 2006
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1DF7
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1DF8
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Jump to the flags
+p 00 00000 00001 1DF9
+p 01 00000 00001 1000
+p 01 00000 00001 1DFA
+#
+# r1 = tmpb
+p 00 00000 00001 1DFA
+p 01 00000 00001 5AF9
+p 01 00000 00001 0000
+#
+# r0 = the saved minuend (the BIU RM register)
+p 00 00000 00001 1DFB
+p 01 00000 00001 59F5
+p 01 00000 00001 0000
+#
+# CALL SUB_BYTE
+p 00 00000 00001 1DFC
+p 01 00000 00001 1100
+p 01 00000 00001 0A46
+#
+# CF = 0 (CORD's final carry)
+p 00 00000 00001 1DFD
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Clear flag bits 15-13 (the register operand marker would push IP-1)
+p 00 00000 00001 1DFE
+p 01 00000 00001 488F
+p 01 00000 00001 1FFF
+#
+# r0 = 0 (interrupt type 0)
+p 00 00000 00001 1DFF
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Jump to the interrupt processing (after INT n's release)
+p 00 00000 00001 1E00
+p 01 00000 00001 1000
+p 01 00000 00001 055D
+#
+# RCR tmpc: isolate bit 0 (the new CF)
+p 00 00000 00001 1E01
+p 01 00000 00001 4EAF
+p 01 00000 00001 0001
+#
+# Jump if one
+p 00 00000 00001 1E02
+p 01 00000 00001 1001
+p 01 00000 00001 1E09
+#
+# tmpc >> 1
+p 00 00000 00001 1E03
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1E04
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1E05
+p 01 00000 00001 1002
+p 01 00000 00001 1E07
+#
+# tmpc[15] = CF
+p 00 00000 00001 1E06
+p 01 00000 00001 5AAF
+p 01 00000 00001 8000
+#
+# CF = 0 (the bit shifted out)
+p 00 00000 00001 1E07
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Jump to the end of the RCR
+p 00 00000 00001 1E08
+p 01 00000 00001 1000
+p 01 00000 00001 1E0E
+#
+# tmpc >> 1
+p 00 00000 00001 1E09
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1E0A
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1E0B
+p 01 00000 00001 1002
+p 01 00000 00001 1E0D
+#
+# tmpc[15] = CF
+p 00 00000 00001 1E0C
+p 01 00000 00001 5AAF
+p 01 00000 00001 8000
+#
+# CF = 1 (the bit shifted out)
+p 00 00000 00001 1E0D
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3[4:0] = 16 (the loop counter)
+p 00 00000 00001 1E0E
+p 01 00000 00001 5CCF
+p 01 00000 00001 0010
+#
+# r3 += 2 cycles
+p 00 00000 00001 1E0F
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# r3 += 1 cycles
+p 00 00000 00001 1E10
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Isolate CF (the bit of tmpc shifted out)
+p 00 00000 00001 1E11
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero: no addition
+p 00 00000 00001 1E12
+p 01 00000 00001 1002
+p 01 00000 00001 1E1B
+#
+# tmpa = tmpa + tmpb
+p 00 00000 00001 1E13
+p 01 00000 00001 2BB9
+p 01 00000 00001 0000
+#
+# Isolate the Carry16 signal
+p 00 00000 00001 1E14
+p 01 00000 00001 4EEF
+p 01 00000 00001 0001
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1E15
+p 01 00000 00001 1002
+p 01 00000 00001 1E18
+#
+# CF = 1
+p 00 00000 00001 1E16
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1E17
+p 01 00000 00001 1000
+p 01 00000 00001 1E19
+#
+# CF = 0
+p 00 00000 00001 1E18
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 2 cycles
+p 00 00000 00001 1E19
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Jump to the shifts
+p 00 00000 00001 1E1A
+p 01 00000 00001 1000
+p 01 00000 00001 1E1C
+#
+# r3 += 1 cycles (the jump)
+p 00 00000 00001 1E1B
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# RCR tmpa: isolate bit 0 (the new CF)
+p 00 00000 00001 1E1C
+p 01 00000 00001 4EBF
+p 01 00000 00001 0001
+#
+# Jump if one
+p 00 00000 00001 1E1D
+p 01 00000 00001 1001
+p 01 00000 00001 1E24
+#
+# tmpa >> 1
+p 00 00000 00001 1E1E
+p 01 00000 00001 7BBF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1E1F
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1E20
+p 01 00000 00001 1002
+p 01 00000 00001 1E22
+#
+# tmpa[15] = CF
+p 00 00000 00001 1E21
+p 01 00000 00001 5BBF
+p 01 00000 00001 8000
+#
+# CF = 0 (the bit shifted out)
+p 00 00000 00001 1E22
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Jump to the end of the RCR
+p 00 00000 00001 1E23
+p 01 00000 00001 1000
+p 01 00000 00001 1E29
+#
+# tmpa >> 1
+p 00 00000 00001 1E24
+p 01 00000 00001 7BBF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1E25
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1E26
+p 01 00000 00001 1002
+p 01 00000 00001 1E28
+#
+# tmpa[15] = CF
+p 00 00000 00001 1E27
+p 01 00000 00001 5BBF
+p 01 00000 00001 8000
+#
+# CF = 1 (the bit shifted out)
+p 00 00000 00001 1E28
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# RCR tmpc: isolate bit 0 (the new CF)
+p 00 00000 00001 1E29
+p 01 00000 00001 4EAF
+p 01 00000 00001 0001
+#
+# Jump if one
+p 00 00000 00001 1E2A
+p 01 00000 00001 1001
+p 01 00000 00001 1E31
+#
+# tmpc >> 1
+p 00 00000 00001 1E2B
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1E2C
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1E2D
+p 01 00000 00001 1002
+p 01 00000 00001 1E2F
+#
+# tmpc[15] = CF
+p 00 00000 00001 1E2E
+p 01 00000 00001 5AAF
+p 01 00000 00001 8000
+#
+# CF = 0 (the bit shifted out)
+p 00 00000 00001 1E2F
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Jump to the end of the RCR
+p 00 00000 00001 1E30
+p 01 00000 00001 1000
+p 01 00000 00001 1E36
+#
+# tmpc >> 1
+p 00 00000 00001 1E31
+p 01 00000 00001 7AAF
+p 01 00000 00001 0000
+#
+# Isolate CF
+p 00 00000 00001 1E32
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero over the next
+p 00 00000 00001 1E33
+p 01 00000 00001 1002
+p 01 00000 00001 1E35
+#
+# tmpc[15] = CF
+p 00 00000 00001 1E34
+p 01 00000 00001 5AAF
+p 01 00000 00001 8000
+#
+# CF = 1 (the bit shifted out)
+p 00 00000 00001 1E35
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 3 cycles
+p 00 00000 00001 1E36
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1E37
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1E38
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: done
+p 00 00000 00001 1E39
+p 01 00000 00001 1002
+p 01 00000 00001 1E3C
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1E3A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1E3B
+p 01 00000 00001 1000
+p 01 00000 00001 1E10
+#
+# r3 += 2 cycles
+p 00 00000 00001 1E3C
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Return to calling code
+p 00 00000 00001 1E3D
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# biu_dataout = tmpa (the minuend of the flag-setting subtraction)
+p 00 00000 00001 1E3E
+p 01 00000 00001 5FFB
+p 01 00000 00001 0000
+#
+# Strobe BIU - set the RM register (kept for the divide error flags)
+p 00 00000 00001 1E3F
+p 01 00000 00001 5DDF
+p 01 00000 00001 3040
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1E40
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# r3 += 3 cycles
+p 00 00000 00001 1E41
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# Isolate tmpb
+p 00 00000 00001 1E42
+p 01 00000 00001 4E9F
+p 01 00000 00001 FFFF
+#
+# Jump if zero: division by zero
+p 00 00000 00001 1E43
+p 01 00000 00001 1002
+p 01 00000 00001 1E89
+#
+# r0 (-tmpb) = NOT r0 (-tmpb)
+p 00 00000 00001 1E44
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# r0 (-tmpb) = r0 (-tmpb) + 1 (two's complement)
+p 00 00000 00001 1E45
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# Dummy = tmpa - tmpb
+p 00 00000 00001 1E46
+p 01 00000 00001 2EB9
+p 01 00000 00001 0000
+#
+# Isolate the Carry16 signal (no borrow)
+p 00 00000 00001 1E47
+p 01 00000 00001 4EEF
+p 01 00000 00001 0001
+#
+# Jump if no borrow: the quotient does not fit
+p 00 00000 00001 1E48
+p 01 00000 00001 1001
+p 01 00000 00001 1E87
+#
+# CF = 1 (the borrow)
+p 00 00000 00001 1E49
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3[4:0] = 16 (the loop counter)
+p 00 00000 00001 1E4A
+p 01 00000 00001 5CCF
+p 01 00000 00001 0010
+#
+# RCL tmpc: tmpc = tmpc + tmpc + CF
+p 00 00000 00001 1E4B
+p 01 00000 00001 AAAA
+p 01 00000 00001 0000
+#
+# Isolate the Carry16 signal
+p 00 00000 00001 1E4C
+p 01 00000 00001 4EEF
+p 01 00000 00001 0001
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1E4D
+p 01 00000 00001 1002
+p 01 00000 00001 1E50
+#
+# CF = 1
+p 00 00000 00001 1E4E
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1E4F
+p 01 00000 00001 1000
+p 01 00000 00001 1E51
+#
+# CF = 0
+p 00 00000 00001 1E50
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# RCL tmpa: tmpa = tmpa + tmpa + CF
+p 00 00000 00001 1E51
+p 01 00000 00001 ABBB
+p 01 00000 00001 0000
+#
+# Isolate the Carry16 signal
+p 00 00000 00001 1E52
+p 01 00000 00001 4EEF
+p 01 00000 00001 0001
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1E53
+p 01 00000 00001 1002
+p 01 00000 00001 1E56
+#
+# CF = 1
+p 00 00000 00001 1E54
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1E55
+p 01 00000 00001 1000
+p 01 00000 00001 1E57
+#
+# CF = 0
+p 00 00000 00001 1E56
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 4 cycles
+p 00 00000 00001 1E57
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# Isolate CF (tmpa overflowed)
+p 00 00000 00001 1E58
+p 01 00000 00001 4E8F
+p 01 00000 00001 0001
+#
+# Jump if zero to the trial subtraction
+p 00 00000 00001 1E59
+p 01 00000 00001 1002
+p 01 00000 00001 1E62
+#
+# r3 += 3 cycles (tmpa overflowed: subtract)
+p 00 00000 00001 1E5A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0060
+#
+# CF = 0
+p 00 00000 00001 1E5B
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# tmpa = tmpa - tmpb
+p 00 00000 00001 1E5C
+p 01 00000 00001 2BB9
+p 01 00000 00001 0000
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1E5D
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1E5E
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: the last bit
+p 00 00000 00001 1E5F
+p 01 00000 00001 1002
+p 01 00000 00001 1E78
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1E60
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1E61
+p 01 00000 00001 1000
+p 01 00000 00001 1E4B
+#
+# biu_dataout = tmpa (the minuend of the flag-setting subtraction)
+p 00 00000 00001 1E62
+p 01 00000 00001 5FFB
+p 01 00000 00001 0000
+#
+# Strobe BIU - set the RM register (kept for the divide error flags)
+p 00 00000 00001 1E63
+p 01 00000 00001 5DDF
+p 01 00000 00001 3040
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1E64
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# r3 += 2 cycles
+p 00 00000 00001 1E65
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# Dummy = tmpa - tmpb (sets the flags on the 8088)
+p 00 00000 00001 1E66
+p 01 00000 00001 2EB9
+p 01 00000 00001 0000
+#
+# Isolate the Carry16 signal (no borrow)
+p 00 00000 00001 1E67
+p 01 00000 00001 4EEF
+p 01 00000 00001 0001
+#
+# Jump if zero: borrow, keep tmpa
+p 00 00000 00001 1E68
+p 01 00000 00001 1002
+p 01 00000 00001 1E71
+#
+# CF = 0 (no borrow)
+p 00 00000 00001 1E69
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# r3 += 2 cycles
+p 00 00000 00001 1E6A
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# tmpa = tmpa - tmpb
+p 00 00000 00001 1E6B
+p 01 00000 00001 2BB9
+p 01 00000 00001 0000
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1E6C
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1E6D
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: the last bit
+p 00 00000 00001 1E6E
+p 01 00000 00001 1002
+p 01 00000 00001 1E78
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1E6F
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1E70
+p 01 00000 00001 1000
+p 01 00000 00001 1E4B
+#
+# CF = 1 (borrow)
+p 00 00000 00001 1E71
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 1 cycles
+p 00 00000 00001 1E72
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# r3 = r3 - 1 (the loop counter)
+p 00 00000 00001 1E73
+p 01 00000 00001 2CCF
+p 01 00000 00001 FFFF
+#
+# Isolate the loop counter
+p 00 00000 00001 1E74
+p 01 00000 00001 4ECF
+p 01 00000 00001 001F
+#
+# Jump if zero: done
+p 00 00000 00001 1E75
+p 01 00000 00001 1002
+p 01 00000 00001 1E79
+#
+# r3 += 1 cycles (the jump back)
+p 00 00000 00001 1E76
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the next bit
+p 00 00000 00001 1E77
+p 01 00000 00001 1000
+p 01 00000 00001 1E4B
+#
+# r3 += 2 cycles
+p 00 00000 00001 1E78
+p 01 00000 00001 2CCF
+p 01 00000 00001 0040
+#
+# RCL tmpc: tmpc = tmpc + tmpc + CF
+p 00 00000 00001 1E79
+p 01 00000 00001 AAAA
+p 01 00000 00001 0000
+#
+# Isolate the Carry16 signal
+p 00 00000 00001 1E7A
+p 01 00000 00001 4EEF
+p 01 00000 00001 0001
+#
+# Jump if zero to clear CF
+p 00 00000 00001 1E7B
+p 01 00000 00001 1002
+p 01 00000 00001 1E7E
+#
+# CF = 1
+p 00 00000 00001 1E7C
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# Jump over the clear
+p 00 00000 00001 1E7D
+p 01 00000 00001 1000
+p 01 00000 00001 1E7F
+#
+# CF = 0
+p 00 00000 00001 1E7E
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# CF = 0
+p 00 00000 00001 1E7F
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Isolate the top bit of tmpc (the final carry)
+p 00 00000 00001 1E80
+p 01 00000 00001 4EAF
+p 01 00000 00001 8000
+#
+# Jump if zero
+p 00 00000 00001 1E81
+p 01 00000 00001 1002
+p 01 00000 00001 1E83
+#
+# CF = 1
+p 00 00000 00001 1E82
+p 01 00000 00001 588F
+p 01 00000 00001 0001
+#
+# r3 += 4 cycles
+p 00 00000 00001 1E83
+p 01 00000 00001 2CCF
+p 01 00000 00001 0080
+#
+# r0 (tmpb again) = NOT r0 (tmpb again)
+p 00 00000 00001 1E84
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# r0 (tmpb again) = r0 (tmpb again) + 1 (two's complement)
+p 00 00000 00001 1E85
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# Return to calling code
+p 00 00000 00001 1E86
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# r0 (tmpb again) = NOT r0 (tmpb again)
+p 00 00000 00001 1E87
+p 01 00000 00001 699F
+p 01 00000 00001 FFFF
+#
+# r0 (tmpb again) = r0 (tmpb again) + 1 (two's complement)
+p 00 00000 00001 1E88
+p 01 00000 00001 299F
+p 01 00000 00001 0001
+#
+# r3 += 1 cycles (the jump)
+p 00 00000 00001 1E89
+p 01 00000 00001 2CCF
+p 01 00000 00001 0020
+#
+# Jump to the divide error
+p 00 00000 00001 1E8A
+p 01 00000 00001 1000
+p 01 00000 00001 1E8B
+#
+# r3 >> 1
+p 00 00000 00001 1E8B
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1E8C
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1E8D
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1E8E
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1E8F
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1E90
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand release
+p 00 00000 00001 1E91
+p 01 00000 00001 1002
+p 01 00000 00001 1E94
+#
+# biu_dataout = cycles + 6 (release: after the ModR/M byte)
+p 00 00000 00001 1E92
+p 01 00000 00001 2FCF
+p 01 00000 00001 0006
+#
+# Jump to the strobe
+p 00 00000 00001 1E93
+p 01 00000 00001 1000
+p 01 00000 00001 1E95
+#
+# biu_dataout = 2000 + cycles + 6 (release: after the operand read)
+p 00 00000 00001 1E94
+p 01 00000 00001 2FCF
+p 01 00000 00001 2006
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1E95
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1E96
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Jump to the flags
+p 00 00000 00001 1E97
+p 01 00000 00001 1000
+p 01 00000 00001 1E98
+#
+# r1 = tmpb
+p 00 00000 00001 1E98
+p 01 00000 00001 5AF9
+p 01 00000 00001 0000
+#
+# r0 = the saved minuend (the BIU RM register)
+p 00 00000 00001 1E99
+p 01 00000 00001 59F5
+p 01 00000 00001 0000
+#
+# CALL SUB_WORD
+p 00 00000 00001 1E9A
+p 01 00000 00001 1100
+p 01 00000 00001 0A52
+#
+# Clear flag bits 15-13 (the register operand marker would push IP-1)
+p 00 00000 00001 1E9B
+p 01 00000 00001 488F
+p 01 00000 00001 1FFF
+#
+# r0 = 0 (interrupt type 0)
+p 00 00000 00001 1E9C
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Jump to the interrupt processing (after INT n's release)
+p 00 00000 00001 1E9D
+p 01 00000 00001 1000
+p 01 00000 00001 055D
+#
+# r3 >> 1
+p 00 00000 00001 1E9E
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1E9F
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1EA0
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1EA1
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# r3 >> 1
+p 00 00000 00001 1EA2
+p 01 00000 00001 7CCF
+p 01 00000 00001 0000
+#
+# Isolate the REPZ bit (register operand)
+p 00 00000 00001 1EA3
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if zero to the memory operand release
+p 00 00000 00001 1EA4
+p 01 00000 00001 1002
+p 01 00000 00001 1EA7
+#
+# biu_dataout = cycles + 6 (release: after the ModR/M byte)
+p 00 00000 00001 1EA5
+p 01 00000 00001 2FCF
+p 01 00000 00001 0006
+#
+# Jump to the strobe
+p 00 00000 00001 1EA6
+p 01 00000 00001 1000
+p 01 00000 00001 1EA8
+#
+# biu_dataout = 2000 + cycles + 6 (release: after the operand read)
+p 00 00000 00001 1EA7
+p 01 00000 00001 2FCF
+p 01 00000 00001 2006
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1EA8
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1EA9
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Jump to the flags
+p 00 00000 00001 1EAA
+p 01 00000 00001 1000
+p 01 00000 00001 1EAB
+#
+# r1 = tmpb
+p 00 00000 00001 1EAB
+p 01 00000 00001 5AF9
+p 01 00000 00001 0000
+#
+# r0 = the saved minuend (the BIU RM register)
+p 00 00000 00001 1EAC
+p 01 00000 00001 59F5
+p 01 00000 00001 0000
+#
+# CALL SUB_WORD
+p 00 00000 00001 1EAD
+p 01 00000 00001 1100
+p 01 00000 00001 0A52
+#
+# CF = 0 (CORD's final carry)
+p 00 00000 00001 1EAE
+p 01 00000 00001 488F
+p 01 00000 00001 FFFE
+#
+# Clear flag bits 15-13 (the register operand marker would push IP-1)
+p 00 00000 00001 1EAF
+p 01 00000 00001 488F
+p 01 00000 00001 1FFF
+#
+# r0 = 0 (interrupt type 0)
+p 00 00000 00001 1EB0
+p 01 00000 00001 59FF
+p 01 00000 00001 0000
+#
+# Jump to the interrupt processing (after INT n's release)
+p 00 00000 00001 1EB1
+p 01 00000 00001 1000
+p 01 00000 00001 055D
+#
+# pc10-iii gen_muldiv.py: END
+#
+# --------------------------------------------------------------------
+# pc10-iii (2026-10-22): MOV r/m,imm to memory (C6/C7), from 0x15C7/0x15E7
+# and the writebacks 0x0CEA/0x0CEE. The BIU reads the immediate itself (the
+# scheduled read at 0x15C2/0x15E2); the EU takes it from its queue view
+# without the fetch procedures, whose SYNCs (one cycle after the last queue
+# read) held it a cycle per byte the BIU had already read, and writes it
+# without the general writeback (the 8088 asks for the write two cycles after
+# it read the last immediate byte; the EU got there a cycle late in ~40% of
+# the word forms). Release: C6 3 cycles after the immediate (as before), C7 2
+# after its high byte (was 3: the write lost its slot to a code fetch); end
+# B000.
+#
+# C7MEM: Strobe BIU - pop the byte before the immediate (QS: subsequent)
+p 00 00000 00001 1F00
+p 01 00000 00001 5DDF
+p 01 00000 00001 100C
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1F01
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# r3 = 0 + prefetch_queue_byte (the low byte, read already)
+p 00 00000 00001 1F02
+p 01 00000 00001 2CF4
+p 01 00000 00001 0000
+#
+# Swap bytes of r3
+p 00 00000 00001 1F03
+p 01 00000 00001 3CCF
+p 01 00000 00001 0000
+#
+# Strobe BIU - pop the low byte
+p 00 00000 00001 1F04
+p 01 00000 00001 5DDF
+p 01 00000 00001 100C
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1F05
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# r3 = r3 + prefetch_queue_byte (the high byte, read already)
+p 00 00000 00001 1F06
+p 01 00000 00001 2CC4
+p 01 00000 00001 0000
+#
+# Swap bytes of r3
+p 00 00000 00001 1F07
+p 01 00000 00001 3CCF
+p 01 00000 00001 0000
+#
+# biu_dataout = 0002 (C7: release 2 cycles after the last queue read, the high byte)
+p 00 00000 00001 1F08
+p 01 00000 00001 5FFF
+p 01 00000 00001 0002
+#
+# Strobe BIU - set the request release
+p 00 00000 00001 1F09
+p 01 00000 00001 5DDF
+p 01 00000 00001 3060
+#
+# Debounce BIU Strobe (and its register code)
+p 00 00000 00001 1F0A
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# biu_dataout = B000 (end: in the cycle the next transfer ends)
+p 00 00000 00001 1F0B
+p 01 00000 00001 5FFF
+p 01 00000 00001 B000
+#
+# Strobe BIU - Set clock counter
+p 00 00000 00001 1F0C
+p 01 00000 00001 5DDF
+p 01 00000 00001 2000
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1F0D
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFFF
+#
+# Return to calling code
+p 00 00000 00001 1F0E
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# C6MEM: Strobe BIU - pop the byte before the immediate (QS: subsequent)
+p 00 00000 00001 1F0F
+p 01 00000 00001 5DDF
+p 01 00000 00001 100C
+#
+# Debounce BIU Strobe
+p 00 00000 00001 1F10
+p 01 00000 00001 4DDF
+p 01 00000 00001 CFF3
+#
+# Zero out r3
+p 00 00000 00001 1F11
+p 01 00000 00001 4CCF
+p 01 00000 00001 0000
+#
+# r3 = 0000 OR prefetch_queue_byte (read already)
+p 00 00000 00001 1F12
+p 01 00000 00001 5CF4
+p 01 00000 00001 0000
+#
+# biu_dataout = 0003 (C6: release 3 cycles after the last queue read)
+p 00 00000 00001 1F13
+p 01 00000 00001 5FFF
+p 01 00000 00001 0003
+#
+# Jump to the release strobe and the end
+p 00 00000 00001 1F14
+p 01 00000 00001 1000
+p 01 00000 00001 1F09
+#
+# C7WB: Isolate the REPZ bit (register operand)
+p 00 00000 00001 1F15
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register writeback at 0x1602
+p 00 00000 00001 1F16
+p 01 00000 00001 1001
+p 01 00000 00001 1602
+#
+# CALL the segment selection below
+p 00 00000 00001 1F17
+p 01 00000 00001 1100
+p 01 00000 00001 1F1C
+#
+# r3 = biu_register_rm - The memory address to write the data to.
+p 00 00000 00001 1F18
+p 01 00000 00001 5CF5
+p 01 00000 00001 0000
+#
+# Copy r0 to the biu_dataout register - The data to be written to memory.
+p 00 00000 00001 1F19
+p 01 00000 00001 5FF9
+p 01 00000 00001 0000
+#
+# CALL MEM_WRITE_WORD
+p 00 00000 00001 1F1A
+p 01 00000 00001 1100
+p 01 00000 00001 0589
+#
+# Jump unconditional to the common ending
+p 00 00000 00001 1F1B
+p 01 00000 00001 1000
+p 01 00000 00001 091D
+#
+# SEG: Debounce the segment field in biu_command
+p 00 00000 00001 1F1C
+p 01 00000 00001 4DDF
+p 01 00000 00001 C003
+#
+# Isolate the REPNZ bit into Dummy (a BP based address)
+p 00 00000 00001 1F1D
+p 01 00000 00001 4E8F
+p 01 00000 00001 8000
+#
+# If last_alu is zero, then jump to set segment to DS
+p 00 00000 00001 1F1E
+p 01 00000 00001 1002
+p 01 00000 00001 1F21
+#
+# Set the segment to SS  (Can be overridden)
+p 00 00000 00001 1F1F
+p 01 00000 00001 5DDF
+p 01 00000 00001 0400
+#
+# Return to calling code
+p 00 00000 00001 1F20
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# Set the segment to DS  (Can be overridden)
+p 00 00000 00001 1F21
+p 01 00000 00001 5DDF
+p 01 00000 00001 0C00
+#
+# Return to calling code
+p 00 00000 00001 1F22
+p 01 00000 00001 1030
+p 01 00000 00001 0000
+#
+# C6WB: Isolate the REPZ bit (register operand)
+p 00 00000 00001 1F23
+p 01 00000 00001 4E8F
+p 01 00000 00001 4000
+#
+# Jump if last_alu is non-zero to the register writeback at 0x1600
+p 00 00000 00001 1F24
+p 01 00000 00001 1001
+p 01 00000 00001 1600
+#
+# CALL the segment selection
+p 00 00000 00001 1F25
+p 01 00000 00001 1100
+p 01 00000 00001 1F1C
+#
+# r3 = biu_register_rm - The memory address to write the data to.
+p 00 00000 00001 1F26
+p 01 00000 00001 5CF5
+p 01 00000 00001 0000
+#
+# Copy r0 to the biu_dataout register - The data to be written to memory.
+p 00 00000 00001 1F27
+p 01 00000 00001 5FF9
+p 01 00000 00001 0000
+#
+# CALL MEM_WRITE_BYTE
+p 00 00000 00001 1F28
+p 01 00000 00001 1100
+p 01 00000 00001 0587
+#
+# Jump unconditional to the common ending
+p 00 00000 00001 1F29
+p 01 00000 00001 1000
+p 01 00000 00001 090E

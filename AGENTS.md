@@ -141,13 +141,28 @@ runs or the fetch is in its T4; otherwise at its T4.
   routines jump or call there.
 - Free words below 0x1000 (unused NOP slots) are reused where they exist.
 - MCL86's call stack is 4 deep: count the nesting when wrapping procedures.
-- eu.v compares the microcode addresses 0x09C9, 0x0A03, 0x0E76, 0x0F02 and
-  0x0F11: never move code there.
+- eu.v compares the microcode addresses 0x0011 (initial AX/DX, OF
+  override off), 0x09C9, 0x09CC, 0x0A03, 0x0A12, 0x0A46, 0x0A52, 0x0AAE,
+  0x0ABA (the OF override at the ADD/ADC/SUB/SBB entries), 0x0E54, 0x0ED0,
+  0x0E76, 0x0F02 (old IDIV) and 0x0F11 (restores AX/DX): never move code
+  there. The F6/F7 MUL/DIV routines no longer pass 0x0F11 (AX/DX were
+  captured only after a prefix).
+- An ADD word (type 2) with bit 31 set adds CF as a carry-in (eu.v,
+  2026-10-22): ADC, SUB, SBB in one pass.
+- Every type 0 word with a non-zero immediate is a SYNC, also ones MCL86
+  meant as something else (0x02B7 was one: AAD waited for cycle 0x2B9).
 - r2 is free scratch around CALC_EA; wrappers pass end values in it.
+- `tools/gen_muldiv.py` generates 0x1B20-0x1EB2 (MUL/IMUL/DIV/IDIV, AAM,
+  AAD; `--test` runs the routines in a microcode simulator).
 
 **Measuring:**
 - `tools/sst_sched.py` (schedule per opcode) and `tools/sst_modes.py` (per
   addressing mode) give the target;
+- `sst_run -S 21 -n N`: each test at the 21 positions of the 20-core-clock
+  CLK periods (one in ~21): a test passes only if it passes at all of them.
+  An EU that reaches a SYNC or a strobe near a clock edge passes or fails
+  with the CLK phase (the plain run's phase depends on the tests before);
+  `-P p` runs at one phase (0 <= p < 0.0477);
 - scan the one or two free parameters with the dev build, then write the
   measured values into the listing with comments.
 
