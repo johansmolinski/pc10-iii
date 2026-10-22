@@ -895,3 +895,95 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   TIMING-FAILED because of it.
 - The main checkout's `M2M/QNICE` submodule was not initialized (earlier builds
   came from worktrees): `git submodule update --init M2M/QNICE`.
+
+## 2026-10-22 - Carry-in add, MUL/DIV/AAM/AAD as the 8088, EU lateness after a BIU opcode read; system trace to clock 2,439,285 (branch `cpu-y`)
+
+- **tb/sys at 1,041,809** (the task from the merge): XCHG [SI],DX ends with a
+  word write; its end (B000) has the BIU read INC AX's opcode in the write's
+  T3, as MartyPC (its EU takes the preloaded byte there). Our EU still runs
+  XCHG's last microinstructions and dispatches INC AX a clock later; INC/DEC
+  r16 ended by the EU reaching the main loop (a legacy core-clock count, C002),
+  so the opcode after INC AX was read a clock late. The 8088 rule is simply
+  INC/DEC r16 = 2 cycles from the opcode read: absolute ends (E002). A
+  detector for this class: a dev ROM whose main loop waits one more 8088
+  clock before every dispatch (`SYNC 8001` at the queue test), i.e. every
+  instruction starts with the BIU's own opcode read and a late EU; the SST
+  files that get worse end through the EU's speed: 40-4F, 91-97 (XCHG AX,r:
+  E003), 98 (CBW: E002), 9E (SAHF: E004) and MUL/DIV, all fixed.
+- **Board (xt_board.sv):** the I/O wait state counts only after the DMA
+  wait (AEN keeps the 8288's I/O command off; MartyPC's cycle.rs does not
+  decrement I/O wait states while DMA wait states remain). An OUT whose T1
+  met the refresh had one Tw too few (reference clock 1,042,013).
+- **CLK phase sweep** (`sst_run -S 21`, `-P p`): the 100 MHz core clock gives
+  20- or 21-clock 8088 periods (one 20 in ~21), and their position depends on
+  the tests before, so an EU that reaches a SYNC or a strobe near a clock
+  edge passes or fails by history. With -S each test runs at all 21
+  positions. Found: CF (IRET) passed 240 of 300 at all phases (the CS pop
+  waited `SYNC 8003`, 3 cycles from where the EU happened to be: now `C003`,
+  3 after the IP pop ended); F6.0/F6.1 register TEST (the end armed after the
+  immediate's fetch procedure, now as soon as the BIU's scheduled read has
+  happened, 0x1B00). These were the race fix's CF/F6.0/F6.1 "regressions".
+- **Carry-in add (eu.v):** bit 31 of an ADD word (unused) adds CF. ADC is one
+  add, SUB = r0 + ~r1 + CF with CF set first, SBB the same with CF inverted
+  first; one flag pass instead of two (MCL86 added twice and computed the
+  flags twice). The 80-83 /2 /3 /5 memory forms wrote late because of the
+  slow EU (81.3 was the race fix's -1,183): all twelve files 100%. OOC
+  (`rooc.sh cpuy-a`): WNS +0.387 ns, WHS +0.105 ns (was +0.407).
+- **MUL/IMUL/DIV/IDIV r/m8, r/m16, AAM, AAD** (`tools/gen_muldiv.py`,
+  0x1B20-0x1EB1): the 8088's algorithms (CORX, CORD, the NEGATE and the
+  signed pre/post steps, the REP prefix negation) step by step, so results,
+  flags and the cycle count are the 8088's; the cycle counts per step from
+  MartyPC's muldiv.rs (MIT). A Python model of those counts fits the suite
+  exactly (register: end = opcode + 3 + cycles; memory: operand read end + 2
+  + cycles; AAM/AAD: immediate + 1 + cycles); `gen_muldiv.py --test` runs the
+  generated microcode in a small simulator against the model (results, ends,
+  divide error releases). The end is armed from the count (A mode after the
+  ModR/M byte; memory: SYNC 64 after the read, then F mode). Divide errors:
+  the flags of the last flag-setting subtraction (minuend kept in the BIU's
+  RM register), the first vector read released as the 8088's, and no IP-1
+  (the register-operand marker in flag bit 14 made the INT routine push
+  IP-1; MCL86's old DIV also went through 0x0F11, which restores AX/DX
+  captured only after a prefix). D4, D5, F6.4-F7.7: 100% state and trace
+  (were 0-25% trace, 23-97% state).
+- **AAD:** MCL86's 0x02B7 ("jump over the first iteration") is a type 0 word
+  with a non-zero immediate, i.e. since the SYNC "wait for cycle 0x2B9": AAD
+  waited ~700 cycles (now a NOP; the system trace stopped there).
+- **C7 to memory:** the immediate is taken from the queue view (the BIU read
+  it already), without the fetch procedure's SYNCs, and the write released 2
+  after the high byte (was 3: the write lost its slot to a code fetch); C7
+  100%. C6 unchanged (the [bp+di]/[bx+si] forms write a cycle later than the
+  release after the immediate gives; 307 tests).
+- **Runs** (`~/pcxt-work/results/`): biu88-y1 (INC/DEC, IRET, TEST8, carry-in):
+  trace 2,905,550 (96.63%), +76,642, no file worse. biu88-y4 (all, = y3):
+  state 3,007,000 (100.00%), trace 3,006,693 (99.99%, +177,785 on run y), no
+  file worse; only C6 (9693/10000) is left. Full runs now go to the Fedora host (16 jobs, ~10
+  min).
+- **tb/sys** (DRQ0_SKEW=7, 1.27 s): first difference 1,041,809 -> 1,042,013
+  (INC/DEC) -> 2,439,097 (board I/O wait; AAD's SYNC there) -> 2,439,285.
+  There: OR AL,DL then TEST AL,2: the BIU reads TEST's opcode at OR's end,
+  our EU dispatches it ~2 cycles later and reads the immediate a cycle late.
+- **EU lateness survey** (`sst_run -L`: core clocks from the start of the
+  cycle in which the BIU read the next opcode to the EU's dispatch on it):
+  the register forms of the ALU ops (00-3B), D0/D1, F6/F7 /2 /3, FE/FF /0 /1
+  and others dispatch the next instruction 1-4 cycles after the BIU read it
+  (up to 90 core clocks for D0.5/D0.7): MCL86 needs ~100-130 microinstructions
+  for an instruction the 8088 does in 2-3 cycles. In the suite this is
+  invisible (the window ends at that read); in a program the next
+  instruction's first reads (ModR/M at cycle 1, an immediate at 2) come late.
+  This is the next limit of the system trace.
+
+## 2026-10-22 - Faster flags for OR/AND/XOR/TEST (run y5)
+
+- The first step against the EU lateness above: the logical operations'
+  flags (S, Z, P from the result; C, O, A cleared; the suite masks A) in
+  10/11 microinstructions (LOGICB/LOGICW at 0x1F30) instead of
+  CALCULATE_FLAGS (18/12) plus the clear. `sst_run -L -n 1000`, tests whose
+  next dispatch comes more than 2 cycles after the BIU's read: 0A 119 -> 6,
+  22 119 -> 65, 32 143 -> 82, 84 117 -> 0 (max lag 51 -> 43 core clocks).
+- Run y5: identical to y4 (state 3,007,000, trace 3,006,693). tb/sys still
+  differs first at 2,439,285: OR AL,DL (register form, ~110
+  microinstructions from dispatch to the next dispatch, 5 cycles of EU time
+  for a 3-cycle instruction) leaves the EU 2 cycles behind, and TEST AL,2
+  reads its immediate a cycle late. Register-form ALU instructions need a
+  shorter path (operand fetch/writeback through the register tables,
+  CALC_EA's ModR/M decode for register operands, the main loop): open.

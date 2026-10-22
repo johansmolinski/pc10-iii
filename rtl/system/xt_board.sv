@@ -628,13 +628,36 @@ always_ff @(posedge clk)
 // edge. The BIU samples READY as it enters T3 and each Tw (bus_t is still T2
 // or T3/Tw then) to know whether that state is the last. Every CPU I/O cycle
 // gets one wait state: its T3 is never the last.
-logic rdy_sync;
+logic rdy_sync, dma_rdy_sync;
 always_ff @(posedge clk)
-    if (reset) rdy_sync <= 1'b1;
+    if (reset) begin
+        rdy_sync <= 1'b1;  dma_rdy_sync <= 1'b1;
+    end
     // the DMA wait: from the CPU clock where AEN rises (S1) to one clock
     // after it falls. CAL: MartyPC (DMA wait states from S1).
-    else if (cpu_fall) rdy_sync <= isa_ready & ~(aen | dma_wait);
+    else if (cpu_fall) begin
+        rdy_sync     <= isa_ready & ~(aen | dma_wait);
+        dma_rdy_sync <= ~(aen | dma_wait);
+    end
 wire io_cycle = cpu_bus_type == ST_IOR || cpu_bus_type == ST_IOW;
-assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle);
+// The I/O wait state counts only where the DMA wait is over (AEN keeps the
+// 8288's I/O command off, and the wait state starts with the command):
+// io_wait is the pending wait state, set in T2; a sample leaving T3/Tw uses
+// it up if the state it leaves was not held by the DMA wait (dma_ok, the DMA
+// part of the sample that decided that state). Without DMA: T3, Tw (last).
+// CAL: MartyPC (cycle.rs: the I/O wait states are not decremented while DMA
+// wait states remain), first seen at reference clock 1,042,013 (an OUT with
+// the refresh in its T1).
+logic io_wait, dma_ok;
+wire  in_t3tw   = cpu_bus_t == T3 || cpu_bus_t == TW;
+wire  io_wait_n = io_wait && !dma_ok;
+always_ff @(posedge clk)
+    if (reset) begin
+        io_wait <= 1'b0;  dma_ok <= 1'b1;
+    end else if (cpu_step) begin
+        dma_ok  <= dma_rdy_sync;
+        io_wait <= cpu_bus_t == T2 ? io_cycle : in_t3tw && io_wait_n;
+    end
+assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle) && !(in_t3tw && io_wait_n);
 
 endmodule
