@@ -356,15 +356,23 @@ assign eu_alu_out = (eu_opcode_type==3'h2) ? eu_alu2 :
 
 
 // Generate 16-bit full adder for the EU
-assign carry[0] = 1'b0;
-genvar i;
-generate
-  for (i=0; i < 16; i=i+1) 
-    begin : GEN_ADDER
-      assign adder_out[i] =  eu_operand0[i] ^ eu_operand1[i] ^ carry[i];     
-      assign carry[i+1]   = (eu_operand0[i] & eu_operand1[i]) | (eu_operand0[i] & carry[i]) | (eu_operand1[i] & carry[i]);  
-    end
-endgenerate
+// pc10-iii (100 MHz): one adder (a carry chain) instead of the ripple of
+// full adders in LUTs; the carry into bit i is a[i] ^ b[i] ^ sum[i], the same
+// bits as before.
+//assign carry[0] = 1'b0;
+//genvar i;
+//generate
+//  for (i=0; i < 16; i=i+1) 
+//    begin : GEN_ADDER
+//      assign adder_out[i] =  eu_operand0[i] ^ eu_operand1[i] ^ carry[i];     
+//      assign carry[i+1]   = (eu_operand0[i] & eu_operand1[i]) | (eu_operand0[i] & carry[i]) | (eu_operand1[i] & carry[i]);  
+//    end
+//endgenerate
+wire [16:0] adder_sum = {1'b0, eu_operand0} + {1'b0, eu_operand1};
+assign adder_out  = adder_sum[15:0];
+assign carry[0]   = 1'b0;
+assign carry[15:1] = eu_operand0[15:1] ^ eu_operand1[15:1] ^ adder_sum[15:1];
+assign carry[16]  = adder_sum[16];
 
 assign eu_parity = ~(eu_alu_last_result[0]^eu_alu_last_result[1]^eu_alu_last_result[2]^eu_alu_last_result[3]^eu_alu_last_result[4]^eu_alu_last_result[5]^eu_alu_last_result[6]^eu_alu_last_result[7]);
 
@@ -392,10 +400,30 @@ assign eu_sync_wait = eu_is_sync && !eu_sync_done;
 // is the real chip's queue read (the BIU reports it on QS): a jump through the
 // opcode table (source 1) reads an opcode or prefix; the ModR/M jump (source 2)
 // or any operand from PFQ_TOP_BYTE reads a subsequent byte.
-wire eu_uop_live = eu_stall_pipeline==1'b0 && eu_sync_wait==1'b0;
-assign EU_QREAD = (eu_uop_live && eu_opcode_type==3'h1 && eu_jump_boolean &&
+// pc10-iii (100 MHz): the same decode from registers, as directly as
+// possible (the BIU acts on it in the same clock):
+// - a SYNC is a type 0 microinstruction: whenever the type below is not 0,
+//   eu_sync_wait is 0, so it is left out;
+// - eu_jump_boolean with eu_alu_last_nz (= eu_alu_last_result != 0, kept as
+//   a register), and its two IDIV terms with eu_q_at_0E75/eu_q_at_0F01: the
+//   microinstruction in eu_rom_data comes from the address before
+//   eu_rom_address whenever the pipeline does not stall (a stall follows
+//   every jump; a SYNC holds both), so eu_rom_address == 0x0E76 there is the
+//   word read from 0x0E75, which those registers note when it is read.
+reg  eu_alu_last_nz;
+reg  eu_q_at_0E75, eu_q_at_0F01;
+wire eu_ax_hi_nz = eu_register_ax[15:7]!='h0;
+wire eu_dx_ax_ov = eu_register_dx!='h0 || eu_register_ax[15]!='h0;
+wire eu_jump_boolean_q = ( (idiv_opcode=='h1) && eu_q_at_0E75 && eu_ax_hi_nz ) ? 1'b1 :
+                         ( (idiv_opcode=='h1) && eu_q_at_0F01 && eu_dx_ax_ov ) ? 1'b1 :
+                         (eu_opcode_jump_cond==4'h0)                           ? 1'b1 :
+                         (eu_opcode_jump_cond==4'h1 && eu_alu_last_nz)         ? 1'b1 :
+                         (eu_opcode_jump_cond==4'h2 && !eu_alu_last_nz)        ? 1'b1 :
+                                                                                 1'b0 ;
+wire eu_uop_live = eu_stall_pipeline==1'b0;
+assign EU_QREAD = (eu_uop_live && eu_opcode_type==3'h1 && eu_jump_boolean_q &&
                    eu_opcode_jump_src==3'h1)                              ? 2'b01 :
-                  (eu_uop_live && eu_opcode_type==3'h1 && eu_jump_boolean &&
+                  (eu_uop_live && eu_opcode_type==3'h1 && eu_jump_boolean_q &&
                    eu_opcode_jump_src==3'h2)                              ? 2'b11 :
                   (eu_uop_live && eu_opcode_type!=3'h0 && eu_opcode_type!=3'h1 &&
                    eu_opcode_op1_sel==4'h4)                               ? 2'b11 :
@@ -452,6 +480,9 @@ begin : EU_MICROSEQUENCER
       eu_sync_rel <= 'h0;
       eu_sync_armed <= 1'b0;
       new_instruction_d1 <= 1'b0;
+      eu_alu_last_nz <= 1'b0;
+      eu_q_at_0E75 <= 1'b0;
+      eu_q_at_0F01 <= 1'b0;
       intr_enable_delayed <= 1'b0;
 	  idiv_opcode <= 'h0;
     end
@@ -461,6 +492,12 @@ else
   
     // pc10-iii: relative SYNC
     new_instruction_d1 <= new_instruction;
+    // pc10-iii: the ROM word now read comes from 0x0E75 / 0x0F01 (see EU_QREAD)
+    if (eu_sync_wait==1'b0)
+      begin
+        eu_q_at_0E75 <= eu_rom_address == 13'h0E75;
+        eu_q_at_0F01 <= eu_rom_address == 13'h0F01;
+      end
     if (eu_is_sync==1'b1 && eu_opcode_immediate[15:14]==2'b10 && eu_sync_armed==1'b0)
       begin
         eu_sync_armed <= 1'b1;
@@ -676,6 +713,7 @@ else
     if (eu_stall_pipeline==1'b0 && eu_opcode_type!=3'h0 && eu_opcode_type!=3'h1) 
       begin       
         eu_alu_last_result <= eu_alu_out[15:0];
+        eu_alu_last_nz     <= eu_alu_out[15:0] != 16'h0;    // pc10-iii
         case (eu_opcode_dst_sel)  // synthesis parallel_case
           4'h0 : eu_register_ax   <= eu_alu_out[15:0];
           4'h1 : eu_register_bx   <= eu_alu_out[15:0];
