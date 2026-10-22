@@ -679,6 +679,12 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PPRDIR/vhdl/pc_ucode.vhd">
+        <FileInfo SFType="VHDL2008">
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PPRDIR/vhdl/pc_fdd_sd.vhd">
         <FileInfo SFType="VHDL2008">
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -711,6 +717,30 @@
       </File>
       <File Path="$PPRDIR/../rtl/cpu/mcl86/eu_rom.v">
         <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../rtl/cpu/z8086/alu.sv">
+        <FileInfo SFType="SVerilog">
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../rtl/cpu/z8086/z86_tables.sv">
+        <FileInfo SFType="SVerilog">
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../rtl/cpu/z8086/z86_eu.sv">
+        <FileInfo SFType="SVerilog">
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/../rtl/cpu/z8086/cpu_z86.sv">
+        <FileInfo SFType="SVerilog">
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
@@ -918,6 +948,7 @@
         <Option Name="VerilogDir" Val="$PPRDIR/../rtl/system/kf/KF8253"/>
         <Option Name="VerilogDir" Val="$PPRDIR/../rtl/system/kf/KF8255"/>
         <Option Name="VerilogDir" Val="$PPRDIR/../rtl/system/kf/KF8259"/>
+        <Option Name="VerilogDir" Val="$PPRDIR/../rtl/cpu/z8086"/>
         <Define Name="MCL86_ROM" Val="&quot;../../../rtl/cpu/mcl86/microcode.hex&quot;"/>
         <Option Name="DesignMode" Val="RTL"/>
         <Option Name="TopModule" Val="mega65_r6"/>

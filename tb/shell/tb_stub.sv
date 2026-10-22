@@ -14,6 +14,7 @@ module tb_stub;
         .rom_addr(rom_addr), .rom_rdata(rom_rdata),
         .vid_ce(vid_ce), .vid_rgbi(rgbi), .vid_hsync(hs), .vid_vsync(vs), .vid_hblank(hb), .vid_vblank(vb),
         .kbd_code(kbd_code), .kbd_valid(kbd_valid), .kbd_busy(kbd_busy),
+        .ucl_we(1'b0), .ucl_addr(13'd0), .ucl_data(8'd0),
         .speaker(speaker), .dip_sw1(8'h2D));
 
     // pc_ram.vhd model: request registered, BRAM read, ack 2 clocks after ram_en

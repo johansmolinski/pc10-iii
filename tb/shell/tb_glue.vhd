@@ -5,6 +5,8 @@
 --   pc_ram.vhd:   6-clock read latency with ack, the size limit (0xFF above it)
 --   pc_font.vhd:  the default font copied into the font port after the reset, a 2 KB font
 --                 loaded by QNICE and copied to 0x1800 and 0x1000
+--   pc_ucode.vhd: a 6 KB bundle loaded by QNICE, read back, copied byte for byte into the
+--                 CPU's load port on GO; valid only after the copy, cleared by forget
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -55,6 +57,19 @@ architecture sim of tb_glue is
    type t_font is array (0 to 8191) of std_logic_vector(7 downto 0);
    signal font      : t_font := (others => x"EE");
    signal font_wr   : natural := 0;
+
+   -- microcode bundle
+   signal uqaddr    : std_logic_vector(27 downto 0) := (others => '0');
+   signal uqdin     : std_logic_vector(15 downto 0) := (others => '0');
+   signal uqdout    : std_logic_vector(15 downto 0);
+   signal uqce, uqwe : std_logic := '0';
+   signal uvalid    : std_logic;
+   signal ucl_we    : std_logic;
+   signal ucl_addr  : std_logic_vector(12 downto 0);
+   signal ucl_data  : std_logic_vector(7 downto 0);
+   signal ucl_n     : natural := 0;
+   signal ucl_bad   : natural := 0;
+   signal ucl_wr_valid : natural := 0;          -- writes while valid was high
 
    type t_codes is array (natural range <>) of std_logic_vector(7 downto 0);
    signal got       : t_codes(0 to 31);
@@ -107,6 +122,27 @@ begin
                 qnice_data_o => fqdout, qnice_ce_i => fqce, qnice_we_i => fqwe,
                 main_clk_i => clk, main_rst_i => mrst,
                 font_we_o => font_we, font_addr_o => font_addr, font_data_o => font_data);
+
+   i_ucode : entity work.pc_ucode
+      port map (qnice_clk_i => qclk, qnice_rst_i => '0', qnice_addr_i => uqaddr, qnice_data_i => uqdin,
+                qnice_data_o => uqdout, qnice_ce_i => uqce, qnice_we_i => uqwe,
+                main_clk_i => clk, main_valid_o => uvalid,
+                ucl_we_o => ucl_we, ucl_addr_o => ucl_addr, ucl_data_o => ucl_data);
+
+   -- the CPU's load port: byte n at address n, in order
+   p_ucl : process (clk)
+   begin
+      if rising_edge(clk) then
+         if ucl_we = '1' then
+            if unsigned(ucl_addr) /= ucl_n mod 8192 or
+               ucl_data /= std_logic_vector(to_unsigned((ucl_n mod 6144) * 7 mod 256, 8)) then
+               ucl_bad <= ucl_bad + 1;
+            end if;
+            if uvalid = '1' then ucl_wr_valid <= ucl_wr_valid + 1; end if;
+            ucl_n <= ucl_n + 1;
+         end if;
+      end if;
+   end process;
 
    -- the CGA card's font RAM
    p_font : process (clk)
@@ -245,7 +281,42 @@ begin
             report "2 KB font byte " & integer'image(i) severity failure;
       end loop;
 
-      report "PASS: keyboard, BIOS alignment, RAM latency and size, CGA font";
+      -- microcode bundle: 6144 bytes (byte i = i * 7 mod 256), read back, GO
+      for i in 0 to 6143 loop
+         wait until rising_edge(qclk);
+         uqaddr <= std_logic_vector(to_unsigned(i / 4096, 16)) & std_logic_vector(to_unsigned(i mod 4096, 12));
+         uqdin  <= x"00" & std_logic_vector(to_unsigned(i * 7 mod 256, 8));
+         uqce <= '1'; uqwe <= '1';
+         wait until rising_edge(qclk);
+         uqce <= '0'; uqwe <= '0';
+      end loop;
+      wait until rising_edge(qclk);
+      uqaddr <= x"0001" & x"7FF"; uqce <= '1';
+      wait until rising_edge(qclk);
+      assert uqdout = x"00" & std_logic_vector(to_unsigned(6143 * 7 mod 256, 8)) report "bundle readback" severity failure;
+      uqaddr <= x"0100" & x"000";
+      wait until rising_edge(qclk);
+      assert uqdout = x"1800" report "bundle size " & to_hstring(uqdout) severity failure;
+      uqce <= '0';
+      wait for 2 us;
+      assert uvalid = '0' and ucl_n = 0 report "bundle valid or copied before GO" severity failure;
+      wait until rising_edge(qclk);
+      uqaddr <= x"0100" & x"002"; uqce <= '1'; uqwe <= '1';
+      wait until rising_edge(qclk);
+      uqce <= '0'; uqwe <= '0';
+      wait for 100 us;
+      assert ucl_n = 6144 and ucl_bad = 0 and ucl_wr_valid = 0
+         report "bundle copy: " & integer'image(ucl_n) & " writes, " & integer'image(ucl_bad) & " wrong, " &
+                integer'image(ucl_wr_valid) & " while valid" severity failure;
+      assert uvalid = '1' report "bundle not valid after the copy" severity failure;
+      wait until rising_edge(qclk);
+      uqaddr <= x"0100" & x"004"; uqce <= '1'; uqwe <= '1';
+      wait until rising_edge(qclk);
+      uqce <= '0'; uqwe <= '0';
+      wait for 2 us;
+      assert uvalid = '0' report "bundle still valid after forget" severity failure;
+
+      report "PASS: keyboard, BIOS alignment, RAM latency and size, CGA font, microcode bundle";
       done <= true;
       wait;
    end process;

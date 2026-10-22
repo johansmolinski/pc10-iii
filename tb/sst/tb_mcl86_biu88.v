@@ -99,6 +99,7 @@ biu88 biu (
     .QS_BYTE              (qs_byte),
     .ALE                  (),
     .eu_qread             (eu.EU_QREAD),
+    .INTA_VEC_LO          (1'b1),
     .tb_preload           (tb_preload),
     .tb_queue             (tb_queue),
     .tb_queue_len         (tb_queue_len),

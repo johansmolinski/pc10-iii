@@ -31,6 +31,10 @@ module pc_system_flat #(
     input  logic [7:0]  font_data,
     input  logic        font_thin,
 
+    input  logic        ucl_we,
+    input  logic [12:0] ucl_addr,
+    input  logic [7:0]  ucl_data,
+
     input  logic [1:0]  drv_80trk,
     input  logic [1:0]  img_present,
     input  logic [1:0]  img_wp,
@@ -76,6 +80,7 @@ pc_system #(.RAM_KB(RAM_KB)) u_pc (
     .rom_addr, .rom_rdata,
     .vid_ce, .vid_rgbi, .vid_hsync, .vid_vsync, .vid_hblank, .vid_vblank,
     .font_we, .font_addr, .font_data, .font_thin,
+    .ucl_we, .ucl_addr, .ucl_data,
     .drv_80trk, .img_present, .img_wp,
     .img_tracks(tracks), .img_heads(heads), .img_spt(spt),
     .drv_motor, .fdc_active,

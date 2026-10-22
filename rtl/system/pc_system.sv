@@ -8,10 +8,17 @@ module pc_system #(
     // fitted video cards (doc/architecture.md section 4, doc/mda.md section 7)
     parameter bit CGA_FIT = 1'b1,       // IBM CGA at B8000-BFFFF, 3D0-3DF
     parameter int MDA_FIT = 0,          // 0 none, 1 IBM MDA, 2 Hercules (B0000, 3B0-3BF)
-    parameter int DRQ0_SKEW = 0         // simulation only (xt_board)
+    parameter int DRQ0_SKEW = 0,        // simulation only (xt_board)
+    parameter string CPU  = "z86"       // the 8088: "z86" (Intel's microcode) or "mcl86"
 ) (
     input  logic        clk,
     input  logic        reset,
+
+    // the 8088's microcode bundle (tools/mkucode.py, doc/z8086.md): the file,
+    // one byte per clk at offset ucl_addr, while reset is high
+    input  logic        ucl_we,
+    input  logic [12:0] ucl_addr,
+    input  logic [7:0]  ucl_data,
 
     output logic [19:0] ram_addr,
     output logic        ram_en,
@@ -127,10 +134,13 @@ logic [2:0]  cpu_s2_s0, cpu_bus_t, cpu_bus_type;
 logic [1:0]  cpu_qs;
 logic        cpu_lock_n, cpu_ale, cpu_ready, cpu_intr, cpu_nmi;
 
-cpu8088 u_cpu (
+cpu8088 #(.CPU(CPU)) u_cpu (
     .clk      (clk),
     .reset    (reset),
     .step     (cpu_step),
+    .ucl_we   (ucl_we),
+    .ucl_addr (ucl_addr),
+    .ucl_data (ucl_data),
     .ready    (cpu_ready),
     .intr     (cpu_intr),
     .nmi      (cpu_nmi),

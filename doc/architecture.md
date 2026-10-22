@@ -25,8 +25,10 @@ exact, 2205/22 MHz). Everything PC-side runs on `clk` with clock enables:
   the IBM schematic clocks on the falling CLK edge uses `cpu_fall`
   (7 `clk` after `cpu_step`).
 - `ce_14m` falls on `cpu_step` and on `cpu_fall` (7 and 21 are multiples of 7).
-- MCL86's EU runs on `clk`: 21 microinstructions per 8088 clock, exactly the
-  ratio the CPU work was tuned for (`AGENTS.md`).
+- The 8088 (`cpu8088`, `CPU = "z86"`, doc/z8086.md): biu88 steps at
+  `cpu_step`; z8086's EU executes one microinstruction per 8088 clock, at
+  `cpu_step` + 3 `clk` (its clock enable). (The old CPU, `CPU = "mcl86"`, ran
+  MCL86's EU on `clk`: 21 microinstructions per 8088 clock.)
 - Turbo (FE2010A 7.16/9.54 MHz) is not part of this contract yet.
 
 ## 2. Module tree
@@ -34,7 +36,8 @@ exact, 2205/22 MHz). Everything PC-side runs on `clk` with clock enables:
 ```
 pc_system          (rtl/system/pc_system.sv)  the PC: everything below
  +- pc_clocks       clock enables
- +- cpu8088         rtl/cpu/cpu8088.sv: MCL86 EU + biu88 behind 8088 max-mode pins
+ +- cpu8088         rtl/cpu/cpu8088.sv: z8086 EU (Intel's 8088 microcode, loaded at
+ |                   start-up) + biu88 behind 8088 max-mode pins (doc/z8086.md)
  +- xt_board        rtl/system/xt_board.sv: the 5160 system board logic
  |   +- 8288 function (bus commands from S2-S0)
  |   +- 8237 DMA, page register, refresh (8253 ch1 -> DRQ0)
@@ -135,10 +138,19 @@ the CGA depend on it):
 module pc_system #(
     parameter int RAM_KB  = 640,
     parameter bit CGA_FIT = 1'b1,     // the CGA is in the machine
-    parameter int MDA_FIT = 0         // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
+    parameter int MDA_FIT = 0,        // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
+    parameter string CPU  = "z86"     // the 8088: "z86" or the old "mcl86"
 ) (
     input  logic        clk,          // 100.2273 MHz
     input  logic        reset,        // synchronous, active high, >= 1 CPU clock
+
+    // The 8088's microcode bundle (tools/mkucode.py, doc/z8086.md), owned by
+    // the glue (QNICE loads /pc10/ucode.bin, pc_ucode.vhd): the file, one byte
+    // per clk at offset ucl_addr, while reset is high. The PC must stay in
+    // reset until it has been loaded (the CPU's tables keep it over resets).
+    input  logic        ucl_we,
+    input  logic [12:0] ucl_addr,
+    input  logic [7:0]  ucl_data,
 
     // System RAM, owned by the glue (BRAM on the PC core, SDRAM in Megamiga).
     // Byte port; read data is expected 1 clk after ram_en (BRAM), but the

@@ -1,0 +1,33 @@
+z8086 in pc10-iii
+
+Source:   https://github.com/nand2mario/z8086
+Commit:   596d9a6616b90c31f35b0d0947d4c1b11aa7a674 (2025-12-21, "cleanups")
+Author:   nand2mario
+Licence:  Apache License 2.0, as stated in the upstream README ("I have chosen
+          to release it under the permissive Apache 2.0 license"). The upstream
+          repository has no LICENSE file; LICENSE here is the Apache 2.0 text.
+
+Files:
+  alu.sv          upstream src/z8086/alu.sv; two pc10-iii changes (DAA/DAS
+                  threshold, NEG byte CF)
+  z86_eu.sv       derived from upstream src/z8086/z8086.sv (pc10-iii changes
+                  marked "pc10-iii", see its header): the EU without z8086's
+                  bus and queue, for biu88, with a clock enable; without
+                  z8086's group decode, translation and address-compression
+                  logic (see below)
+  z86_tables.sv   pc10-iii: the four Intel tables as RAMs (not from z8086)
+  z86_overlay.svh pc10-iii: the 8088 interrupt overlay for an 8086 ROM
+  cpu_z86.sv      pc10-iii: z86_eu + tables + adapter + biu88 (not from z8086)
+
+Not included (AGENTS.md rule 4: no table from Intel's die in the repository or
+in the bitstream):
+  - upstream src/z8086/ucode.hex, the 512 x 21-bit 8086 microcode ROM
+    (Andrew Jenner's extraction from Ken Shirriff's die photo);
+  - the tables that upstream z8086.sv carries as logic: the group decode ROM
+    (Shirriff's transcription), the translation ROM entries and the microcode
+    address decoder ("uaddr_pack").
+All four come from the microcode bundle the user builds with tools/mkucode.py
+from his own copy of Jenner's public archive (8086_microcode_v2.zip; it has
+the 8088 ROM too) and is loaded at start-up (doc/z8086.md). Upstream z8086.sv
+itself was removed from this repository on 2026-10-22 for that reason; the
+commit above is the reference.

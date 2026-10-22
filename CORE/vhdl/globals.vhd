@@ -89,6 +89,8 @@ constant C_DEV_PC_FDA         : std_logic_vector(15 downto 0) := x"0101";
 constant C_DEV_PC_FDB         : std_logic_vector(15 downto 0) := x"0102";
 -- The CGA character ROM (pc_font.vhd): windows 0..1 the 8 KB image, window 0x0100 control.
 constant C_DEV_PC_FONT        : std_logic_vector(15 downto 0) := x"0103";
+-- The 8088's microcode bundle (pc_ucode.vhd): windows 0..1 the 6 KB image, window 0x0100 control.
+constant C_DEV_PC_UCODE       : std_logic_vector(15 downto 0) := x"0104";
 
 ----------------------------------------------------------------------------------------------------------
 -- Virtual Drive Management System: not used (yet)
@@ -129,17 +131,24 @@ constant C_CRTROMS_MAN           : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_
 -- size (8..64 KB) and releases the BIOS gate of pc_bios.vhd.
 -- The CGA character ROM is optional: without /pc10/cga.rom the free default font of
 -- pc_font.vhd stays (PREP_START copies a loaded one into the CGA card).
+-- The 8088's microcode is mandatory too (AGENTS.md rule 4: it is not in the bitstream): the
+-- bundle that tools/mkucode.py builds, /pc10/ucode.bin; PREP_START checks it (UCODE_START)
+-- and has pc_ucode.vhd copy it into the CPU, which releases the PC from reset.
 constant BIOS_ROM_NAME           : string := "/pc10/bios.rom" & ENDSTR;
 constant BIOS_ROM_NAME_START     : std_logic_vector(15 downto 0) := x"0000";
 constant FONT_ROM_NAME           : string := "/pc10/cga.rom" & ENDSTR;
 constant FONT_ROM_NAME_START     : std_logic_vector(15 downto 0) := std_logic_vector(to_unsigned(BIOS_ROM_NAME'length, 16));
+constant UCODE_ROM_NAME          : string := "/pc10/ucode.bin" & ENDSTR;
+constant UCODE_ROM_NAME_START    : std_logic_vector(15 downto 0) := std_logic_vector(to_unsigned(BIOS_ROM_NAME'length + FONT_ROM_NAME'length, 16));
 
-constant C_CRTROMS_AUTO_NUM      : natural := 2;
-constant C_CRTROMS_AUTO_NAMES    : string  := BIOS_ROM_NAME & FONT_ROM_NAME;
+constant C_CRTROMS_AUTO_NUM      : natural := 3;
+constant C_CRTROMS_AUTO_NAMES    : string  := BIOS_ROM_NAME & FONT_ROM_NAME & UCODE_ROM_NAME;
 constant C_CRTROMS_AUTO          : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_DEV_PC_BIOS,
                                                          C_CRTROMTYPE_MANDATORY, BIOS_ROM_NAME_START,
                                                          C_CRTROMTYPE_DEVICE, C_DEV_PC_FONT,
                                                          C_CRTROMTYPE_OPTIONAL, FONT_ROM_NAME_START,
+                                                         C_CRTROMTYPE_DEVICE, C_DEV_PC_UCODE,
+                                                         C_CRTROMTYPE_MANDATORY, UCODE_ROM_NAME_START,
                                                          x"EEEE");
 
 ----------------------------------------------------------------------------------------------------------

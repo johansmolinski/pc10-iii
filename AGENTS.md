@@ -19,10 +19,21 @@ why, test numbers).
    synthesis needs no Python. The unmodified upstream ROM is the Xilinx
    `MCL86_Microcode_Xilinx_Version_4.coe` (`mcasm.py --check` reproduces it
    from the original listing).
-4. **No Intel microcode.** Intel's 8086 microcode is copyrighted (NEC v.
-   Intel, 1989); do not copy it into this repository, not even as comments.
-   Timing facts from the test suite, MartyPC (MIT) or published analyses
-   are fine.
+4. **No Intel microcode in the repository or the bitstream.** Intel's
+   8086/8088 microcode and the other tables read off its die (the ROM's
+   address decoder, the translation ROM, the group decode ROM) are
+   copyrighted (NEC v. Intel, 1989); do not copy them into this repository,
+   not even as comments, and never into a RAM's initial contents. The CPU
+   (z8086's EU, doc/z8086.md) loads them at start-up from the **microcode
+   bundle** that the user builds with `tools/mkucode.py` from his own copy of
+   Andrew Jenner's public archive (`8086_microcode_v2.zip`; the tool contains
+   no table data): on the MEGA65 `/pc10/ucode.bin` on the SD card, next to the
+   BIOS (`CORE/vhdl/pc_ucode.vhd`; the PC stays in reset without a valid
+   one); in simulation `~/pcxt-work/ucode/8088.bin` (`$PC10_UCODE`, or
+   `make Z86_UCODE=...`). The 8088 interrupt overlay for an 8086 bundle
+   (`rtl/cpu/z8086/z86_overlay.svh`) holds only our own words, derived from
+   behaviour (doc/z8086.md section 5). Timing facts from the test suite,
+   MartyPC (MIT), XTCE (The Unlicense) or published analyses are fine.
 5. **Test data stays outside the repo** (`~/pcxt-work/`): the suite has no
    licence file, and the converted form is several GB.
 6. Hardware rules from Megamiga apply once there is a bitstream: board XDC,
@@ -30,6 +41,11 @@ why, test numbers).
 
 ## Layout
 
+- `rtl/cpu/cpu8088.sv`: the 8088; `CPU = "z86"` (default) or `"mcl86"`.
+- `rtl/cpu/z8086/` (doc/z8086.md): z8086's EU (`z86_eu.sv`, `alu.sv`), the
+  Intel tables as RAMs (`z86_tables.sv`), the 8088 interrupt overlay
+  (`z86_overlay.svh`), EU + adapter + biu88 (`cpu_z86.sv`).
+- `tools/mkucode.py`: the microcode bundle (rule 4).
 - `rtl/cpu/mcl86/`:
   - eu.v (microsequencer);
   - biu88.v (our cycle-stepped BIU) and biu_max.v (the original, for
@@ -37,8 +53,11 @@ why, test numbers).
   - eu4kx32.v (ROM model);
   - microcode.txt / .hex.
 - `tb/sst/`: `sst2txt.py` (JSON -> line format), `sst_run.cpp` (Verilator
-  harness), `tb_mcl86.v` (wrapper; debug outputs via hierarchical
-  references).
+  harness), `tb_z86.v` / `tb_mcl86_biu88.v` / `tb_mcl86.v` (wrappers; debug
+  outputs via hierarchical references). `make run` runs the z86 CPU,
+  `make run CPU=mcl86` (BIU=biu88/max) the old one.
+- `tb/sys/`: the system; `make` builds the z86 CPU, `make CPU=mcl86` the old
+  one.
 - `tools/mcasm.py`: microcode assembler; `tools/mcset.py`: change words in
   the listing in place.
 - `rtl/video/cga/` (cga_card.sv, cga_crtc.sv) and `tb/cga/` (Verilator TB
@@ -49,6 +68,10 @@ why, test numbers).
 - **Clocking:** CORE_CLK 100 MHz, CLK 4.7727 MHz from a phase accumulator,
   1/3 duty. MCL86's cycle counter and BIU state numbers are tuned for that
   ratio.
+- **z86:** biu88 steps at `step`, the EU at `step` + 3 clk (its enable, one
+  microinstruction per 8088 clock); the harness streams the microcode bundle
+  through the load port once per process (`$PC10_UCODE`). The phase sweep
+  (`-S`) changes nothing for it.
 - **Loader:** the CPU's registers come from a program served on the bus
   (POPF, MOV r16,imm, MOV sreg,AX, JMP FAR).
   - Prefetched tests (initial queue non-empty): with `biu88`, a test-only

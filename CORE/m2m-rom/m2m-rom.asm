@@ -7,8 +7,11 @@
 ; the BIOS: /pc10/bios.rom is a mandatory auto-loaded ROM (globals.vhd), so the
 ; Shell loads it into the BIOS device (pc_bios.vhd) while the PC is held in
 ; reset, and goes fatal if the file is missing. PREP_START then checks the
-; size (8..64 KB) and releases the BIOS gate of pc_bios.vhd, which is what lets
-; the PC out of reset.
+; size (8..64 KB) and releases the BIOS gate of pc_bios.vhd. The 8088's
+; microcode is loaded the same way: /pc10/ucode.bin (tools/mkucode.py; not in
+; the bitstream, AGENTS.md rule 4) is a mandatory auto-loaded ROM in
+; pc_ucode.vhd; PREP_START checks it and has it copied into the CPU. Both gates
+; together let the PC out of reset.
 ;
 ; Callbacks the Megamiga fork's Shell needs on top of the M2M template's:
 ; HANDLE_CORE_IO (core-io-hook), BROWSE_EXTRA (cfg-strings), CFG_SIGCHECK and
@@ -328,6 +331,9 @@ _PCPS_OK        MOVE    R1, R2                  ; right-align the image (pc_bios
 _PCPS_AL        RSUB    FONT_START, 1           ; the CGA font (optional)
                 CMP     0, R8
                 RBRA    _PCPS_RET, !Z
+                RSUB    UCODE_START, 1          ; the 8088's microcode
+                CMP     0, R8
+                RBRA    _PCPS_RET, !Z
                 MOVE    M2M$RAMROM_DEV, R0      ; back to the BIOS device
                 MOVE    PC_DEV_BIOS, @R0
                 MOVE    M2M$RAMROM_4KWIN, R0
@@ -429,6 +435,79 @@ _FTST_RET       DECRB
                 RET
 
 ERR_FONT        .ASCII_W "/pc10/cga.rom must be 2 KB or 8 KB"
+
+; UCODE_START: check the 8088 microcode bundle that the Shell loaded into
+; pc_ucode.vhd (/pc10/ucode.bin, made by tools/mkucode.py, format in its
+; header) and have it copied into the CPU, which releases the PC's microcode
+; gate. Checks: 6144 bytes and no more, magic "PC10UCOD", version 1, the size
+; field 0x1800, the checksum (the sum of the bytes 0x0100..0x17FF, modulo
+; 65536). The same checks as the simulations (tb/common/ucode_file.h).
+; Output: R8/R9: 0 = OK, else the fatal message / code (own register bank)
+UCODE_START     INCRB
+                MOVE    M2M$RAMROM_DEV, R0
+                MOVE    PC_DEV_UCODE, @R0
+                MOVE    M2M$RAMROM_4KWIN, R0
+                MOVE    PC_BIOS_CTRL, @R0       ; (its control window is 0x0100 too)
+                MOVE    M2M$RAMROM_DATA, R1
+                CMP     0x1800, @R1             ; size
+                RBRA    _UCST_BAD, !Z
+                MOVE    R1, R3                  ; larger than 8 KB?
+                ADD     1, R3
+                MOVE    @R3, R3
+                AND     1, R3
+                RBRA    _UCST_BAD, !Z
+
+                MOVE    0, @R0                  ; the header (window 0)
+                MOVE    M2M$RAMROM_DATA, R4
+                MOVE    UCODE_MAGIC, R5
+                MOVE    8, R6
+_UCST_MAG       MOVE    @R4++, R7
+                CMP     @R5++, R7
+                RBRA    _UCST_BAD, !Z
+                SUB     1, R6
+                RBRA    _UCST_MAG, !Z
+                CMP     1, @R4++                ; version 1
+                RBRA    _UCST_BAD, !Z
+                ADD     1, R4                   ; (flags)
+                CMP     0x00, @R4++             ; size 0x1800
+                RBRA    _UCST_BAD, !Z
+                CMP     0x18, @R4++
+                RBRA    _UCST_BAD, !Z
+                MOVE    @R4++, R6               ; R6: the checksum
+                MOVE    @R4++, R7
+                SHL     8, R7
+                OR      R7, R6
+
+                XOR     R10, R10                ; R10: the sum of 0x0100..0x17FF
+                MOVE    M2M$RAMROM_DATA, R4
+                ADD     0x0100, R4
+                MOVE    0x0F00, R7
+_UCST_SUM0      ADD     @R4++, R10
+                SUB     1, R7
+                RBRA    _UCST_SUM0, !Z
+                MOVE    1, @R0                  ; window 1: 0x1000..0x17FF
+                MOVE    M2M$RAMROM_DATA, R4
+                MOVE    0x0800, R7
+_UCST_SUM1      ADD     @R4++, R10
+                SUB     1, R7
+                RBRA    _UCST_SUM1, !Z
+                CMP     R6, R10
+                RBRA    _UCST_BAD, !Z
+
+                MOVE    PC_BIOS_CTRL, @R0       ; GO: copy it into the CPU
+                MOVE    R1, R3
+                ADD     2, R3
+                MOVE    1, @R3
+                XOR     R8, R8
+                XOR     R9, R9
+                RBRA    _UCST_RET, 1
+_UCST_BAD       MOVE    ERR_UCODE, R8
+                MOVE    4, R9
+_UCST_RET       DECRB
+                RET
+
+UCODE_MAGIC     .DW     0x0050, 0x0043, 0x0031, 0x0030, 0x0055, 0x0043, 0x004F, 0x0044
+ERR_UCODE       .ASCII_W "/pc10/ucode.bin is not a valid 8088 microcode bundle (tools/mkucode.py)"
 
 ; ----------------------------------------------------------------------------
 ; Core specific callback functions: OSM selections

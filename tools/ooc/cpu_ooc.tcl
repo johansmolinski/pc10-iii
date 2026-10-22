@@ -1,5 +1,6 @@
 # cpu_ooc.tcl - out-of-context synthesis + implementation of the CPU alone
-# (rtl/cpu/cpu8088.sv: MCL86 EU + biu88 + microcode ROM) for the MEGA65 R6 part
+# (rtl/cpu/cpu8088.sv, CPU = "z86": z8086 EU + tables + biu88; env OOC_CPU=mcl86
+# for MCL86's EU + biu88 + microcode ROM) for the MEGA65 R6 part
 # at 100.2273 MHz, with the CPU's constraints (rtl/cpu/cpu8088.xdc, scoped to
 # cpu8088 as in the system).
 #   cd <repo>/tools/ooc && vivado -mode batch -source cpu_ooc.tcl [-tclargs synth|explore]
@@ -17,8 +18,10 @@ set explore    [expr {[llength $argv] > 0 && [lindex $argv 0] eq "explore"}]
 set placedir   [expr {[llength $argv] > 1 ? [lindex $argv 1] : "Explore"}]
 file mkdir $here/out
 set_part xc7a200tfbg484-2
+set ooc_cpu [expr {[info exists env(OOC_CPU)] ? $env(OOC_CPU) : "z86"}]
 read_verilog $here/cpu_ooc_top.v $rtl/eu.v $rtl/biu88.v $rtl/eu_rom.v
-read_verilog -sv $cpu/cpu8088.sv
+read_verilog -sv [list $cpu/z8086/alu.sv $cpu/z8086/z86_tables.sv $cpu/z8086/z86_eu.sv \
+    $cpu/z8086/cpu_z86.sv $cpu/cpu8088.sv]
 set clkxdc [open $here/out/clk.xdc w]
 puts $clkxdc {create_clock -name clk -period 9.977 [get_ports clk]}
 close $clkxdc
@@ -27,6 +30,7 @@ if {[file exists $cpu/cpu8088.xdc]} {
     read_xdc -ref cpu8088 $cpu/cpu8088.xdc
 }
 synth_design -top cpu_ooc_top -mode out_of_context -flatten_hierarchy rebuilt \
+    -include_dirs $cpu/z8086 -generic CPU=\"$ooc_cpu\" \
     -verilog_define MCL86_ROM=\"$rtl/microcode.hex\"
 report_utilization -file $here/out/synth_util.rpt
 report_timing_summary -max_paths 10 -file $here/out/synth_timing.rpt
@@ -50,9 +54,9 @@ report_timing_summary -max_paths 10 -file $here/out/timing.rpt
 report_timing -max_paths 30 -nworst 1 -sort_by group -file $here/out/paths.rpt
 report_design_analysis -logic_level_distribution -file $here/out/levels.rpt
 # by region: EU, BIU (the multicycle sources of biu88's step apart: bd*, sn_*, p1_*)
-set eu  [get_cells -hier -filter {IS_SEQUENTIAL && NAME =~ cpu/eu/*}]
-set win [get_cells -hier -filter {IS_SEQUENTIAL && (NAME =~ cpu/biu/bd* || NAME =~ cpu/biu/sn_* || NAME =~ cpu/biu/p1_*)}]
-set biu [get_cells -hier -filter {IS_SEQUENTIAL && NAME =~ cpu/biu/* && NAME !~ cpu/biu/bd* && NAME !~ cpu/biu/sn_* && NAME !~ cpu/biu/p1_*}]
+set eu  [get_cells -hier -filter {IS_SEQUENTIAL && NAME =~ cpu/*eu/*}]
+set win [get_cells -hier -filter {IS_SEQUENTIAL && (NAME =~ cpu/*biu/bd* || NAME =~ cpu/*biu/sn_* || NAME =~ cpu/*biu/p1_*)}]
+set biu [get_cells -hier -filter {IS_SEQUENTIAL && NAME =~ cpu/*biu/* && NAME !~ cpu/*biu/bd* && NAME !~ cpu/*biu/sn_* && NAME !~ cpu/*biu/p1_*}]
 report_timing -max_paths 5 -nworst 1 -from $eu  -to $eu  -file $here/out/eu2eu.rpt
 report_timing -max_paths 5 -nworst 1 -from $eu  -to [concat $biu $win] -file $here/out/eu2biu.rpt
 report_timing -max_paths 5 -nworst 1 -from [concat $biu $win] -to $eu -file $here/out/biu2eu.rpt

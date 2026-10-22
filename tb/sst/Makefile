@@ -10,7 +10,20 @@ JOBS ?= $(shell nproc)
 RTL  = ../../rtl/cpu/mcl86
 # BIU=biu88 (default): the cycle-stepped BIU; BIU=max: MCL86's original BIU
 BIU ?= biu88
-ifeq ($(BIU),max)
+# CPU=z86 (default): z8086's EU + biu88 (doc/z8086.md); CPU=mcl86: MCL86. The microcode bundle
+# (tools/mkucode.py, not in the repository) is read at run time: $$PC10_UCODE,
+# else Z86_UCODE compiled in.
+CPU ?= z86
+Z86_UCODE ?= $(HOME)/pcxt-work/ucode/8088.bin
+Z86  = ../../rtl/cpu/z8086
+ifeq ($(CPU),z86)
+SRC  = tb_z86.v $(Z86)/z86_eu.sv $(Z86)/z86_tables.sv $(Z86)/alu.sv \
+       $(Z86)/cpu_z86.sv $(RTL)/biu88.v
+CDEF = -CFLAGS -DBIU88 -CFLAGS -DZ86 -CFLAGS -DZ86_UCODE='\"$(Z86_UCODE)\"' -CFLAGS -I$(abspath ../common) \
+       -I$(Z86)
+OBJ  ?= obj_z86
+ROMHEX = $(Z86)/z86_overlay.svh
+else ifeq ($(BIU),max)
 SRC  = tb_mcl86.v $(RTL)/eu.v $(RTL)/biu_max.v $(RTL)/eu_rom.v
 CDEF =
 else

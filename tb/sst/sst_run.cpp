@@ -31,6 +31,9 @@
 #include <sstream>
 #include "Vtb_mcl86.h"
 #include "verilated.h"
+#ifdef Z86
+#include "ucode_file.h"
+#endif
 
 enum { AX, BX, CX, DX, CS, SS, DS, ES, SP, BP, SI, DI, IP, FLAGS, NREG };
 static const char *REGN[NREG] = {"ax", "bx", "cx", "dx", "cs", "ss", "ds",
@@ -571,6 +574,20 @@ int main(int argc, char **argv) {
         else if (argv[i][0] != '+') files.push_back(argv[i]);
     }
     Sim sim;
+#ifdef Z86
+    {
+        // the microcode bundle through the CPU's load port, in reset
+        std::vector<uint8_t> uc;
+        std::string err;
+        if (!ucode_read(uc, err)) { fprintf(stderr, "%s\n", err.c_str()); return 2; }
+        sim.top->reset = 1;
+        for (size_t i = 0; i < uc.size(); i++) {
+            sim.top->ucl_we = 1; sim.top->ucl_addr = i; sim.top->ucl_data = uc[i];
+            sim.step();
+        }
+        sim.top->ucl_we = 0;
+    }
+#endif
     printf("%-10s %6s %6s %6s %6s %6s %6s\n", "file", "tests", "state",
            "plain", "length", "trace", "tmout");
     for (auto &fn : files) {

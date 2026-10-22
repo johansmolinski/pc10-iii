@@ -149,6 +149,8 @@ module biu88 (
     input      [15:0]   EU_REGISTER_R3,
     input               EU_PREFIX_LOCK,
     input      [1:0]    eu_qread,           // EU uses the queue top: 01 opcode, 11 other
+    input               INTA_VEC_LO,        // INTA word: the vector (2nd cycle) in the low byte
+                                            // (MCL86; z86's 8088 overlay); else {2nd, 1st}
 
     output              BIU_DONE,
     output              BIU_CLK_COUNTER_ZERO,
@@ -2889,7 +2891,7 @@ always @(posedge CORE_CLK_INT) begin
                 RP_WAIT:
                     if (st_t4 && (!r_write || r_word && !r_second)) begin
                         if (r_write) ;
-                        else if (r_second && r_type == ST_INTA)
+                        else if (r_second && r_type == ST_INTA && INTA_VEC_LO)
                             return_data = {8'h00, st_db};   // the vector: 2nd INTA
                         else if (r_second) return_data[15:8] = st_db;
                         else return_data = {8'h00, st_db};

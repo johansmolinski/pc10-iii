@@ -33,11 +33,14 @@ if {[get_property PROGRESS [get_runs synth_1]] ne "100%"} {
     exit 1
 }
 
-# the MCL86 microcode ROM must have been read (a missing file is only a warning: a dead CPU)
+# with CPU = "mcl86" the MCL86 microcode ROM must have been read (a missing file is only a
+# warning: a dead CPU). The default CPU (z86) has no microcode in the bitstream: it is loaded
+# from the SD card (pc_ucode.vhd, AGENTS.md rule 4).
 set synth_log [file join [get_property DIRECTORY [get_runs synth_1]] runme.log]
 set uc_gate ""
-if {[string match *MCL86_ROM* [get_property verilog_define [current_fileset]]]} {
-    set f [open $synth_log r]; set log [read $f]; close $f
+set f [open $synth_log r]; set log [read $f]; close $f
+if {[string match *MCL86_ROM* [get_property verilog_define [current_fileset]]] &&
+    [regexp {synthesizing module 'mcl86_eu_core} $log]} {
     if {![regexp {microcode\.hex' is read successfully} $log]} {
         set uc_gate "the MCL86 microcode image was not read by synthesis"
     }

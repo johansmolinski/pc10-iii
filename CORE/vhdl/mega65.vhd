@@ -11,6 +11,8 @@
 --   and released the image
 -- * pc_font.vhd: the CGA character ROM (free default font, or /pc10/cga.rom), QNICE device
 --   C_DEV_PC_FONT, copied into pc_system's font port
+-- * pc_ucode.vhd: the 8088's microcode bundle (/pc10/ucode.bin, tools/mkucode.py), QNICE
+--   device C_DEV_PC_UCODE, copied into the CPU's tables; the PC stays in reset until then
 -- * pc_fdd_sd.vhd: floppy A: and B: from image files on the SD card (QNICE devices
 --   C_DEV_PC_FDA/FDB, the SD host's engine port)
 -- * the OSM settings (config.vhd): floppy images and write protection, memory size, CGA thin
@@ -362,6 +364,10 @@ signal main_pc_reset          : std_logic := '1';
 attribute max_fanout : integer;
 attribute max_fanout of main_pc_reset : signal is 32;    -- the PC's synchronous reset
 signal main_bios_valid        : std_logic;
+signal main_ucode_valid       : std_logic;
+signal main_ucl_we            : std_logic;
+signal main_ucl_addr          : std_logic_vector(12 downto 0);
+signal main_ucl_data          : std_logic_vector(7 downto 0);
 signal main_mem_size          : std_logic_vector(1 downto 0);
 
 ---------------------------------------------------------------------------------------------
@@ -387,6 +393,9 @@ signal qnice_bios_we          : std_logic;
 signal qnice_font_data        : std_logic_vector(15 downto 0);
 signal qnice_font_ce          : std_logic;
 signal qnice_font_we          : std_logic;
+signal qnice_ucode_data       : std_logic_vector(15 downto 0);
+signal qnice_ucode_ce         : std_logic;
+signal qnice_ucode_we         : std_logic;
 signal qnice_fdd_data         : std_logic_vector(15 downto 0);
 signal qnice_fdd_ce           : std_logic;
 signal qnice_fdd_we           : std_logic;
@@ -579,7 +588,8 @@ begin
    p_reset : process (main_clk)
    begin
       if rising_edge(main_clk) then
-         main_pc_reset <= main_rst or main_reset_core_i or main_reset_m2m_i or not main_bios_valid;
+         main_pc_reset <= main_rst or main_reset_core_i or main_reset_m2m_i or not main_bios_valid or
+                          not main_ucode_valid;
       end if;
    end process p_reset;
 
@@ -627,6 +637,9 @@ begin
          font_addr_i          => main_font_addr,
          font_data_i          => main_font_data,
          font_thin_i          => main_osm_control_i(C_MENU_CGA_THIN),
+         ucl_we_i             => main_ucl_we,
+         ucl_addr_i           => main_ucl_addr,
+         ucl_data_i           => main_ucl_data,
 
          drv_80trk_i          => main_drv_80trk,
          img_present_i        => main_img_present,
@@ -698,6 +711,8 @@ begin
       qnice_bios_we    <= '0';
       qnice_font_ce    <= '0';
       qnice_font_we    <= '0';
+      qnice_ucode_ce   <= '0';
+      qnice_ucode_we   <= '0';
       qnice_fdd_ce     <= '0';
       qnice_fdd_we     <= '0';
       qnice_fdd_drive  <= '0';
@@ -712,6 +727,11 @@ begin
             qnice_font_ce    <= qnice_dev_ce_i;
             qnice_font_we    <= qnice_dev_we_i;
             qnice_dev_data_o <= qnice_font_data;
+
+         when C_DEV_PC_UCODE =>
+            qnice_ucode_ce   <= qnice_dev_ce_i;
+            qnice_ucode_we   <= qnice_dev_we_i;
+            qnice_dev_data_o <= qnice_ucode_data;
 
          when C_DEV_PC_FDA | C_DEV_PC_FDB =>
             qnice_fdd_ce     <= qnice_dev_ce_i;
@@ -756,6 +776,22 @@ begin
          font_addr_o          => main_font_addr,
          font_data_o          => main_font_data
       ); -- i_pc_font
+
+   i_pc_ucode : entity work.pc_ucode
+      port map (
+         qnice_clk_i          => qnice_clk_i,
+         qnice_rst_i          => qnice_rst_i,
+         qnice_addr_i         => qnice_dev_addr_i,
+         qnice_data_i         => qnice_dev_data_i,
+         qnice_data_o         => qnice_ucode_data,
+         qnice_ce_i           => qnice_ucode_ce,
+         qnice_we_i           => qnice_ucode_we,
+         main_clk_i           => main_clk,
+         main_valid_o         => main_ucode_valid,
+         ucl_we_o             => main_ucl_we,
+         ucl_addr_o           => main_ucl_addr,
+         ucl_data_o           => main_ucl_data
+      ); -- i_pc_ucode
 
    i_pc_fdd_sd : entity work.pc_fdd_sd
       port map (
