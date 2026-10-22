@@ -115,6 +115,14 @@ the CGA depend on it):
   DMA term changes only on `cpu_step`, so `rdy_ce` sees the value `cpu_fall`
   saw (checked in simulation); every CPU I/O cycle gets one wait state,
   counted only where the DMA wait is over (MartyPC's cycle.rs).
+- After a DMA transfer the CPU's commands come back one `clk` after AEN
+  falls (`cmd_en` in `xt_board.sv`): AEN falls in the `clk` in which the
+  8237 ends its strobes, so a CPU command the DMA held would otherwise
+  continue the 8237's strobe of the same kind without a high phase (a
+  refresh's IOW running into the CPU's OUT; the FDC dropped the DOR write,
+  2026-10-22). A strobe line never changes owner while it is low (checked
+  in simulation), so a strobe that starts with AEN high is the DMA's to its
+  end.
 - Read data is taken in the `clk` where T4 begins.
 - `ce_14m` coincides with `cpu_step` and `cpu_fall` (pc_clocks, any PHASE);
   the card state that `rdy_ce` samples is the one after the dot update for

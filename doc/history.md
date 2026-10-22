@@ -1066,3 +1066,59 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   FDD" (seek test), this branch before the merge the same, after it "FDD
   [ 0 ]" with POST still running at 10 s (its CGA writes now wait). Not
   caused by the READY rework; open (it starts with the refresh DMA work).
+
+## 2026-10-22 - Floppy boot: a CPU command never continues a DMA strobe (branch `fdboot`)
+
+- **Cause** (traces of 22f9853, 387e87e and main 531f5e2 with
+  `sys_run -a hello360.img`, a new FDC event log `-f` and a clk-level dump
+  of the board): since 387e87e AEN falls in the clk in which the 8237 ends
+  its strobes (`aen_next = hold_ack && hold_request_next`, S4), where it
+  used to fall one CPU clock later. A CPU command that the DMA held (the
+  cycle met the refresh in T1) is released in that same clk, so the bus
+  strobe of that kind stays low across both owners: the refresh (a read
+  transfer: MEMR + IOW) ran straight into the CPU's MEMR or IOW. Cards that
+  decode at the strobe's falling edge saw one DMA strobe.
+  - The RAM had this first: the board's RAM request came at the strobe's
+    falling edge, so a CPU read held by a refresh got the previous read's
+    byte (7437964's finding). At 387e87e (128 KB and 640 KB runs) an early
+    POST memory check (MEM_CHECK) fails and GLaBIOS halt-beeps from ~150 ms
+    on: the empty screen of the bisect (14edb29, b327eaf the same there).
+    7437964 fixed it for the RAM only (RAM requests per bus owner).
+  - The FDC (`fdc_card`: "decode at the strobe's start, act at its end")
+    drops the CPU's write. Main, step 10,711,241 (128 KB run): `OUT 3F2,08`
+    (INT 13h reset, F000:ECB5) meets the refresh in T1, the refresh's IOW
+    starts at step +4 with AEN high, AEN falls at +6 in the clk where the
+    8237's IOW ends and the CPU's IOW begins; IOW stays low, the card's DOR
+    cycle flag stays 0, no DOR write. The FDC log of 22f9853 shows `DOR 08`,
+    `DOR 0C`, IRQ6; main shows only `DOR 0C`, the 765 is never reset, IRQ6
+    (edge-triggered, high since the first reset at 521 ms) gives no new
+    interrupt, FDC_WAIT_INT times out (POST Error 1000 FDC at 7437964; later
+    timing moved the loss to the seek test's command bytes or let the
+    reset's retry fail too: 0800 FDD, "FDD [ 0 ]"). Main's 640 KB run loses
+    both resets (6,836 and 8,825 ms).
+  - Neither the 8253 change nor the FDC's DMA: main never reached a DACK2
+    cycle, and the fix leaves the 8253 as it is.
+- **Fix** (`xt_board.sv`): the CPU's commands come back one clk after AEN
+  falls (`cmd_en = !aen && !aen_d`; the next-strobe outputs for registered
+  card decodes follow). The 8288 enables its commands well after AEN on the
+  5160 (tAELCV); one clk is enough for the cards and leaves every CPU-clock
+  edge (AEN, the DMA wait, READY, the trace) as it was. doc/architecture.md
+  section 3 states the rule.
+- **Regression check:** a `$fatal` in `xt_board` when a bus strobe changes
+  owner while low. The old enable (`!aen` alone) with the check stops tb/sys
+  before 50 ms (the first refresh that holds a CPU command), so every tb/sys
+  run guards it, the 1.27 s trace gate included.
+- **Gates** (fedora):
+  - floppy boot, `sys_run -a hello360.img -s 10 -C 40`: FDC reset at
+    6,836 ms (`DOR 08`, `DOR 0C`, IRQ6, sense interrupt), C0 H0 S1 and S2 by
+    DMA at 9,405 ms, "Booted from floppy A: (pc10-iii FDC+DMA)" (22f9853:
+    reset at 6,814 ms, sectors at 9,423 ms); the `-C` oracle there: 134 CGA
+    reads and 14,135 writes, 0 differ (3,622 DMA-stretched);
+  - MartyPC trace (`make DRQ0_SKEW=7`, `-s 1.27 -q -C 40 -t`,
+    `tools/ctrace_diff.py` against the 6M-clock reference): first difference
+    at reference clock 2,439,285, as on main; the `-C` oracle in that run
+    13,313 CGA writes, 0 differ (3,348 DMA-stretched, not compared);
+  - tb/fdc PASS (208 checks), tb/hdc PASS (3,184 checks), tb/cga PASS,
+    tb/mda PASS (MDA and Hercules).
+- Not built yet: `cmd_en` adds one register input in front of the four CPU
+  strobes (the bitstream's timing to be checked with the next build).
