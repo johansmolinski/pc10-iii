@@ -321,7 +321,7 @@ every read.
 
 | Test | What | Result |
 |---|---|---|
-| `waits` | 3,000 random VRAM reads/writes (all of B0000-B7FFF), 6845 and 3BA accesses | IOCHRDY equal at every clk; waits as in section 4.2; 2,031 reads equal |
+| `waits` | 3,000 random VRAM reads/writes (all of B0000-B7FFF), 6845 and 3BA accesses | IOCHRDY equal at every clk; waits as in section 4.2; 2,031 reads equal (they also check the writes) |
 | `text` | IBM BIOS mode 7 (3B8 = 01, 6845 table 61 50 52 0F 19 06 19 19 02 0D 0B 0C, 3B8 = 29), all 256 characters, attributes 07 0F 01 09 70 78 87 F0 00 7F 8F 71, cursor; 2 frames | 654,680 dots equal; 882 dots x 370 lines; text at dots 154-873, lines 20-369 |
 | `attrs` | the attribute decoder against MartyPC's `MDA_ATTR_TABLE`, blink on and off (512 cases) | equal except the 128 cases of background intensity with blink off (section 10) |
 | `status` | 3BA back-to-back for one frame, half the screen lit | 19,136 reads equal; bit 0 in 16.3 % (16/98) |
@@ -335,8 +335,8 @@ every read.
 
 Runtime about 3 minutes (`make -C tb/mda run`).
 
-Mutants (`mut.py`, 34): each breaks one behaviour (slot sample and end
-points, 6845 without slot, 3B8 with slot, dot clock rate, the HRES stop, the
+Mutants (`mut.py`, 35): each breaks one behaviour (slot sample and end
+points, the write after an early strobe end, 6845 without slot, 3B8 with slot, dot clock rate, the HRES stop, the
 U55 stages, the HSYNC stretch, the status bits, the horizontal drive gate,
 the 9th dot, underline row, reverse, no-display, both intensities, blink
 under the cursor, both blink rates, the U28 counting edge, the U101 delay,
@@ -361,7 +361,12 @@ simulated (`~/pcxt-work/mda/sys_mda.png`: "GLaBIOS [.] Reboot the Past",
 row, cursor blinking). The first run showed a blank screen: the board's
 write timing (section 4.2). A test ROM in `tb/sys` gave the wait states of
 section 4.2 (reads 2-3, 6845 writes 2-3, VRAM writes 0) with the real
-`xt_board.sv` and `biu88.v`. HGCRESULT
+`xt_board.sv` and `biu88.v`. With the Hercules card
+(`make MDA=2`) the same boot shows the banner and the RAM count running
+("RAM [ 176 KB OK ]" at 2.6 s simulated); GLaBIOS's HGC detection (status
+bit 7) comes after the RAM test and was not reached in that run (the
+detection itself is covered by `tb/mda` test `hgc`). A boot to the end of
+POST takes hours of simulation on the shared host.
 
 ## 10. Differences and open points
 

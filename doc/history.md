@@ -748,10 +748,14 @@ reading `mda_model.h` stepped on the same clk; MartyPC's 6845 from
   3BF gating, CGA coexistence, status bit 7: all equal;
 - attribute decoder vs. MartyPC's `MDA_ATTR_TABLE`: 512 cases equal except
   the 128 with background intensity (blink off, bit 7), which MartyPC lacks;
-- `mut.py`: 34 mutants, all killed. The first run found one hole (the
+- `mut.py`: 35 mutants, all killed. The first run found one hole (the
   blink counter's edge is invisible while VSYNC is in the blanking), closed.
 
 `tb/sys` (`make MDA=1`, `sys_run -m -F font -o image`): GLaBIOS 0.4.2 8X
 with the MDA fitted next to the CGA and the mono DIP setting: mode 7 at
 518 ms, the banner on the MDA at 0.8 s simulated (text dump and PNG).
-HGCHIST
+With the Hercules card (`make MDA=2`): banner and RAM count at 2.6 s (the
+HGC detection message after the RAM test not reached in that run).
+
+Open: the board's write timing (above); a Vivado out-of-context run; the
+printer port; Hercules details without a schematic (doc/mda.md section 10).
