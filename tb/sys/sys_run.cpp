@@ -4,7 +4,7 @@
 //           [-a floppy.img] [-d dip_sw1] [-L ram_latency_clk]
 //           [-X xub.bin] [-H disk.img] [-J slave.img] [-G c,h,s] [-V variant]
 //           [-W out.img] [-K backend_us] [-S ms,ms,...]
-//           [-F font.bin] [-m] [-v] [-o image]
+//           [-F font.bin] [-m] [-v] [-o image] [-C [max]]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
 //
@@ -21,6 +21,12 @@
 //   -v  log the CPU's writes to 3B0-3BF and 3D0-3DF
 //   -o  with -m: the last MDA frame as <image>.ppm (the vid_hblank/vid_vblank
 //       window, green phosphor; tb/mda/topng.py makes a PNG)
+//   -C  CGA wait-state oracle: every CPU memory cycle in B8000-BFFFF gets
+//       MartyPC's number of wait states, WAIT_TABLE[(dc + 1) & 15] ticks
+//       rounded up to CPU clocks, dc = the card's lchar phase at the end of
+//       T2 (doc/cga.md section 4); cycles that a DMA wait stretched are
+//       counted apart. Prints the first [max] (default 20) mismatches and a
+//       summary; the exit code is 3 if any cycle differs.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -89,6 +95,8 @@ int main(int argc, char **argv) {
     double secs = 1.0;
     bool quiet = false, mono = false, vidlog = false;
     const char *fontfile = nullptr, *imgfile = nullptr;
+    bool woracle = false;
+    int wmax = 20;
     int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 6)
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
     for (int i = 1; i < argc; i++) {
@@ -101,6 +109,10 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-v")) vidlog = true;
         else if (!strcmp(argv[i], "-F") && i + 1 < argc) fontfile = argv[++i];
         else if (!strcmp(argv[i], "-o") && i + 1 < argc) imgfile = argv[++i];
+        else if (!strcmp(argv[i], "-C")) {
+            woracle = true;
+            if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') wmax = atoi(argv[++i]);
+        }
         else if (!strcmp(argv[i], "-a") && i + 1 < argc) fdimg = argv[++i];
         else if (!strcmp(argv[i], "-L") && i + 1 < argc) ramlat = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
@@ -229,6 +241,12 @@ int main(int argc, char **argv) {
     unsigned long long report = (unsigned long long)(0.05 * CLK_HZ);
     unsigned long long steps = 0;
     unsigned last_t = 0;
+    // the CGA wait-state oracle (-C)
+    static const int WAIT_TABLE[16] = {14, 13, 12, 11, 10, 9, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15};
+    struct WCyc { bool on = false, dma = false, wr = false; int p = 0, exp = 0, tw = 0; unsigned a = 0; unsigned long long st = 0; } wc;
+    unsigned long long w_n[2] = {0, 0}, w_bad[2] = {0, 0}, w_dma = 0;
+    unsigned long long w_ph[2][16] = {}, w_phbad[2][16] = {};
+    int w_hist[2][16] = {};                  // Tw counts seen
     for (cyc = 0; cyc < total; cyc++) {
         tb->clk = 0;
         // the sector port backend: inputs for the coming edge
@@ -286,6 +304,40 @@ int main(int argc, char **argv) {
         // sample before the edge (the BIU changes its pins on the edge)
         if (tb->cpu_step) {
             steps++;
+            if (woracle) {
+                auto *rp = tb->rootp;
+                unsigned bt = tb->bus_t & 7, ty = tb->bus_type & 7;
+                bool dmaw = rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__aen ||
+                            rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__dma_wait;
+                if (wc.on) {
+                    if (bt == 3 || bt == 4) {                   // T3, Tw
+                        if (dmaw) wc.dma = true;
+                        if (bt == 4) wc.tw++;
+                    } else {                                    // T4 (or anything else): the cycle ended
+                        int k = wc.wr;
+                        if (wc.dma) w_dma++;
+                        else {
+                            w_n[k]++; w_ph[k][wc.p]++;
+                            if (wc.tw < 16) w_hist[k][wc.tw]++;
+                            if (wc.tw != wc.exp || bt != 5) {
+                                w_bad[k]++; w_phbad[k][wc.p]++;
+                                if (w_bad[0] + w_bad[1] <= (unsigned long long)wmax)
+                                    printf("[%9.3f ms] CGA wait oracle: step %llu %s %05X phase %d: %d Tw, MartyPC %d%s\n",
+                                           cyc / CLK_HZ * 1e3, wc.st, wc.wr ? "MEMW" : "MEMR", wc.a, wc.p, wc.tw, wc.exp,
+                                           bt != 5 ? " (no T4)" : "");
+                            }
+                        }
+                        wc.on = false;
+                    }
+                }
+                // the step that ends T2 of a CPU memory cycle in B8000-BFFFF:
+                // MartyPC's phase is the card's lchar phase there, + 1
+                if (bt == 2 && (ty == 4 || ty == 5 || ty == 6) && (tb->bus_addr >> 15) == 0x17) {
+                    wc.on = true; wc.dma = dmaw; wc.wr = ty == 6; wc.tw = 0; wc.a = tb->bus_addr; wc.st = steps;
+                    wc.p = (rp->tb_sys__DOT__u_pc__DOT__u_cga__DOT__dc + 1) & 15;
+                    wc.exp = (WAIT_TABLE[wc.p] + 2) / 3;
+                }
+            }
             if (tf) {
                 static const char *tn[] = {"Ti", "T1", "T2", "T3", "Tw", "T4", "?6", "T0"};
                 static const char *bt[] = {"INTA", "IOR", "IOW", "HALT", "CODE", "MEMR", "MEMW", "-"};
@@ -403,8 +455,21 @@ int main(int argc, char **argv) {
             printf("MDA frame: %llu dots, window %dx%d -> %s\n", e - s, w, h, fn.c_str());
         }
     }
+    int rc = 0;
+    if (woracle) {
+        for (int k = 0; k < 2; k++) {
+            printf("CGA wait oracle, %s: %llu cycles, %llu differ from MartyPC; Tw seen:", k ? "writes" : "reads",
+                   w_n[k], w_bad[k]);
+            for (int t = 0; t < 16; t++) if (w_hist[k][t]) printf(" %d:%d", t, w_hist[k][t]);
+            printf("\n  by phase (cycles/differ):");
+            for (int q = 0; q < 16; q++) printf(" %d:%llu/%llu", q, w_ph[k][q], w_phbad[k][q]);
+            printf("\n");
+        }
+        printf("CGA wait oracle: %llu cycles stretched by a DMA wait, not compared\n", w_dma);
+        if (w_bad[0] || w_bad[1]) rc = 3;
+    }
     if (tf) fclose(tf);
     if (itf) fclose(itf);
     delete tb;
-    return 0;
+    return rc;
 }
