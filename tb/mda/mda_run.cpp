@@ -1,10 +1,10 @@
 // mda_run.cpp - Verilator testbench for rtl/video/mda (doc/mda.md section 8).
 //
 // The card is driven by a model of the pc10-iii system board's bus timing
-// (rtl/system/xt_board.sv: 8288 command edges, IOCHRDY synchronised on the
-// falling CLK edge, one wait state on CPU I/O cycles; biu88.v: READY sampled
-// as T3 and each Tw begin, so the falling edge before a state decides whether
-// it is the last) with the clock enables of pc_clocks.sv. Next to it runs mda_model.h, a C++ model written from the
+// (rtl/system/xt_board.sv: 8288 command edges, IOCHRDY sampled on rdy_ce, 2
+// clk before the rising CLK edge that ends a state, one wait state on CPU I/O
+// cycles; biu88.v: at the edge that starts T3/Tw the CPU knows from READY
+// whether that state is the last) with the clock enables of pc_clocks.sv. Next to it runs mda_model.h, a C++ model written from the
 // IBM logic diagrams, stepped on the same clk. Every clk, the card's IOCHRDY
 // is compared with the model; every dot (video, intensity, syncs, window)
 // and every read are compared too. Tests (MDA build):
@@ -139,7 +139,7 @@ struct Sim {
     }
 
     void step() {
-        bool ce = c7 == 0, cs = c21 == 0, cf = c21 == 7;
+        bool ce = c7 == 0, cs = c21 == 0, cf = c21 == 7, cr = c21 == 19;
         (void)ce;
         top->clk = 0;
         top->eval();
@@ -192,7 +192,7 @@ struct Sim {
             if (ts == T1 && is_read(cur)) ncmd_rd = true;
             if (ts == T2 && is_write(cur)) ncmd_wr = true;
         }
-        if (cf) rdy_sync = ready;
+        if (cr) rdy_sync = ready;        // xt_board.sv: rdy_ce
         if (cs) {
             bool cpu_ready = rdy_sync;
             switch (ts) {
@@ -290,6 +290,7 @@ struct Sim {
         CHECK(cmp_bad == 0, "%s: %llu of %llu dots differ", what, (unsigned long long)cmp_bad,
               (unsigned long long)cmp_n);
         CHECK(rdy_bad == 0, "%s: IOCHRDY differs in %llu clk", what, (unsigned long long)rdy_bad);
+        CHECK(g.wr_lost == 0, "%s: %d writes ended before the slot", what, g.wr_lost);
         printf("  %s: %llu dots compared, %llu lit\n", what, (unsigned long long)cmp_n,
                (unsigned long long)cmp_lit);
     }
@@ -418,6 +419,7 @@ static void test_waits(const std::vector<uint8_t> &font) {
     }
     s.run_ops();
     CHECK(s.rdy_bad == 0, "waits: IOCHRDY differs in %llu clk", (unsigned long long)s.rdy_bad);
+    CHECK(s.g.wr_lost == 0, "waits: %d writes ended before the slot", s.g.wr_lost);
     for (auto &h : s.tw_hist) {
         int n = 0, sum = 0, lo = 99, hi = -1;
         printf("  %-10s", h.first.c_str());
@@ -427,15 +429,17 @@ static void test_waits(const std::vector<uint8_t> &font) {
             lo = std::min(lo, e.first); hi = std::max(hi, e.first);
         }
         printf("   (mean %.2f)\n", (double)sum / n);
-        // the slot: IOCHRDY 5.5 to 14.5 dots after the strobe; with the
-        // board's MEMR at the falling edge in T1 and READY sampled at the
-        // falling edge before each T3/Tw: 1-4. MEMW starts at the falling
-        // edge in T2, which already decides T3: never a wait (doc/mda.md 4.2)
-        if (h.first == "MEMR") CHECK(lo == 1 && hi == 4, "MEMR waits %d-%d, expected 1-4", lo, hi);
-        if (h.first == "MEMW") CHECK(lo == 0 && hi == 0, "MEMW waits %d-%d, expected 0", lo, hi);
+        // the slot: IOCHRDY 5.5 to 14.5 dots (34-89 clk) after the strobe.
+        // The board samples IOCHRDY 2 clk before the edge that ends T2, T3,
+        // Tw...: 32 + 21k clk after the card sees MEMR/IOR (falling edge in
+        // T1), 11 + 21k after MEMW/IOW (falling edge in T2), so reads get 1-3
+        // wait states, writes 2-4 (doc/mda.md 4.2). The 6845 read here
+        // follows the 6845 write to 3B4 at a nearly fixed slot phase: 1-2.
+        if (h.first == "MEMR") CHECK(lo == 1 && hi == 3, "MEMR waits %d-%d, expected 1-3", lo, hi);
+        if (h.first == "MEMW") CHECK(lo == 2 && hi == 4, "MEMW waits %d-%d, expected 2-4", lo, hi);
         if (h.first == "IOR 3B8-F") CHECK(lo == 1 && hi == 1, "3BA waits %d-%d, expected 1 (the board's)", lo, hi);
-        if (h.first == "IOR 6845") CHECK(lo == 1 && hi == 4, "6845 IOR waits %d-%d, expected 1-4", lo, hi);
-        if (h.first == "IOW 6845") CHECK(lo == 2 && hi == 5, "6845 IOW waits %d-%d, expected 2-5", lo, hi);
+        if (h.first == "IOR 6845") CHECK(lo == 1 && hi == 2, "6845 IOR waits %d-%d, expected 1-2", lo, hi);
+        if (h.first == "IOW 6845") CHECK(lo == 2 && hi == 4, "6845 IOW waits %d-%d, expected 2-4", lo, hi);
     }
     int n = 0, sum = 0;
     printf("  MartyPC   ");

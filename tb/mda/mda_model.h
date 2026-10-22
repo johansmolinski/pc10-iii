@@ -35,11 +35,10 @@ struct MdaModel {
     int ph = 0;                          // dot in the character; 0 = CCLK rises
     bool wide = false;                   // 16-dot characters (HGC graphics)
 
-    // CPU slot (U4a, U4b); a write whose strobe ends before the slot
+    // CPU slot (U4a, U4b); writes whose strobe ended before the slot (lost)
     bool cap = false, ack = false;
     bool wr_prev = false, wr_done = false;
-    int wr_off = 0;
-    uint8_t wr_dat = 0;
+    int wr_lost = 0;
 
     // display pipeline
     uint8_t s1_chr = 0, s1_att = 0;      // U34, U31
@@ -180,11 +179,10 @@ struct MdaModel {
         fall = fall && run;
         bool req = is_req(memr, memw, ior, iow, a);
         bool mw = memw && mem_off(a) >= 0;
-        // the strobe ended before the slot: write now (doc/mda.md 4.2)
-        if (wr_prev && !mw && !wr_done) mem[wr_off] = wr_dat;
+        // the strobe ended before the slot: the write is lost (doc/mda.md 4.2)
+        if (wr_prev && !mw && !wr_done) wr_lost++;
         if (!mw) wr_done = false;
         wr_prev = mw;
-        if (mw) { wr_off = mem_off(a); wr_dat = d; }
 
         if (fall) {
             bool hs = (hs1 || hs2) && hs_ok;

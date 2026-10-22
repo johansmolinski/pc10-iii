@@ -1,6 +1,6 @@
 # IBM CGA card (`rtl/video/cga/`)
 
-Status 2026-10-21: complete for RGBI output, verified in simulation (section
+Status 2026-10-22: complete for RGBI output, verified in simulation (section
 9) against a C++ model of MartyPC's CGA. GLaBIOS boots with it in `tb/sys`
 (instead of `cga_stub.sv`), without a font. Not yet on hardware; composite
 decoding not done (the raw signals are there, section 7).
@@ -121,29 +121,52 @@ Tw    = ceil(ticks / 3)       = 5 5 4 4 4 3 8 8 8 7 7 7 6 6 6 5
 The same table for reads and writes. Read as a rule: **the access ends at
 the CGA's CPU slot, the instant the lchar phase becomes 14, and needs at
 least 9 ticks after the phase reference** (phase + table = 14 or 30 for every
-entry). The CPU then sees READY at its next falling CLK edge: a T3/Tw is the
-last one when the slot is at or before 1 tick into it.
+entry). With D = slot - (end of T2) in ticks (10 to 25), Tw = ceil((D - 1) /
+3): the last T3/Tw is the one whose start is at most 1 tick after the slot
+and at most 1 tick before it, i.e. the slot falls between 1 tick before that
+state and 1 tick into it.
+
+**The board side** (doc/architecture.md section 3): `xt_board.sv` samples
+IOCHRDY on `rdy_ce`, 2 clk before the rising CLK edge that ends a state, and
+biu88 decides at that edge whether the next T3/Tw is the last. In the card's
+time that sample sees the state after the dot update 1 tick before the edge,
+so a state is the last one when IOCHRDY was high 1 tick before it began. For
+MartyPC's count IOCHRDY must therefore go high **2 ticks before the slot**
+(lchar phase 12).
 
 **Implementation** (`cga_card.sv`, "CPU memory access"): when the card sees
 MEMR or MEMW fall in the B8000-BFFFF window it pulls `isa_ready` low and
-counts dot ticks; `isa_ready` goes high at the first instant with `dc = 14`
-and at least `LEAD + 9` ticks since the strobe was seen. The access (VRAM
-write, snow capture) happens then. `LEAD` converts the strobe's time to
-MartyPC's reference (end of T2 + 1 tick):
+counts dot ticks (`el`). `isa_ready` goes high at the first instant with
+`dc = 12` and at least `LEAD + 7` ticks since the strobe was seen (`rel_due`,
+then held in `rel`); the access itself (VRAM write, snow capture) happens 2
+ticks later at the slot, `dc = 14` with `LEAD + 9` ticks, still inside the
+strobe (the board ends it with T4, at least 2 ticks after the slot). `LEAD`
+converts the strobe's time to MartyPC's reference (end of T2 + 1 tick):
 - `RD_LEAD` = 6: `xt_board.sv` asserts MEMR at the falling CLK edge in T1,
   5 ticks before the end of T2;
-- `WR_LEAD` = 3: MEMW at the falling edge in T2, 2 ticks before its end.
+- `WR_LEAD` = 3: MEMW (the 8288's advanced write, AMWC) at the falling edge
+  in T2, 2 ticks before its end.
 
-If the board's command edges move (they are marked CAL in `xt_board.sv`),
-these two parameters move with them. The board samples `isa_ready` at
-`cpu_fall` (8284 RDY synchroniser) and the CPU takes it at the end of
-T3/Tw: that is exactly the rule above, so no change on the board side.
+If the board's command edges or its READY sample move (they are marked CAL
+in `xt_board.sv`), these parameters and the release phase move with them.
 
-A board that ends the strobe before the slot (ignoring IOCHRDY) still gets
-its write done at the strobe end.
+**No write fallback any more.** Until 2026-10-22 the board sampled IOCHRDY
+at the falling edge in T2, the edge where MEMW starts, so a write could not
+wait and the card wrote at the end of the strobe when the slot had not come.
+Now every strobe outlasts the slot: the CPU's (above), and the 8237's (it
+samples IOCHRDY at the end of SW and ends MEMW with the step in S4, 2 ticks
+later, when the slot is due). The one exception is a refresh DMA while the
+CPU waits: the board grants HOLDA in T3/Tw and AEN takes the CPU's command
+away (the 8288's AEN) until the transfer is over. The card drops the access
+then (its select is gone) and starts a new one when the strobe returns; that
+one writes, or captures the snow byte, at its own slot. A strobe that ends
+before the slot with AEN low would lose the access, as on the real card; the
+simulation stops with `$fatal` then. (The old fallback wrote at the cut and
+again at the restarted access.)
 
 **Verified** (section 9, test `waits`): reads and writes at all 16 phases,
-4 to 8 accesses each, give MartyPC's number of wait states.
+at least 8 of each, give MartyPC's number of wait states; in `tb/sys` the
+`-C` oracle checks every CPU access of a GLaBIOS boot (section 9).
 
 **MartyPC's limit here:** the phase is computed from the CGA's tick count at
 the start of the instruction plus the CPU cycles since the last data
@@ -352,8 +375,9 @@ and writes images to `~/pcxt-work/cga/`. `python3 tb/cga/mut.py` runs the
 mutant set.
 
 The testbench drives the card bus with a model of `xt_board.sv`'s bus
-timing: `pc_clocks` enables, 8288 command edges, IOCHRDY synchronised at
-`cpu_fall`, one wait state on every I/O cycle. Next to the card runs
+timing and biu88's READY rule: `pc_clocks` enables, 8288 command edges,
+IOCHRDY sampled on `rdy_ce` (2 clk before the step), the next T3/Tw's
+lastness decided at the step from it, one wait state on every I/O cycle. Next to the card runs
 `cga_model.h`, a C++ transliteration of MartyPC's CGA and 6845 written from
 the Rust sources (not from the HDL), ticked at the board's 14.318 MHz
 instants; I/O accesses act on it at the end of the CPU bus cycle, VRAM
@@ -362,7 +386,7 @@ against the model at every tick.
 
 | Test | What | Result |
 |---|---|---|
-| `waits` | 256 memory accesses, reads and writes, at all 16 phases: wait states vs. `WAIT_TABLE` | all equal |
+| `waits` | a sweep of 256 reads and writes over the 16 phases, then random gaps until every phase has at least 8 reads and 8 writes (416 accesses): wait states vs. `WAIT_TABLE` | all equal (the card of 2026-10-21, which released at the slot, gives one wait more at 11 of the 16 phases with the board rule of 2026-10-22: 370 of 544 accesses differ) |
 | `mode0`-`mode6` | IBM BIOS mode set (6845 tables from the IBM PC/XT BIOS `VIDEO_PARMS`, also in GLaBIOS `INT_1D`; mode bytes 2C 28 2D 29 2A 2E 1E; colour 30/3F), VRAM filled over the bus, 2 frames dot by dot (colour, HSYNC, VSYNC), line and frame period | all equal, 912 dots, 238,944 dots = 262 lines |
 | `status` | 3DA read back-to-back for one frame, each read vs. the model; bit 3 / bit 0 fractions vs. 16/262 and 1 - (640 x 200)/(912 x 262); then a frame with VSYNC inside the displayed rows | 31,872 reads equal |
 | `torture` | 4 runs x 5 frames (modes 3 and 4): ~1,900 random writes each to all 6845 registers, 3D8, 3D9, 3DB/3DC, reads of R14-R17 and 3DA, at random times | ~4.8 M dots and ~8,000 reads equal |
@@ -372,7 +396,7 @@ against the model at every tick.
 | `blink` | 34 frames mode 3 with blinking characters and cursor | dot-exact |
 | `thin` | thin font, mode 1 | dot-exact |
 
-Mutants (`mut.py`, 25): each breaks one behaviour (wait lead and slot,
+Mutants (`mut.py`, 27): each breaks one behaviour (wait lead, release phase and lead, slot,
 `CE_DELAY` 2 and 7, the card HSYNC alignment, the glyph row latch, the 3-line VSYNC, status bits, pixel
 pairs, the 640 bit order, palettes, the mode deferral, the clock switch, blink
 rate, snow position, thin font, and in the 6845 the VSYNC length, HSYNC
@@ -388,6 +412,14 @@ misreading of MartyPC common to both would not show; the wait-state table is
 compared with MartyPC's numbers directly. Comparison with MartyPC itself
 (traces of a real program) belongs to `tb/sys` (architecture.md section 5).
 
+**In the system** (`tb/sys`, `sys_run -C`): every CPU memory cycle in
+B8000-BFFFF is checked against MartyPC's count from the card's phase at the
+end of T2, with the real `xt_board.sv` and `biu88.v` (cycles stretched by a
+refresh DMA are counted apart). GLaBIOS 0.4.2 (4 s): 13,371 writes, all
+equal, no reads; `tb/sys/cgawait_rom.py` (a test ROM with reads and writes
+at pseudo-random delays): 2,001 reads and 2,001 writes over all 16 phases,
+all equal.
+
 ## 10. For the integrator
 
 - **pc_system ports**: the instance in `pc_system.sv` must connect
@@ -397,8 +429,9 @@ compared with MartyPC's numbers directly. Comparison with MartyPC itself
 - **Font**: QNICE loads the user's 8 KB IBM character ROM (or a 2 KB 8x8 font
   at 0x1800). Until then text modes show background colour only.
 - **IOCHRDY**: `isa_ready` goes into the board's READY logic as
-  `xt_board.sv` already does (`rdy_sync` at `cpu_fall`). Keep the command
-  edges, or change `RD_LEAD`/`WR_LEAD` with them (section 4).
+  `xt_board.sv` does (`rdy_sync` on `rdy_ce`). Keep the command edges and the
+  sample, or change `RD_LEAD`/`WR_LEAD` and the release phase with them
+  (section 4).
 - **CPU-CGA phase**: `DC_RESET` and `pc_clocks`' `PHASE` (section 2).
 - `tb/sys` reads `u_cga.vram` hierarchically; the card keeps that array
   (16384 x 8, byte = offset in B8000), so

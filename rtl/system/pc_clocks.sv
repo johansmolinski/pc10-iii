@@ -5,6 +5,8 @@
 //   ce_14m    OSC   14.31818 MHz, every 7 clk
 //   cpu_step  CLK88  4.77273 MHz, every 21 clk (the rising CLK edge)
 //   cpu_fall         7 clk after cpu_step (CLK has a 1/3 duty cycle)
+//   rdy_ce           2 clk before cpu_step: the 8284's RDY sample for the
+//                    rising CLK edge (xt_board.sv, READY)
 //   ce_pclk   PCLK/2 1.19318 MHz, every 84 clk (the 8253 count clock)
 //   pit_clk          the same as a square wave, for the 8253 counters
 //
@@ -18,6 +20,7 @@ module pc_clocks #(
     output logic ce_14m,
     output logic cpu_step,
     output logic cpu_fall,
+    output logic rdy_ce,
     output logic ce_pclk,
     output logic pit_clk
 );
@@ -48,6 +51,7 @@ always_ff @(posedge clk) begin
     ce_14m   <= c7_n  == 3'd0;
     cpu_step <= c21_n == 5'd0;
     cpu_fall <= c21_n == 5'd7;
+    rdy_ce   <= c21_n == 5'd19;
     ce_pclk  <= cnt_n == 7'd0;
     pit_clk  <= cnt_n < 7'd42;
 end

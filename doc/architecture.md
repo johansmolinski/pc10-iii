@@ -14,6 +14,7 @@ exact, 2205/22 MHz). Everything PC-side runs on `clk` with clock enables:
 |---|---|---|---|
 | `ce_14m` | 14.31818 MHz (OSC) | 7 | CGA dot clock, composite, the master phase |
 | `cpu_step` | 4.77273 MHz (CLK88) | 21 | biu88/EU step (the 8088 clock edge) |
+| `rdy_ce` | 4.77273 MHz | 21, 2 before `cpu_step` | the 8284's RDY sample (READY) |
 | `ce_pclk` | 1.19318 MHz (PCLK) | 84 | 8253 counters (OSC/12) |
 
 - All enables derive from **one modulo-84 counter** (`pc_clocks.sv`), so the
@@ -84,11 +85,41 @@ Bus timing (`xt_board.sv`, the 8288 function; marked CAL there, cards such as
 the CGA depend on it):
 - MEMR/IOR/INTA go low at the CLK falling edge (`cpu_fall`) in T1, MEMW/IOW
   at the falling edge in T2; all go high in the `clk` where T4 begins (+1).
-- READY: `isa_ready` is synchronized at `cpu_fall`; the BIU samples READY as
-  it enters T3 and each Tw (it says whether that state is the last one);
-  every CPU I/O cycle gets one wait state.
+- MEMW/IOW are the 8288's **advanced** write commands (AMWC/AIOWC), as on
+  the 5160 (IBM wires AMWC/AIOWC to -MEMW/-IOW, MWTC/IOWC are unused; so does
+  KFPC-XT, built from the 5160 logic). MartyPC asserts MRDC and AMWC/AIOWC
+  from T2 (`cpu_808x/cycle.rs`; MWTC/IOWC from T3; its raw trace shows
+  `I:.A.` from T2), and its CGA table gives reads and writes the same wait
+  states from the phase at T2. Our MEMW/IOW are "from T2" in that sense; the
+  normal commands would start at the falling edge in T3, after the RDY sample
+  that decides T3. Our reads start one CPU clock earlier than MRDC/IORC (in
+  T1): a deviation, kept because the cards' wait logic and the MartyPC trace
+  are calibrated on it (open point).
+- READY: the 5160's 8284 synchronizes RDY in two stages (rising CLK edge,
+  then falling edge) and the 8088 samples READY at the next rising edge, the
+  one that ends T3/Tw. So RDY at the rising edge that ends T2 decides whether
+  T3 is the last state, RDY at the edge that ends T3 whether the first Tw is,
+  and so on. `xt_board.sv` samples `isa_ready` on `rdy_ce` (`pc_clocks`, 2
+  `clk` before `cpu_step`: the edge, less the RDY setup time) into the
+  register that drives READY_IN, so READY_IN is stable over the clock before
+  the step and the step's own (biu88 reads it on the step's clock, and its
+  copy `p1_ready` two clocks later). biu88 decides at that step whether the
+  T3/Tw it enters is the last (MartyPC: wait states fixed at T2).
+- A card that pulls IOCHRDY low on the strobe therefore stretches both kinds
+  of cycle: MEMR/IOR are 33 `clk` old at the first sample, MEMW/IOW 12
+  (IBM's rule for the I/O channel: "drive it low immediately upon detecting a
+  valid address and a read or write command"). Until 2026-10-22 IOCHRDY was
+  sampled at `cpu_fall` in T2, the edge where MEMW starts: no write could
+  wait (the CGA and MDA wrote at the strobe end as a workaround).
+- The DMA wait (`aen | dma_wait`) and the I/O wait state are unchanged: the
+  DMA term changes only on `cpu_step`, so `rdy_ce` sees the value `cpu_fall`
+  saw (checked in simulation); every CPU I/O cycle gets one wait state (T3 is
+  never its last state).
 - Read data is taken in the `clk` where T4 begins.
-- `ce_14m` coincides with `cpu_step` and `cpu_fall` (pc_clocks, any PHASE).
+- `ce_14m` coincides with `cpu_step` and `cpu_fall` (pc_clocks, any PHASE);
+  the card state that `rdy_ce` samples is the one after the dot update for
+  the `ce_14m` 1 tick before the step (a CGA must release IOCHRDY 2 ticks
+  before its slot, doc/cga.md section 4).
 
 ## 4. `pc_system` ports (what the MEGA65 glue sees)
 
