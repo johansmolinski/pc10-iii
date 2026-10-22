@@ -488,12 +488,18 @@ always_comb begin
     else                    bus_wdata = isa_din;
 end
 
-// RAM: one request at the start of each read or write strobe
-logic       mem_rd_d, mem_wr_d;
+// RAM: one request at the start of each read or write strobe, per bus owner:
+// a CPU cycle that a DMA transfer held (AEN from its T1 on) gets its strobe
+// when AEN falls, right after the 8237's (refresh: DACK0, no RAM access), so
+// the two strobes are one low level on the bus and only the owner tells them
+// apart
+logic       cpu_rd_d, cpu_wr_d, dma_rd_d, dma_wr_d;
 logic [7:0] ram_q;
 always_ff @(posedge clk) begin
-    mem_rd_d <= !mem_rd_n;
-    mem_wr_d <= !mem_wr_n;
+    cpu_rd_d <= cpu_memr;
+    cpu_wr_d <= cpu_memw;
+    dma_rd_d <= !dma_memr_n;
+    dma_wr_d <= !dma_memw_n;
     if (ram_ack && !ram_we) ram_q <= ram_rdata;
 end
 always_comb begin
@@ -501,9 +507,11 @@ always_comb begin
     ram_wdata = bus_wdata;
     ram_en    = 1'b0;
     ram_we    = 1'b0;
-    if (sel_ram && !refresh) begin
-        if (!mem_wr_n && !mem_wr_d) begin ram_en = 1'b1; ram_we = 1'b1; end
-        else if (!mem_rd_n && !mem_rd_d) ram_en = 1'b1;
+    // (DACK0 can outlast AEN by part of a clock: the refresh condition is the
+    // DMA's only)
+    if (sel_ram) begin
+        if ((cpu_memw && !cpu_wr_d) || (!refresh && !dma_memw_n && !dma_wr_d)) begin ram_en = 1'b1; ram_we = 1'b1; end
+        else if ((cpu_memr && !cpu_rd_d) || (!refresh && !dma_memr_n && !dma_rd_d)) ram_en = 1'b1;
     end
 end
 assign rom_addr = bus_addr[15:0];

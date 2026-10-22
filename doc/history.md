@@ -847,3 +847,34 @@ HGC detection message after the RAM test not reached in that run).
 
 Open: the board's write timing (above); a Vivado out-of-context run; the
 printer port; Hercules details without a schematic (doc/mda.md section 10).
+
+## 2026-10-22 - Merged: board timing, XTIDE, CPU timing (race-free BIU), MDA; system trace to clock 1,041,809
+
+- Merged `board-timing` (every non-CPU path passes in bt-j), `xtide`, `cpu-timing`
+  (CPU out of context +0.407 ns; biu88 outputs are nonblocking copies, so the
+  simulation does what the hardware does) and `mda`. `pc_clocks`' enables are
+  registers now (byte-identical traces); `rtl/cpu/cpu8088.xdc` is in CORE-R6
+  scoped to cpu8088; `mda_card.sv` is in the project.
+- **SST run y** (race-free CPU + run x microcode): state 99.06%, trace 2,828,908
+  (94.08%), -1,432 against the racy run x: 81.3 -1,183, CF -118, F6.0 -52,
+  F6.1 -65, a few in F6.6/F7.4/F7.6/F7.7. This is the new baseline; the racy
+  numbers were not what the bitstream does.
+- **The race and the refresh:** with the race gone, the board's HOLDA flip-flop
+  sees the status of the clock it samples; AEN follows HOLDA by one CPU clock
+  (also in the CPU's T4 and T1, as MartyPC's S1 after HLDA), the T4/Ti gate,
+  calibrated on the racy simulation, is gone. The DMA wait (READY) runs from
+  the clock AEN rises (S1) to one clock after it falls.
+- **RAM request per bus owner:** a CPU cycle that a transfer holds from its T1
+  gets its MEMR right after the 8237's, so MEMR stays low across both; the
+  board now starts RAM requests on the CPU's and the 8237's own strobes, and
+  the refresh condition (DACK0, which outlasts AEN) gates only the 8237's.
+  Before, such a CPU read returned the previous read's byte.
+- **MartyPC trace diff** (`make DRQ0_SKEW=7`, 6M-clock reference): equal to
+  clock 1,041,809 (was 208,499). There: XCHG [SI],DX ends with a full queue
+  and MartyPC's preload byte; MartyPC takes the next opcode (INC AX) in the
+  write's T3, ours in T4.
+- Open (board): MEMW asserts at the falling CLK edge in T2, the same edge that
+  samples IOCHRDY, so a card cannot add wait states to a write (the MDA's and
+  CGA's write fallbacks work around it). MartyPC: AMWC from T2, CGA writes
+  not ready from T2 on. To settle against MartyPC's CGA write cycles
+  (first at reference clock 2,443,292).
