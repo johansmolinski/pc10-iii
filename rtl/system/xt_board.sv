@@ -662,14 +662,36 @@ always_ff @(posedge clk)
 // The DMA wait (aen | dma_wait) changes only on cpu_step, so sampling it on
 // rdy_ce gives the value it had at cpu_fall: from the CPU clock where AEN
 // rises (S1) to one clock after it falls. CAL: MartyPC (DMA wait states from
-// S1). Every CPU I/O cycle gets one wait state: its T3 is never the last
-// (the T2 term, decided at the step that ends T2).
-logic rdy_sync;
+// S1). Every CPU I/O cycle gets one wait state (the T2 term, decided at the
+// step that ends T2, and io_wait below when a DMA wait held that state).
+logic rdy_sync, dma_rdy_sync;
 always_ff @(posedge clk)
-    if (reset) rdy_sync <= 1'b1;
-    else if (rdy_ce) rdy_sync <= isa_ready & ~(aen | dma_wait);
+    if (reset) begin
+        rdy_sync <= 1'b1;  dma_rdy_sync <= 1'b1;
+    end else if (rdy_ce) begin
+        rdy_sync     <= isa_ready & ~(aen | dma_wait);
+        dma_rdy_sync <= ~(aen | dma_wait);
+    end
 wire io_cycle = cpu_bus_type == ST_IOR || cpu_bus_type == ST_IOW;
-assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle);
+// The I/O wait state counts only where the DMA wait is over (AEN keeps the
+// 8288's I/O command off, and the wait state starts with the command):
+// io_wait is the pending wait state, set in T2; a sample leaving T3/Tw uses
+// it up if the state it leaves was not held by the DMA wait (dma_ok, the DMA
+// part of the sample that decided that state). Without DMA: T3, Tw (last).
+// CAL: MartyPC (cycle.rs: the I/O wait states are not decremented while DMA
+// wait states remain), first seen at reference clock 1,042,013 (an OUT with
+// the refresh in its T1).
+logic io_wait, dma_ok;
+wire  in_t3tw   = cpu_bus_t == T3 || cpu_bus_t == TW;
+wire  io_wait_n = io_wait && !dma_ok;
+always_ff @(posedge clk)
+    if (reset) begin
+        io_wait <= 1'b0;  dma_ok <= 1'b1;
+    end else if (cpu_step) begin
+        dma_ok  <= dma_rdy_sync;
+        io_wait <= cpu_bus_t == T2 ? io_cycle : in_t3tw && io_wait_n;
+    end
+assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle) && !(in_t3tw && io_wait_n);
 
 `ifndef SYNTHESIS
 // the DMA term on rdy_ce equals its value at cpu_fall (it changes on cpu_step

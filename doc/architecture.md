@@ -113,8 +113,8 @@ the CGA depend on it):
   wait (the CGA and MDA wrote at the strobe end as a workaround).
 - The DMA wait (`aen | dma_wait`) and the I/O wait state are unchanged: the
   DMA term changes only on `cpu_step`, so `rdy_ce` sees the value `cpu_fall`
-  saw (checked in simulation); every CPU I/O cycle gets one wait state (T3 is
-  never its last state).
+  saw (checked in simulation); every CPU I/O cycle gets one wait state,
+  counted only where the DMA wait is over (MartyPC's cycle.rs).
 - Read data is taken in the `clk` where T4 begins.
 - `ce_14m` coincides with `cpu_step` and `cpu_fall` (pc_clocks, any PHASE);
   the card state that `rdy_ce` samples is the one after the dot update for

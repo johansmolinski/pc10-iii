@@ -107,6 +107,7 @@ Board logic that acts on every core clock sees the T-state change later
 | old CPU, this script, default directives | -5.019 | +0.132 | 4820 (ROM in LUTs) | | 0 |
 | new, default directives (`rooc.sh <name>`) | **+0.407** | +0.108 | 3123 | 2228 | 8 RAMB36 |
 | new, the shell's directives (`rooc.sh <name> explore`) | +0.212 | +0.145 | 3130 | 2228 | 8 RAMB36 |
+| 2026-10-22, eu.v carry-in add (bit 31), `rooc.sh cpuy-a` | +0.387 | +0.105 | 3126 | 2228 | 8 RAMB36 |
 
 Reports: `~/pcxt-work/ooc/timing-ooc-final3` (default) and
 `timing-ooc-final3-x` (explore). By region (default run): EU -> EU +0.66,

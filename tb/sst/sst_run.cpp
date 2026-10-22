@@ -129,6 +129,8 @@ struct Sim {
 struct Result {
     bool state_ok = false, len_ok = false, trace_ok = false, ran = false;
     bool prefetched = false;
+    int lag = -1;                     // core clocks from the start of the cycle in which the
+                                      // BIU read the next opcode to the EU's dispatch on it
     std::string why;
     std::vector<Cycle> got;
     unsigned regs[NREG] = {};
@@ -167,8 +169,14 @@ static bool g_dump = false;   // -d: print every bus cycle of the test
 static bool g_prefix = false; // -p: compare only up to the first EU bus cycle's T1
 static long g_cyc = 0;        // 8088 cycle number (for -d)
 
+static double g_phase = -1.0;   // -P: the CLK phase at each test's start (0 <= p < Sim::STEP
+                                // places the 20-core-clock periods, one in ~21)
+static int g_sweep = 0;         // -S n: run each test at n phases
+static bool g_lag = false;      // -L: dispatch lag (see Result::lag) in -l lines, and per file
+
 static Result run_test(Sim &sim, const Test &t) {
     Result r;
+    if (g_phase >= 0.0) sim.phase = (double)(long)sim.phase + g_phase;
     r.prefetched = !t.queue.empty();
     if (g_dump) printf("=== test %d\n", t.idx);
     auto &top = sim.top;
@@ -218,6 +226,7 @@ static Result run_test(Sim &sim, const Test &t) {
 #ifdef BIU88
     bool tstarted = false, tdone = false;
     int tf_seen = 0;
+    uint64_t cyc_start = 0, cyc_start_prev = 0, read_start = 0, disp_core = 0;
 #else
     const bool tdone = true;
 #endif
@@ -234,6 +243,9 @@ static Result run_test(Sim &sim, const Test &t) {
 #endif
             rose = sim.step();
             if (rose) g_cyc++;
+#ifdef BIU88
+            if (rose) { cyc_start_prev = cyc_start; cyc_start = sim.core_clocks; }
+#endif
 #ifdef BIU88
             if (g_dump && top->qs != snap_qs)
                 printf("      qs c%ld%s %d -> %d\n", g_cyc, rose ? "(edge)" : "", snap_qs, (int)top->qs);
@@ -345,6 +357,9 @@ static Result run_test(Sim &sim, const Test &t) {
                     // MCL86 keeps prefix state in flags 15..12, 5, 3, 1
                     r.regs[FLAGS] = (top->dbg_flags & 0x0FD5) | 0xF002;
                     done = true;
+#ifdef BIU88
+                    disp_core = sim.core_clocks;
+#endif
                 } else {
                     qev_cur.push_back({'F', byte});
                 }
@@ -417,7 +432,10 @@ static Result run_test(Sim &sim, const Test &t) {
             if (!tstarted) {
                 if (c.qop == "F") { tstarted = true; tf_seen = 1; r.got.push_back(c); }
             } else {
-                if (c.qop == "F" && ++tf_seen > want_f) tdone = true;
+                if (c.qop == "F" && ++tf_seen > want_f) {
+                    tdone = true;
+                    read_start = cyc_start_prev;   // the read was in the cycle before the F
+                }
                 else r.got.push_back(c);
             }
         }
@@ -437,6 +455,9 @@ static Result run_test(Sim &sim, const Test &t) {
 
     r.ran = done;
     if (!done) { r.why = "timeout"; return r; }
+#ifdef BIU88
+    if (tdone) r.lag = (int)((long)disp_core - (long)read_start);
+#endif
 
     // the cycle in which the next first byte left the queue belongs to the test
     // (its F would be reported one cycle later); it was pushed above already
@@ -544,6 +565,9 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-r")) only_reg = true;
         else if (!strcmp(argv[i], "-p")) g_prefix = true;
         else if (!strcmp(argv[i], "-m")) only_mem = true;
+        else if (!strcmp(argv[i], "-P") && i + 1 < argc) g_phase = atof(argv[++i]);
+        else if (!strcmp(argv[i], "-S") && i + 1 < argc) g_sweep = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-L")) g_lag = true;
         else if (argv[i][0] != '+') files.push_back(argv[i]);
     }
     Sim sim;
@@ -554,15 +578,33 @@ int main(int argc, char **argv) {
         if (!in) { fprintf(stderr, "cannot open %s\n", fn.c_str()); return 1; }
         Test t;
         int n = 0, st = 0, plain = 0, len = 0, tr = 0, tmo = 0;
+        int lag_max = -1, lag1 = 0, lag2 = 0;
         bool shown = false;
         while (read_test(in, t)) {
             if (limit >= 0 && n >= limit) break;
             // -r / -m: only tests without / with a memory operand
             bool mem = t.name.find('[') != std::string::npos;
             if ((only_reg && mem) || (only_mem && !mem)) continue;
-            Result r = run_test(sim, t);
+            Result r;
+            int sweep_ok = 0;
+            if (g_sweep > 0) {
+                // the test at g_sweep CLK phases: it passes only if it passes at all
+                bool all_st = true, all_tr = true;
+                for (int k = 0; k < g_sweep; k++) {
+                    g_phase = Sim::STEP * k / g_sweep;   // the 20-clock periods move
+                    r = run_test(sim, t);
+                    all_st = all_st && r.state_ok;
+                    all_tr = all_tr && r.trace_ok;
+                    if (r.state_ok && r.trace_ok) sweep_ok++;
+                }
+                r.state_ok = all_st; r.trace_ok = all_tr;
+            } else
+                r = run_test(sim, t);
             n++;
             if (!r.ran) tmo++;
+            if (r.lag > lag_max) lag_max = r.lag;
+            if (r.lag > 21) lag1++;
+            if (r.lag > 42) lag2++;
             if (r.state_ok) st++;
 #ifdef BIU88
             if (true) {
@@ -575,9 +617,11 @@ int main(int argc, char **argv) {
             }
             bool fail = !r.state_ok || !r.trace_ok;
             if (list) {
+                if (g_sweep > 0) printf("%3d/%-3d", sweep_ok, g_sweep);
                 printf("%5d %c%c q%zu c%-3zu %-24s", t.idx, r.state_ok ? 's' : 'S', r.trace_ok ? 't' : 'T',
                        t.queue.size(), t.cycles.size(), t.name.c_str());
                 for (int b : t.bytes) printf(" %02X", b);
+                if (g_lag) printf("  L%d", r.lag);
                 printf("\n");
             }
             if (t.idx == verbose_idx || (first_fail && fail && !shown)) {
@@ -589,6 +633,8 @@ int main(int argc, char **argv) {
         base = base.substr(0, base.rfind(".txt"));
         printf("%-10s %6d %6d %6d %6d %6d %6d\n", base.c_str(), n, st, plain,
                len, tr, tmo);
+        if (g_lag)
+            printf("lag %-6s max %4d  >1 cycle %6d  >2 cycles %6d\n", base.c_str(), lag_max, lag1, lag2);
         fflush(stdout);
     }
     return 0;
