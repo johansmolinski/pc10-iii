@@ -4,7 +4,7 @@
 //           [-a floppy.img] [-d dip_sw1] [-L ram_latency_clk]
 //           [-X xub.bin] [-H disk.img] [-J slave.img] [-G c,h,s] [-V variant]
 //           [-W out.img] [-K backend_us] [-S ms,ms,...]
-//           [-F font.bin] [-m] [-v] [-o image] [-C [max]]
+//           [-F font.bin] [-m] [-v] [-o image] [-C [max]] [-f]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
 //
@@ -21,6 +21,9 @@
 //   -v  log the CPU's writes to 3B0-3BF and 3D0-3DF
 //   -o  with -m: the last MDA frame as <image>.ppm (the vid_hblank/vid_vblank
 //       window, green phosphor; tb/mda/topng.py makes a PNG)
+//   -f  floppy controller log: the CPU's 765 reads and writes (A0, data,
+//       CS:IP), DOR writes, DACK2 cycles, TC, IRQ6 edges, DRQ2 rises, with the
+//       CPU step number (the -t trace's first column)
 //   -C  CGA wait-state oracle: every CPU memory cycle in B8000-BFFFF gets
 //       MartyPC's number of wait states, WAIT_TABLE[(dc + 1) & 15] ticks
 //       rounded up to CPU clocks, dc = the card's lchar phase at the end of
@@ -84,6 +87,7 @@ static void dump_screen(Vtb_sys *tb, const char *title, bool mono = false) {
     }
 }
 
+static bool fdclog = false;     // -f
 int main(int argc, char **argv) {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
@@ -105,6 +109,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-t") && i + 1 < argc) trace = argv[++i];
         else if (!strcmp(argv[i], "-d") && i + 1 < argc) dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-q")) quiet = true;
+        else if (!strcmp(argv[i], "-f")) fdclog = true;
         else if (!strcmp(argv[i], "-m")) mono = true;
         else if (!strcmp(argv[i], "-v")) vidlog = true;
         else if (!strcmp(argv[i], "-F") && i + 1 < argc) fontfile = argv[++i];
@@ -410,6 +415,28 @@ int main(int argc, char **argv) {
         if (tb->mda_ce)
             mring[mdots++ & (mring.size() - 1)] = tb->mda_video | tb->mda_intens << 1 | tb->mda_hsync << 2 |
                                                   tb->mda_vsync << 3 | (!tb->mda_hblank && !tb->mda_vblank) << 4;
+        if (fdclog) {
+            auto *q = tb->rootp;
+            static unsigned intr_d = 0, drq_d = 0;
+            double ms = cyc / CLK_HZ * 1e3;
+            if (q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__cpu_wr)
+                printf("[%9.4f ms] st %llu FDC W a0=%d %02X  %04X:%04X\n", ms, steps, q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__io_a0,
+                       q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__wdat_q, tb->cs, tb->ip);
+            if (q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__cpu_rd)
+                printf("[%9.4f ms] st %llu FDC R a0=%d %02X  %04X:%04X\n", ms, steps, q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__bus_a0,
+                       q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__cpu_rdata, tb->cs, tb->ip);
+            if (q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__iow_rise && q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__io_cyc_dor)
+                printf("[%9.4f ms] st %llu DOR %02X\n", ms, steps, q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__wdat_q);
+            if (q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__dma_ack)
+                printf("[%9.4f ms] st %llu DMA ack ior=%d iow=%d tc=%d\n", ms, steps, !q->tb_sys__DOT__u_pc__DOT__isa_ior_n,
+                       !q->tb_sys__DOT__u_pc__DOT__isa_iow_n, q->tb_sys__DOT__u_pc__DOT__isa_tc);
+            if (q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__tc_pulse)
+                printf("[%9.4f ms] st %llu TC\n", ms, steps);
+            unsigned it = q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__intr, dq = q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__drq;
+            if (it != intr_d) printf("[%9.4f ms] st %llu INTR %d\n", ms, steps, it);
+            if (dq != drq_d && dq) printf("[%9.4f ms] st %llu DRQ\n", ms, steps);
+            intr_d = it; drq_d = dq;
+        }
         tb->clk = 1; tb->eval();
         if (cyc % report == 0 && !quiet)
             printf("[%9.3f ms] CS:IP %04X:%04X\n", cyc / CLK_HZ * 1e3, tb->cs, tb->ip);

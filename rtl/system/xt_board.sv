@@ -140,10 +140,21 @@ always_ff @(posedge clk) begin
     end
 end
 logic aen;                              // DMA owns the bus
-wire  cpu_memr = cmd_memr && !aen;
-wire  cpu_memw = cmd_memw && !aen;
-wire  cpu_ior  = cmd_ior  && !aen;
-wire  cpu_iow  = cmd_iow  && !aen;
+// The CPU's commands come back one clk after AEN falls (cmd_en). AEN falls in
+// the clk in which the 8237 ends its commands (S4, aen_next below), so a CPU
+// command that the DMA held would otherwise continue the 8237's strobe of the
+// same kind without a high phase: a refresh's IOW running straight into the
+// CPU's OUT. A card that decodes at the strobe's start (fdc_card) then sees
+// one DMA strobe and drops the CPU's write (lost DOR reset write, 2026-10-22:
+// the floppy boot broken since 387e87e). On the 5160 the 8288 enables its
+// commands well after AEN (tAELCV); here one clk is the gap, so the CPU-clock
+// timing (READY, trace) is unchanged.
+logic aen_d;
+wire  cmd_en   = !aen && !aen_d;
+wire  cpu_memr = cmd_memr && cmd_en;
+wire  cpu_memw = cmd_memw && cmd_en;
+wire  cpu_ior  = cmd_ior  && cmd_en;
+wire  cpu_iow  = cmd_iow  && cmd_en;
 wire  inta     = cmd_inta;
 
 `ifndef SYNTHESIS
@@ -163,10 +174,10 @@ always_ff @(posedge clk) begin
 end
 always_ff @(posedge clk)
     if (!reset && (
-        cpu_memr != (cmd_rd && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) && !aen) ||
-        cpu_memw != (cmd_wr && cpu_bus_type == ST_MEMW && !aen) ||
-        cpu_ior  != (cmd_rd && cpu_bus_type == ST_IOR && !aen) ||
-        cpu_iow  != (cmd_wr && cpu_bus_type == ST_IOW && !aen) ||
+        cpu_memr != (cmd_rd && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) && !aen && !aen_d) ||
+        cpu_memw != (cmd_wr && cpu_bus_type == ST_MEMW && !aen && !aen_d) ||
+        cpu_ior  != (cmd_rd && cpu_bus_type == ST_IOR && !aen && !aen_d) ||
+        cpu_iow  != (cmd_wr && cpu_bus_type == ST_IOW && !aen && !aen_d) ||
         inta     != (cmd_rd && cpu_bus_type == ST_INTA)))
         $fatal(1, "xt_board: command registers differ from the 8288 function");
 `endif
@@ -193,6 +204,7 @@ always_comb begin
 end
 always_ff @(posedge clk) begin
     aen      <= aen_next;
+    aen_d    <= aen;                    // the CPU's command enable (cmd_en above)
     dma_wait <= dma_wait_next;
     if (reset) begin
         hrq_ff1 <= 1'b0;  hrq_ff2 <= 1'b0;
@@ -563,10 +575,11 @@ always_comb begin
         if (cpu_bus_t == T2 && cpu_bus_type == ST_MEMW) cmd_memw_next = 1'b1;
     end
 end
-assign isa_ior_n_next  = ~(cmd_ior_next  && !aen_next) & dma_ior_n_next;
-assign isa_iow_n_next  = ~(cmd_iow_next  && !aen_next) & dma_iow_n_next;
-assign isa_memr_n_next = ~(cmd_memr_next && !aen_next) & dma_memr_n_next;
-assign isa_memw_n_next = ~(cmd_memw_next && !aen_next) & dma_memw_n_next;
+wire  cmd_en_next = !aen_next && !aen;  // aen_d's D input is aen
+assign isa_ior_n_next  = ~(cmd_ior_next  && cmd_en_next) & dma_ior_n_next;
+assign isa_iow_n_next  = ~(cmd_iow_next  && cmd_en_next) & dma_iow_n_next;
+assign isa_memr_n_next = ~(cmd_memr_next && cmd_en_next) & dma_memr_n_next;
+assign isa_memw_n_next = ~(cmd_memw_next && cmd_en_next) & dma_memw_n_next;
 `ifndef SYNTHESIS
 logic ior_n_pred, iow_n_pred, memr_n_pred, memw_n_pred;
 always_ff @(posedge clk) begin
@@ -579,6 +592,20 @@ always_ff @(posedge clk)
     if (!reset && (ior_n_pred != io_rd_n || iow_n_pred != io_wr_n ||
                    memr_n_pred != mem_rd_n || memw_n_pred != mem_wr_n))
         $fatal(1, "xt_board: next strobes mispredicted");
+// a strobe never passes from one bus owner to the other while it is low: a
+// card that decodes at the strobe's start would take the second owner's cycle
+// for the first's (cmd_en)
+logic cpu_ior_d, cpu_iow_d, cpu_memr_d, cpu_memw_d, io_rd_n_d, io_wr_n_d, mem_rd_n_d, mem_wr_n_d;
+always_ff @(posedge clk) begin
+    cpu_ior_d  <= cpu_ior;   cpu_iow_d  <= cpu_iow;   cpu_memr_d <= cpu_memr;  cpu_memw_d <= cpu_memw;
+    io_rd_n_d  <= io_rd_n;   io_wr_n_d  <= io_wr_n;   mem_rd_n_d <= mem_rd_n;  mem_wr_n_d <= mem_wr_n;
+end
+always_ff @(posedge clk)
+    if (!reset && ((!io_rd_n  && !io_rd_n_d  && cpu_ior  != cpu_ior_d)  ||
+                   (!io_wr_n  && !io_wr_n_d  && cpu_iow  != cpu_iow_d)  ||
+                   (!mem_rd_n && !mem_rd_n_d && cpu_memr != cpu_memr_d) ||
+                   (!mem_wr_n && !mem_wr_n_d && cpu_memw != cpu_memw_d)))
+        $fatal(1, "xt_board: a bus strobe changed owner without going high");
 `endif
 assign isa_ale    = cpu_bus_t == T1;
 assign isa_dack_n = dack_n;
