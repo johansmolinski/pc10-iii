@@ -81,6 +81,13 @@ pc_system #(.RAM_KB(RAM_KB)) u_pc (
     .drv_motor, .fdc_active,
     .sp_req, .sp_write, .sp_drive, .sp_cyl, .sp_head, .sp_sector, .sp_lba,
     .sp_rd_valid, .sp_rd_data, .sp_wr_valid, .sp_wr_data, .sp_wr_ready, .sp_done, .sp_err,
+    // the hard disk card is not wired into the shell yet (doc/hdc.md section 8):
+    // card disabled, no drives, the option ROM socket empty
+    .hdc_enable(1'b0), .hdc_variant(2'd0), .hdc_rom_addr(), .hdc_rom_rdata(8'hFF),
+    .hd_present(2'b00), .hd_sectors('0), .hd_cyls('0), .hd_heads('0), .hd_spt('0), .hd_active(),
+    .hd_sp_req(), .hd_sp_write(), .hd_sp_drive(), .hd_sp_lba(),
+    .hd_sp_rd_valid(1'b0), .hd_sp_rd_data(8'h00), .hd_sp_wr_valid(), .hd_sp_wr_data(),
+    .hd_sp_wr_ready(1'b0), .hd_sp_done(1'b0), .hd_sp_err(1'b0),
     .kbd_code, .kbd_valid, .kbd_busy,
     .speaker,
     .dip_sw1

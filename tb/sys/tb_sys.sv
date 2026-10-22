@@ -1,8 +1,11 @@
 // tb_sys.sv - pc_system with RAM and ROM models for the Verilator system
 // simulation (sys_run.cpp). The ROM image comes from +rom=<hex file> (one
-// byte per line, 64 KB, F0000-FFFFF).
+// byte per line, 64 KB, F0000-FFFFF), the XTIDE card's option ROM from
+// +xub=<hex file> (16 KB, C8000-CBFFF; 0xFF without one).
 
-module tb_sys (
+module tb_sys #(
+    parameter int RAM_KB = 640
+) (
     input  logic        clk,
     input  logic        reset,
     input  logic [7:0]  kbd_code,
@@ -42,7 +45,27 @@ module tb_sys (
     output logic [7:0]  sp_wr_data,
     input  logic        sp_wr_ready,
     input  logic        sp_done,
-    input  logic        sp_err
+    input  logic        sp_err,
+
+    // hard disk: configuration and the sector port (served by sys_run.cpp)
+    input  logic        hdc_enable,
+    input  logic [1:0]  hdc_variant,
+    input  logic [1:0]  hd_present,
+    input  logic [55:0] hd_sectors,     // {slave, master}
+    input  logic [31:0] hd_cyls,
+    input  logic [9:0]  hd_heads,
+    input  logic [11:0] hd_spt,
+    output logic        hd_sp_req,
+    output logic        hd_sp_write,
+    output logic        hd_sp_drive,
+    output logic [27:0] hd_sp_lba,
+    input  logic        hd_sp_rd_valid,
+    input  logic [7:0]  hd_sp_rd_data,
+    output logic        hd_sp_wr_valid,
+    output logic [7:0]  hd_sp_wr_data,
+    input  logic        hd_sp_wr_ready,
+    input  logic        hd_sp_done,
+    input  logic        hd_sp_err
 );
 
 logic [7:0]  ram [1048576];
@@ -51,10 +74,15 @@ logic [19:0] ram_addr;
 logic        ram_en, ram_we, ram_ack;
 logic [7:0]  ram_wdata, ram_rdata, rom_rdata;
 logic [15:0] rom_addr;
+logic [7:0]  xrom [16384];
+logic [13:0] xrom_addr;
+logic [7:0]  xrom_rdata;
 
 initial begin
     string f;
     if ($value$plusargs("rom=%s", f)) $readmemh(f, rom);
+    for (int i = 0; i < 16384; i++) xrom[i] = 8'hFF;
+    if ($value$plusargs("xub=%s", f)) $readmemh(f, xrom);
 end
 
 always_ff @(posedge clk) begin
@@ -62,9 +90,10 @@ always_ff @(posedge clk) begin
     if (ram_en && ram_we) ram[ram_addr] <= ram_wdata;
     if (ram_en) ram_rdata <= ram[ram_addr];
     rom_rdata <= rom[rom_addr];
+    xrom_rdata <= xrom[xrom_addr];
 end
 
-pc_system u_pc (
+pc_system #(.RAM_KB(RAM_KB)) u_pc (
     .clk        (clk),
     .reset      (reset),
     .ram_addr   (ram_addr),
@@ -107,6 +136,27 @@ pc_system u_pc (
     .sp_wr_ready(sp_wr_ready),
     .sp_done    (sp_done),
     .sp_err     (sp_err),
+    .hdc_enable    (hdc_enable),
+    .hdc_variant   (hdc_variant),
+    .hdc_rom_addr  (xrom_addr),
+    .hdc_rom_rdata (xrom_rdata),
+    .hd_present    (hd_present),
+    .hd_sectors    (hd_sectors),
+    .hd_cyls       (hd_cyls),
+    .hd_heads      (hd_heads),
+    .hd_spt        (hd_spt),
+    .hd_active     (),
+    .hd_sp_req     (hd_sp_req),
+    .hd_sp_write   (hd_sp_write),
+    .hd_sp_drive   (hd_sp_drive),
+    .hd_sp_lba     (hd_sp_lba),
+    .hd_sp_rd_valid(hd_sp_rd_valid),
+    .hd_sp_rd_data (hd_sp_rd_data),
+    .hd_sp_wr_valid(hd_sp_wr_valid),
+    .hd_sp_wr_data (hd_sp_wr_data),
+    .hd_sp_wr_ready(hd_sp_wr_ready),
+    .hd_sp_done    (hd_sp_done),
+    .hd_sp_err     (hd_sp_err),
     .kbd_code   (kbd_code),
     .kbd_valid  (kbd_valid),
     .kbd_busy   (kbd_busy),
