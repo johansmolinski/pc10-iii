@@ -1300,8 +1300,14 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   timing (the entries above); the z86 CPU reaches the same with Intel's
   microcode and no instruction-specific timing. doc/cpu-timing.md is kept as
   history.
-- Checks after the removal: tb/sys's trace against MartyPC identical over the
-  2M-clock reference, tb/shell PASS; the full gates in the entry below.
+- Gates after the removal (`z86f-88`, gates `f`): SST state 3,007,000
+  (100.00%), trace 3,006,693 (99.99%, C6 only), no file worse than y5;
+  floppy boot ("Booted from floppy A:", sectors at 9,005 ms, the CGA oracle
+  134 reads / 14,147 writes, 0 differ); MartyPC trace 2,227,925 (2,439,294
+  against the LOOP-fixed reference, 2,439,417 with `-d EE`); tb/cga, tb/mda,
+  tb/fdc, tb/hdc, tb/shell PASS. The floppy boot with the 8086 bundle and the
+  overlay (hardware IRQs through rows 0x19A-0x19D) boots the same way, with
+  the same oracle numbers.
 
 ## 2026-10-22 - Clock plan: the PC on 28.63636 MHz (phase C, assessment only)
 
