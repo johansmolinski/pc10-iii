@@ -1051,6 +1051,18 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   writes, all equal, 3,342 DMA-stretched); the reads were checked with the
   test ROM. The DMA-stretched cycles are not compared (MartyPC's refresh and
   the CGA's restart would need a model of their own).
-- **Gates:** MartyPC trace (`DRQ0_SKEW=7`, 1.27 s): first difference still at
-  reference clock 1,041,809, no `$fatal`; tb/cga PASS, tb/mda PASS (MDA and
-  Hercules), tb/fdc PASS (208 checks), tb/hdc PASS (3,184 checks).
+- **Gates:** MartyPC trace (`DRQ0_SKEW=7`, 1.27 s): first difference at
+  reference clock 1,041,809 before the merge of main 93831be (cpu-y), as on
+  main 7437964, and at 2,439,285 after it, as on main 93831be; no `$fatal`.
+  The `-C` oracle in the same runs: 13,335 / 13,313 CGA writes, all equal.
+  tb/cga PASS, tb/mda PASS (MDA and Hercules), tb/fdc PASS (208 checks),
+  tb/hdc PASS (3,184 checks). Merged with main: the I/O wait's DMA sample
+  (`dma_rdy_sync`) is taken on `rdy_ce` too (the same value).
+- **Floppy boot** (`sys_run -a hello360.img -s 10`, fedora): fails, and
+  already on main. A run of each first-parent commit since the first floppy
+  boot: 8c0461f to 22f9853 boot ("Booted from floppy A:"), 387e87e (refresh
+  DMA against MartyPC), 14edb29 and b327eaf end with an empty screen, main
+  7437964 with "POST Error 1000 FDC", main 93831be with "POST Error 0800
+  FDD" (seek test), this branch before the merge the same, after it "FDD
+  [ 0 ]" with POST still running at 10 s (its CGA writes now wait). Not
+  caused by the READY rework; open (it starts with the refresh DMA work).
