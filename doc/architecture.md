@@ -68,7 +68,7 @@ The bus a card sees, all on `clk`. Signals are levels, valid for the many
 | `isa_dack_n[3:0]` | in | DACK0-DACK3 (0 = refresh) |
 | `isa_tc` | in | terminal count |
 | `isa_reset` | in | RESET DRV |
-| `isa_addr_next`, `isa_aen_next` | in | the values `isa_addr` and `isa_aen` will have in the next `clk` (optional: for a card that registers its address decode, doc/timing.md; the FDC does) |
+| `isa_addr_next`, `isa_aen_next`, `isa_memr_n_next`, `isa_memw_n_next`, `isa_ior_n_next`, `isa_iow_n_next` | in | the values these signals will have in the next `clk` (the strobes' except in the first `clk` of a reset). Optional: for a card that registers its decode or strobe edges (the FDC, the CGA's IOCHRDY; doc/timing.md) |
 
 A card's read data must be valid within 2 `clk` of the strobe going low and
 held while it stays low.

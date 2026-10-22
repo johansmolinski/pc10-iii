@@ -364,6 +364,7 @@ The bitstream is written although timing fails; it was not loaded on a MEGA65.
 | `pc10-real-b` | 28.6 MHz video clock, RAM banks, keyboard pipeline, BIOS without adder | -5.756 | 599 |
 | `pc10-real-c` | RAM input register (4-clock ack), PC reset replicated | -5.710 | 582 |
 | `pc10-real-d` | = c plus a firmware change (same netlist) | -5.710 | 582 |
+| `bt-j` | branch board-timing: everything outside the CPU retimed (doc/timing.md) | -6.133 | 228, all in `rtl/cpu` |
 
 WHS +0.018 ns. Per clock (d): main_clk -5.710, video_clk +1.492,
 qnice_clk +0.676, hdmi_clk +2.187, hr_clk +0.074.

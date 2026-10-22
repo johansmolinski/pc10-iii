@@ -45,22 +45,21 @@ the CLK-falling-edge update). A register loaded with f(D of A, D of B) holds
 f(A, B) in every clk (after reset both give 4'b1111). The D input is
 exported as `dma_acknowledge_next` for the board.
 
-The DACK flip-flop's next value (and the flip-flop itself) uses a copy of the
-state decoder with READY = 1 (`next_state_r1`), and only its transitions out
-of S1 and S4:
-- READY only decides between S4 and staying in S2/S3/SW. The one case where
-  that matters for the flip-flop (`next_state == S2` in S2: compressed
-  timing, verify, not ready) reloads it with `dma_acknowledge_internal`, the
-  value it already holds (loaded on entering S2; the internal value only
-  changes in SI).
-- In SI and S0 the flip-flop is 0 already (cleared when SI is entered, from
-  S4 or by reset or master clear), so the original "next_state == SI -> 0"
-  in SI changes nothing.
+The DACK flip-flop (and its next value) is loaded only on the transitions out
+of S1 and S4, written out from those cases of the state decoder, where READY
+plays no part. The original also loaded it in two other cases that change
+nothing:
+- `next_state == SI -> 0` in SI: it is 0 already there (cleared when SI is
+  entered, from S4 or by reset or master clear);
+- `next_state == S2 -> dma_acknowledge_internal` in S2 (compressed timing,
+  verify, not ready): it holds that value already (loaded on entering S2; the
+  internal value only changes in SI).
 
 So neither the card's IOCHRDY nor the DMA requests and mask bits (SI -> S0)
 feed DACK and the bus address register. The hold request and the high
-address strobe use `next_state_r1` too; there it is exact (READY never makes
-the next state S0 or SI and does nothing in S1).
+address strobe use a copy of the state decoder with READY = 1
+(`next_state_r1`), exact there: READY never makes the next state S0 or SI
+and does nothing in S1.
 
 ### 2.2 Board: the bus address as a register (`xt_board.sv`)
 
@@ -137,12 +136,19 @@ keeps its multicycle constraint (CORE.xdc).
 
 - `op == OP_RTRK` and `op == OP_RD || op == OP_RDDEL` are registers loaded
   together with `op` (reset and the command byte) from `dec_op`.
-- The selected drive's cylinder (`cyl[pd]`, the 765's `drv_cyl`, which goes
-  into its tag compares and the track format check) is a register loaded
-  with `cyl_next[dor_next[0]]` (the DOR and the cylinders with their D inputs
-  written out).
-- The track format check gets `drv_cyl < img_tracks[pd]` from the card
-  (`geo_cyl_ok`) instead of the tracks.
+- The drive inputs from the glue (geometry, presence, write protection, the
+  80-track flag) are registered where they enter the card, and the sectors
+  per cylinder of each drive with them. The glue is asynchronous to the PC
+  (QNICE domain, `cdc_stable`, under a 4-clock multicycle constraint), so
+  this is indistinguishable from a glue one clk slower; tb/fdc, which
+  changes the geometry between its tests, gives the identical log and images.
+- Everything of the selected drive the 765 uses is a register loaded from the
+  next values (the DOR and the cylinders with their D inputs written out,
+  and the drive inputs): the cylinder (`drv_cyl`, into the tag compares),
+  drive select, presence, write protection, heads, sectors per track and
+  `cylinder < tracks` (`geo_cyl_ok`, the track format check, replacing the
+  765's `geo_tracks` input). Neither the DOR's select bits (fanout about 100)
+  nor the geometry multiplexers are in front of the 765 any more.
 
 ### 2.8 Glue: the PC reset
 
@@ -176,8 +182,9 @@ default 1) and gives the identical traces with `-L 6` (section 3).
 The KF chips reset asynchronously, the board and the cards synchronously. In
 the first `clk` of a PC reset the original bus address was already the
 CPU's (DACK cleared at once), while the register of section 2.2 still holds
-the address of the clk before (the DMA's, if a DMA cycle was running). In
-that clk nothing that keeps state reads it: no strobe starts (the CPU's
+the address of the clk before (the DMA's, if a DMA cycle was running); the
+FDC's registered strobe edges (section 2.13) likewise miss the 8237's strobes
+going inactive. In that clk nothing that keeps state reads them: no strobe starts (the CPU's
 command registers are unchanged, the 8237's strobes go inactive), the board,
 the cards and the 765 take their synchronous reset branches, which ignore the
 bus, and the KF chips are held in reset; from the next clk on the address is
@@ -193,40 +200,111 @@ RAM/ROM, the card bus, 0xFF) now only decides the source, and the block RAM
 data (BIOS ROM, RAM register, the cards' `isa_din`) go through one 4:1
 multiplexer at the end. The same function.
 
-### 2.13 FDC: address decode one clk ahead
+### 2.13 FDC and CGA: address decode and strobe edges one clk ahead
 
-The FDC decodes its I/O address (3F2, 3F4/3F5) into registers from
-`isa_addr_next`/`isa_aen_next`, new on the card bus (doc/architecture.md
-section 3): the D inputs of the board's bus address register and AEN. The
-register equals the combinational decode in every clk (checked). Parameter
+The FDC decodes its I/O address (3F2, 3F4/3F5) and detects the IOR/IOW
+edges (its `ior_fall`, `iow_fall`, `iow_rise`, `ior_rise`, which drive the
+765) into registers, from values of the next clk the board now provides on
+the card bus (doc/architecture.md section 3): `isa_addr_next`/`isa_aen_next`
+(the D inputs of the bus address register and AEN) and
+`isa_ior_n_next`/`isa_iow_n_next` (the command registers', AEN's and the
+8237's I/O strobes' D inputs; the 8237 exports the latter). The registers
+equal the combinational decode and edges in every clk (checked) - the
+strobes' next values only miss the 8237's asynchronous clear in a reset's
+first clk, when the FDC and the 765 are in reset (section 2.11). Parameter
 `REG_DECODE` (1 in `pc_system`, 0 in tb/fdc, whose bus model has no next
-values).
+values). A0 for the 765's register select likewise.
+
+The CGA's IOCHRDY (into the 8237's READY and the board's READY flip-flop)
+uses its memory select (B8000-BFFFF and MEMR or MEMW) from a register loaded
+from `isa_addr_next` and `isa_memr_n_next`/`isa_memw_n_next`; the card's own
+access state keeps the combinational select. Parameter `REG_READY` (1 in
+`pc_system`, 0 in tb/cga). In a reset's first clk the registered select can
+miss the 8237's strobes going inactive; both readers of IOCHRDY are in reset
+then.
 
 The 765's `xslot` (about 100 loads) gets `max_fanout 24`.
 
 ## 3. Verification
 
 - **Simulation checks** (`ifndef SYNTHESIS`, `$fatal`): every retimed signal
-  is compared with its original expression in every clk - DACK and its next
-  value without READY, the bus address, the five command strobes, the CPU
-  write data of the page/NMI registers, `next_word`, the 8253 decrements in
-  each clk that uses them, the FDC LBA, the 765 op decodes. They ran in all
-  simulations below and never fired.
-- **tb/sys** (GLaBIOS 0.4.2 8X; main `832b94e` against this branch, same
-  Verilator on the build host): the bus trace (`-t`: every 8088 clock,
-  T-state, status, address, data, QS, CS:IP) and the instruction trace
-  (`-i ... 0`) are byte-identical (SHA-256), and so is the screen at the end
-  (the GLaBIOS banner):
+  is compared with its original expression in every clk (outside a reset):
+  DACK, the DACK flip-flop's next value and its written-out transitions, the
+  READY-free state decode where it is used, `next_word`, the bus address, the
+  next-clk strobes, the five command strobes, the CPU write data of the
+  page/NMI registers, the CPU read data, the 8253 decrements in each clk that
+  uses them, the FDC's LBA, address decode, strobe edges and selected-drive
+  values, the 765 op decodes, the CGA's registered memory select. They ran in
+  all simulations below and never fired; mutants (a wrong next value in the
+  bus address register, a missing SW term in `next_word`) stop the simulation
+  within the first 0.15 s.
+- **tb/sys** (GLaBIOS 0.4.2 8X; main `832b94e` against this branch, both
+  built with the same Verilator on the build host): the bus trace (`-t`:
+  every 8088 clock, T-state, status, address, data, QS, CS:IP) and the
+  instruction trace (`-i ... 0`) are byte-identical (SHA-256), and so is the
+  output (POST, FDC requests, CS:IP every 50 ms, the screen at the end):
 
   | Run | Simulated | Result |
   |---|---|---|
-  | GLaBIOS, RAM latency 1 | 1.0 s | identical |
-  | GLaBIOS, RAM latency 6 | 1.0 s | identical to main with latency 1 |
-  | GLaBIOS + `hello360.img` in A: | 20 s | see section 4 |
+  | GLaBIOS, RAM latency 1 | 1.0 s | identical (banner on screen) |
+  | GLaBIOS, RAM latency 6 (`-L 6`) | 1.0 s | identical to main with latency 1 |
+  | GLaBIOS + `hello360.img` in A:, RAM latency 1 | 20 s | identical: boots from the floppy at 9.2 s ("Booted from floppy A: (pc10-iii FDC+DMA)") |
+  | the same with RAM latency 6 | 20 s | identical to main with latency 1 |
 
-- **tb/fdc** `make run`: PASS, 208 checks; its log and both written disk
+- **tb/fdc** `make run`: PASS, 208 checks; the log and both written disk
   images are identical to main's.
+- **tb/cga** `make run`: PASS, the log identical to main's; the images too,
+  except `crtc3_window.ppm`, which differs between two runs of main's own
+  bench (`write_images` writes `ww * wh * 3` bytes of a window whose rows
+  vary in width: it reads past the end of its vector).
 - **tb/shell** `run.sh`: PASS (`tb_glue` with the 6-clock RAM, `tb_fdd`, the
   stand-in).
 
 ## 4. Results
+
+R6 builds on the build host (Vivado 2022.2, `tools/remote/rbuild.sh`), worst
+setup slack between the blocks on `main_clk` (final checkpoint, reports in
+`~/pcxt-work/builds/<name>/`, `block_pairs.txt`):
+
+| From -> to | pc10-real-d | bt-j (this branch) | bt-x (experiment) |
+|---|---|---|---|
+| board -> board | -1.474 | +0.177 | +1.595 |
+| FDC -> FDC | -1.427 | +0.246 | +0.952 |
+| CPU -> FDC | -1.061 | +3.838 | +5.078 |
+| board -> FDC | -0.982 | +0.801 | +0.954 |
+| CPU -> board | -0.557 | +3.173 | +4.676 |
+| board -> BIOS ROM | -0.112 | +3.325 | +3.005 |
+| `pc_ram` | -0.750 | +0.955 | +1.711 |
+| BIOS ROM -> CPU (`data_bus`) | -1.061 | -0.067 | (relaxed) |
+| board -> CPU (`rdy_sync` -> BIU) | -3.643 | -3.626 | (relaxed) |
+| clocks -> CPU (`c21` -> BIU) | -3.558 | -3.816 | (relaxed) |
+| CPU -> CPU | -5.710 | -6.133 | (relaxed) |
+| failing endpoints | 582 | 228, all in `rtl/cpu` | 0 |
+
+- **bt-j** (`ba8deaf`): every path that ends outside the CPU passes. What
+  fails ends in biu88: the CPU's own paths, the board's READY flip-flop and
+  the clock enables into the BIU's T-state logic (20-23 levels, all inside the
+  BIU), and the BIOS ROM's data into the BIU's `data_bus` (-0.067: block RAM
+  with cascade, one LUT in the board, four in the BIU).
+- **bt-x** is bt-f's sources (`864b7ef`, with the registered strobes that
+  were dropped later) plus an experiment-only constraint relaxing all paths
+  into the CPU to 2 clocks: WNS **+0.199** for the whole design, every
+  other path >= +0.95 ns.
+- In between (bt-a .. bt-i, rounds of this branch) the worst path ending
+  outside the CPU moved by up to +-0.9 ns from build to build at the same
+  logic depth: with the CPU 5-6 ns short, placement and routing serve it
+  first, and logic that talks to it (the board, the FDC next to it) gets what
+  is left. The later rounds took the cards' bus inputs out of their deep
+  paths (registered decodes, strobe edges, selected-drive values) for that
+  reason; the margins of bt-j (+0.18 / +0.25) should grow once the CPU closes
+  (bt-x).
+- If the BIOS ROM -> BIU path stays after the CPU work: the ROM's block RAM
+  output register (one more clock of `rom_rdata` latency) takes about 1.5 ns
+  off it; the board uses ROM data at the earliest 13 clk after the address is
+  stable, so that would not be visible either (as with the RAM, section 2.10).
+
+| | pc10-real-d | bt-j |
+|---|---|---|
+| LUTs | 26381 | 26524 |
+| FFs | 18716 | 19089 |
+| Block RAM tiles | 238.5 | 238.5 |

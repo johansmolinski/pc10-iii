@@ -250,10 +250,8 @@ module KF8237_Timing_And_Control (
     // already has (it got it on entering S2, and the internal value only
     // changes in SI).
     state_t         next_state_r1;
-    logic           next_s4_r1;
     always_comb begin
         next_state_r1 = state;
-        next_s4_r1    = 1'b0;
 
         casez (state)
             SI: begin
@@ -267,7 +265,6 @@ module KF8237_Timing_And_Control (
             S1: begin
                 if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE) begin
                     next_state_r1 = S4;
-                    next_s4_r1    = 1'b1;
                 end
                 else
                     next_state_r1 = S2;
@@ -278,7 +275,6 @@ module KF8237_Timing_And_Control (
                 else if (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY) begin
                     if (1'b1)
                         next_state_r1 = S4;
-                    next_s4_r1    = 1'b1;
                 end
                 else
                     next_state_r1 = SW;
@@ -287,7 +283,6 @@ module KF8237_Timing_And_Control (
                 if (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY) begin
                     if (1'b1)
                         next_state_r1 = S4;
-                    next_s4_r1    = 1'b1;
                 end
                 else
                     next_state_r1 = SW;
@@ -295,7 +290,6 @@ module KF8237_Timing_And_Control (
             SW: begin
                 if (1'b1)
                     next_state_r1 = S4;
-                next_s4_r1    = 1'b1;
             end
             S4: begin
                 if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE)
@@ -541,13 +535,14 @@ module KF8237_Timing_And_Control (
         else
             dack_sense_next = dack_sense_active_high;
 
-        // only the transitions out of S1 and S4 load the flip-flop: in SI
-        // (and S0) it is 0 already (cleared when SI is entered, from S4 or
-        // by reset/master clear), so the original "next_state == SI ->
-        // 0" in SI changes nothing, and next_state_r1 is never S2 from S2.
-        // This keeps the DMA requests and masks (SI -> S0) out of DACK.
-        // The two transitions written out from the S1 and S4 cases of the
-        // state decoder (READY plays no part there).
+        // Only the transitions out of S1 and S4, written out from those cases
+        // of the state decoder, load the flip-flop. The original also did
+        // "next_state == SI -> 0" in SI, where it is 0 already (cleared when
+        // SI is entered: from S4, by reset, by master clear), and
+        // "next_state == S2 -> dma_acknowledge_internal" in S2 (compressed
+        // timing, verify, not ready), where it holds that value already
+        // (loaded on entering S2; the internal value only changes in SI).
+        // This keeps READY and the DMA requests/masks (SI -> S0) out of DACK.
         if (master_clear)
             dma_acknowledge_ff_next = 0;
         else if (cpu_clock_negedge)
