@@ -1,14 +1,28 @@
 // tb_sys.sv - pc_system with RAM and ROM models for the Verilator system
 // simulation (sys_run.cpp). The ROM image comes from +rom=<hex file> (one
-// byte per line, 64 KB, F0000-FFFFF).
+// byte per line, 64 KB, F0000-FFFFF). MDA_FIT: 0 none, 1 MDA, 2 Hercules.
 
-module tb_sys (
+module tb_sys #(
+    parameter int MDA_FIT = 0
+) (
     input  logic        clk,
     input  logic        reset,
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
     input  logic [7:0]  dip_sw1,
+
+    // character ROM load (sys_run -F), MDA video
+    input  logic        font_we,
+    input  logic [12:0] font_addr,
+    input  logic [7:0]  font_data,
+    output logic        mda_ce,
+    output logic        mda_video,
+    output logic        mda_intens,
+    output logic        mda_hsync,
+    output logic        mda_vsync,
+    output logic        mda_hblank,
+    output logic        mda_vblank,
 
     // monitors
     output logic        io_wr,          // one clk: a CPU I/O write strobe began
@@ -64,7 +78,7 @@ always_ff @(posedge clk) begin
     rom_rdata <= rom[rom_addr];
 end
 
-pc_system u_pc (
+pc_system #(.MDA_FIT(MDA_FIT)) u_pc (
     .clk        (clk),
     .reset      (reset),
     .ram_addr   (ram_addr),
@@ -81,9 +95,16 @@ pc_system u_pc (
     .vid_vsync  (),
     .vid_hblank (),
     .vid_vblank (),
-    .font_we    (1'b0),
-    .font_addr  (13'h0),
-    .font_data  (8'h0),
+    .mda_ce     (mda_ce),
+    .mda_video  (mda_video),
+    .mda_intens (mda_intens),
+    .mda_hsync  (mda_hsync),
+    .mda_vsync  (mda_vsync),
+    .mda_hblank (mda_hblank),
+    .mda_vblank (mda_vblank),
+    .font_we    (font_we),
+    .font_addr  (font_addr),
+    .font_data  (font_data),
     .font_thin  (1'b0),
     .drv_80trk  (2'b00),
     .img_present(img_present),

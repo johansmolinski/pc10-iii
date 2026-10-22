@@ -15,6 +15,7 @@
 //   status   3BA read back-to-back over a frame;
 //   torture  random 6845, mode and VRAM writes, every dot and read;
 //   blink    70 frames: cursor and character blink rates;
+//   hdrive   no HSYNC to the monitor before video is enabled (U45);
 //   hres     no dot clock without 3B8 bit 0: a VRAM access never ends.
 // Hercules build (-h): hgc (config switch, page mapping, CGA coexistence,
 // status bit 7), hgctext, hgcgfx (720x348 both pages, images).
@@ -233,7 +234,11 @@ struct Sim {
                 } else {
                     ts = TW;
                     tw++;
-                    if (!hang_ok) CHECK(tw < 40, "bus hangs at %05X", cur.a);
+                    if (!hang_ok && tw == 40) {
+                        CHECK(false, "bus hangs at %05X", cur.a);
+                        printf("FAILED: bus hangs\n");
+                        exit(1);
+                    }
                 }
                 break;
             }
@@ -574,6 +579,39 @@ static void test_blink(const std::vector<uint8_t> &font) {
     for (size_t i = 1; i < lit.size(); i++) kinds[lit[i] - lit[i - 1]]++;
     printf("  %zu different frames (cursor on/off x characters on/off)\n", kinds.size());
     CHECK(kinds.size() == 4, "blink: %zu kinds of frames, expected 4", kinds.size());
+    // VSYNC inside the displayed rows: the blink toggles where U28 counts
+    // (the end of VSYNC) become visible
+    s.crtc(7, 10);
+    s.run_ops();
+    s.rec_start(false);
+    s.run_dots(34 * MDA_FRAME);
+    s.rec_stop();
+    s.compare("blink, VSYNC at row 10");
+}
+
+// U45: no horizontal drive to the monitor until video has been enabled once
+static void test_hdrive(const std::vector<uint8_t> &font) {
+    printf("hdrive\n");
+    Sim s(font);
+    s.iow(0x3B8, 0x01);
+    for (int i = 0; i < 16; i++) s.crtc(i, PMDA[i]);
+    s.run_ops();
+    s.rec_start();
+    s.run_dots(MDA_FRAME);
+    int h = 0, v = 0;
+    for (auto &r : s.rec) { h += r.h; v += r.vs; }
+    printf("  video never enabled: %d dots with HSYNC, %d with VSYNC\n", h, v);
+    CHECK(h == 0 && v > 0, "hdrive: HSYNC before video enable (%d dots)", h);
+    s.iow(0x3B8, 0x29);
+    s.iow(0x3B8, 0x21);                  // video off again: the drive stays on
+    s.run_ops();
+    s.rec_start();
+    s.run_dots(MDA_FRAME);
+    h = 0;
+    for (auto &r : s.rec) h += r.h;
+    printf("  after one enable: %d dots with HSYNC\n", h);
+    CHECK(h > 50000, "hdrive: no HSYNC after video enable");
+    s.compare("hdrive");
 }
 
 static void test_hres(const std::vector<uint8_t> &font) {
@@ -707,7 +745,7 @@ int main(int argc, char **argv) {
     fclose(f);
     if (tests.empty()) {
         if (HERC_BUILD) tests = {"hgc", "hgctext", "hgcgfx"};
-        else tests = {"waits", "text", "attrs", "status", "torture", "blink", "hres"};
+        else tests = {"waits", "text", "attrs", "status", "torture", "blink", "hdrive", "hres"};
     }
     for (auto &t : tests) {
         if (t == "waits") test_waits(font);
@@ -717,6 +755,7 @@ int main(int argc, char **argv) {
         else if (t == "torture") { for (int sd = 1; sd <= 3; sd++) test_torture(font, sd); }
         else if (t == "blink") test_blink(font);
         else if (t == "hres") test_hres(font);
+        else if (t == "hdrive") test_hdrive(font);
         else if (t == "hgc") test_hgc(font);
         else if (t == "hgctext") test_hgctext(font);
         else if (t == "hgcgfx") test_hgcgfx(font);

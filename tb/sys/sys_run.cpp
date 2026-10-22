@@ -1,8 +1,15 @@
 #include <unistd.h>
 // sys_run.cpp - Verilator driver for the pc_system simulation.
 //   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-i itrace.txt from_ms] [-q]
+//           [-F font.bin] [-m] [-o image]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
+//   -F  character ROM image (8 KB, IBM 5788005 layout) through the font port
+//   -m  monochrome: DIP SW1 bits 5-4 = 11 (the BIOS uses the MDA); dumps the
+//       MDA text screen (build with make MDA=1 or MDA=2)
+//   -v  log the CPU's writes to 3B0-3BF and 3D0-3DF
+//   -o  with -m: the last MDA frame as <image>.ppm (the vid_hblank/vid_vblank
+//       window, green phosphor; tb/mda/topng.py makes a PNG)
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -19,7 +26,8 @@ int main(int argc, char **argv) {
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
     double itrace_from = 0.0;
     double secs = 1.0;
-    bool quiet = false;
+    bool quiet = false, mono = false, vidlog = false;
+    const char *fontfile = nullptr, *imgfile = nullptr;
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-b") && i + 1 < argc) bios = argv[++i];
@@ -27,6 +35,10 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-t") && i + 1 < argc) trace = argv[++i];
         else if (!strcmp(argv[i], "-d") && i + 1 < argc) dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-q")) quiet = true;
+        else if (!strcmp(argv[i], "-m")) mono = true;
+        else if (!strcmp(argv[i], "-v")) vidlog = true;
+        else if (!strcmp(argv[i], "-F") && i + 1 < argc) fontfile = argv[++i];
+        else if (!strcmp(argv[i], "-o") && i + 1 < argc) imgfile = argv[++i];
         else if (!strcmp(argv[i], "-a") && i + 1 < argc) fdimg = argv[++i];
         else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
     }
@@ -54,7 +66,17 @@ int main(int argc, char **argv) {
     FILE *itf = itrace ? fopen(itrace, "w") : nullptr;
     unsigned long long itrace_cyc = (unsigned long long)(itrace_from * 1e-3 * CLK_HZ);
 
+    if (mono) dip |= 0x30;               // SW1 5-6 off: monochrome 80x25
     tb->dip_sw1 = dip;
+    std::vector<unsigned char> font(8192, 0);
+    if (fontfile) {
+        FILE *ff = fopen(fontfile, "rb");
+        if (!ff || fread(font.data(), 1, 8192, ff) != 8192) { fprintf(stderr, "font %s?\n", fontfile); return 1; }
+        fclose(ff);
+    }
+    // MDA dots: video | intensity << 1 | hsync << 2 | vsync << 3 | window << 4
+    std::vector<unsigned char> mring(1 << 20);
+    unsigned long long mdots = 0;
 
     // floppy A: from an image file (geometry from its size)
     std::vector<unsigned char> disk;
@@ -83,6 +105,11 @@ int main(int argc, char **argv) {
     tb->kbd_valid = 0;
     tb->reset = 1;
     for (int i = 0; i < 200; i++) { tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval(); }
+    for (int a = 0; fontfile && a < 8192; a++) {
+        tb->font_we = 1; tb->font_addr = a; tb->font_data = font[a];
+        tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval();
+    }
+    tb->font_we = 0;
     if (!trace) unlink(hex.c_str());       // the ROM is loaded (initial block ran)
     tb->reset = 0;
 
@@ -165,24 +192,54 @@ int main(int argc, char **argv) {
         if (tb->io_wr) {
             if ((tb->io_addr & 0xFFFF) == 0x80 && !quiet)
                 printf("[%9.3f ms] POST %02X\n", cyc / CLK_HZ * 1e3, tb->io_data);
+            if (vidlog && ((tb->io_addr & 0x3F0) == 0x3B0 || (tb->io_addr & 0x3F0) == 0x3D0))
+                printf("[%9.3f ms] OUT %03X %02X\n", cyc / CLK_HZ * 1e3, tb->io_addr & 0x3FF, tb->io_data);
         }
+        if (tb->mda_ce)
+            mring[mdots++ & (mring.size() - 1)] = tb->mda_video | tb->mda_intens << 1 | tb->mda_hsync << 2 |
+                                                  tb->mda_vsync << 3 | (!tb->mda_hblank && !tb->mda_vblank) << 4;
         tb->clk = 1; tb->eval();
         if (cyc % report == 0 && !quiet)
             printf("[%9.3f ms] CS:IP %04X:%04X\n", cyc / CLK_HZ * 1e3, tb->cs, tb->ip);
     }
 
-    // CGA text screen (80x25 at B8000)
+    // text screen (80x25 at B8000 for the CGA, B0000 for the MDA)
     auto *r = tb->rootp;
-    printf("---- screen ----\n");
+    printf("---- screen (%s) ----\n", mono ? "MDA" : "CGA");
     for (int y = 0; y < 25; y++) {
         char line[81];
         for (int x = 0; x < 80; x++) {
-            unsigned char c = r->tb_sys__DOT__u_pc__DOT__u_cga__DOT__vram[(y * 80 + x) * 2];
+            unsigned char c = mono ? r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[(y * 80 + x) * 2]
+                                   : r->tb_sys__DOT__u_pc__DOT__u_cga__DOT__vram[(y * 80 + x) * 2];
             line[x] = (c >= 32 && c < 127) ? c : (c == 0 ? ' ' : '.');
         }
         line[80] = 0;
         int e = 79; while (e >= 0 && line[e] == ' ') line[e--] = 0;
         printf("%s\n", line);
+    }
+    // the last complete MDA frame (VSYNC start to VSYNC start), its window
+    if (mono && imgfile) {
+        const size_t N = mring.size();
+        auto at = [&](unsigned long long k) { return mring[k & (N - 1)]; };
+        unsigned long long lo = mdots > N ? mdots - N + 1 : 1, e = 0, s = 0;
+        for (unsigned long long k = mdots - 1; k > lo; k--)
+            if ((at(k) & 8) && !(at(k - 1) & 8)) { if (!e) e = k; else { s = k; break; } }
+        if (!s) printf("no complete MDA frame recorded\n");
+        else {
+            static const unsigned char PAL[4][3] = {{0, 0, 0}, {0x10, 0x40, 0x10}, {0x20, 0xB0, 0x20}, {0x70, 0xFF, 0x70}};
+            std::vector<unsigned char> img, row;
+            int w = 0, h = 0;
+            for (unsigned long long k = s; k < e; k++) {
+                if (at(k) & 16) row.insert(row.end(), PAL[at(k) & 3], PAL[at(k) & 3] + 3);
+                else if (!row.empty()) { w = row.size() / 3; img.insert(img.end(), row.begin(), row.end()); row.clear(); h++; }
+            }
+            std::string fn = std::string(imgfile) + ".ppm";
+            FILE *pf = fopen(fn.c_str(), "wb");
+            fprintf(pf, "P6\n%d %d\n255\n", w, h);
+            fwrite(img.data(), 1, (size_t)w * h * 3, pf);
+            fclose(pf);
+            printf("MDA frame: %llu dots, window %dx%d -> %s\n", e - s, w, h, fn.c_str());
+        }
     }
     if (tf) fclose(tf);
     if (itf) fclose(itf);
