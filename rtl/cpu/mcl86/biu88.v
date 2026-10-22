@@ -98,8 +98,8 @@ module biu88 (
     input      [7:0]    AD_IN,
     output     [2:0]    S2_S0_OUT,
     output              S6_3_MUX,
-    output reg [1:0]    QS_OUT,
-    output reg [7:0]    QS_BYTE,            // debug: the byte QS_OUT reports
+    output     [1:0]    QS_OUT,
+    output     [7:0]    QS_BYTE,            // debug: the byte QS_OUT reports
     output              ALE,
 
     // EU interface (MCL86)
@@ -114,7 +114,7 @@ module biu88 (
     output     [1:0]    BIU_SEGMENT,
     output              BIU_NMI_CAUGHT,
     input               BIU_NMI_DEBOUNCE,
-    output reg          BIU_INTR,
+    output              BIU_INTR,
 
     output     [7:0]    PFQ_TOP_BYTE,
     output              PFQ_EMPTY,
@@ -252,36 +252,36 @@ wire [15:0] seg_val = seg_sel == 2'b00 ? reg_es :
                       seg_sel == 2'b10 ? reg_cs : reg_ds;
 
 assign BIU_SEGMENT          = seg_sel;
-assign BIU_REGISTER_ES      = reg_es;
-assign BIU_REGISTER_SS      = reg_ss;
-assign BIU_REGISTER_CS      = reg_cs;
-assign BIU_REGISTER_DS      = reg_ds;
-assign BIU_REGISTER_RM      = reg_rm;
-assign BIU_REGISTER_REG     = reg_reg;
-assign BIU_RETURN_DATA      = return_data;
-assign BIU_CYC              = since_dispatch;
-assign BIU_SINCE_READ       = since_read;
-assign BIU_SINCE_DONE       = since_done;
-assign BIU_SR_PENDING       = sr_armed;
-assign BIU_DONE             = done;
-assign BIU_CLK_COUNTER_ZERO = counter == 13'd0;
-assign BIU_NMI_CAUGHT       = nmi_caught;
-assign LOCK_n               = ~(inta_lock | EU_PREFIX_LOCK);
+assign BIU_REGISTER_ES      = o_reg_es;
+assign BIU_REGISTER_SS      = o_reg_ss;
+assign BIU_REGISTER_CS      = o_reg_cs;
+assign BIU_REGISTER_DS      = o_reg_ds;
+assign BIU_REGISTER_RM      = o_reg_rm;
+assign BIU_REGISTER_REG     = o_reg_reg;
+assign BIU_RETURN_DATA      = o_return_data;
+assign BIU_CYC              = o_since_dispatch;
+assign BIU_SINCE_READ       = o_since_read;
+assign BIU_SINCE_DONE       = o_since_done;
+assign BIU_SR_PENDING       = o_sr_armed;
+assign BIU_DONE             = o_done;
+assign BIU_CLK_COUNTER_ZERO = o_counter == 13'd0;
+assign BIU_NMI_CAUGHT       = o_nmi_caught;
+assign LOCK_n               = ~(o_inta_lock | EU_PREFIX_LOCK);
 
-assign PFQ_TOP_BYTE = pfq_top_d1;
-assign PFQ_EMPTY    = pfq_empty_d1;
-assign PFQ_ADDR_OUT = pfq_addr_d1;
+assign PFQ_TOP_BYTE = o_pfq_top_d1;
+assign PFQ_EMPTY    = o_pfq_empty_d1;
+assign PFQ_ADDR_OUT = o_pfq_addr_d1;
 
 // pins
-assign ALE       = t_cycle == T1 && latch != ST_PASV && latch != ST_HALT;
-assign S2_S0_OUT = (t_cycle == T1 || t_cycle == T2) ? status : ST_PASV;
+assign ALE       = o_t_cycle == T1 && o_latch != ST_PASV && o_latch != ST_HALT;
+assign S2_S0_OUT = (o_t_cycle == T1 || o_t_cycle == T2) ? o_status : ST_PASV;
 assign AD_OE     = 1'b1;
-assign AD_OUT    = t_cycle == T1 ? address_latch : {address_latch[19:8], data_bus};
-assign S6_3_MUX  = t_cycle != T1;
+assign AD_OUT    = o_t_cycle == T1 ? o_address_latch : {o_address_latch[19:8], o_data_bus};
+assign S6_3_MUX  = o_t_cycle != T1;
 
-assign dbg_t_state   = t_cycle;
+assign dbg_t_state   = o_t_cycle;
 assign dbg_ta_state  = ta_cycle;
-assign dbg_latch     = latch;
+assign dbg_latch     = o_latch;
 assign dbg_queue_len = qlen;
 
 // ------------------------------------------------------------------ helpers
@@ -598,6 +598,40 @@ task do_cycle;
 endtask
 
 // ------------------------------------------------------------------ main
+// The outputs. The state is kept with blocking assignments (the model is
+// procedural); these copies carry it to the outputs with nonblocking ones, so
+// that the EU and the board (other processes on the same clock edge) read the
+// values from before the edge in simulation too, as they do in hardware
+// (pc10-iii, 2026-10-21: Verilator ran them after this block and gave them
+// the new values).
+reg  [15:0]  o_reg_es;
+reg  [15:0]  o_reg_ss;
+reg  [15:0]  o_reg_cs;
+reg  [15:0]  o_reg_ds;
+reg  [15:0]  o_reg_rm;
+reg  [15:0]  o_reg_reg;
+reg  [15:0]  o_return_data;
+reg  [11:0]  o_since_dispatch;
+reg  [11:0]  o_since_read;
+reg  [11:0]  o_since_done;
+reg         o_sr_armed;
+reg         o_done;
+reg         o_nmi_caught;
+reg  [12:0]  o_counter;
+reg         o_inta_lock;
+reg  [7:0]  o_pfq_top_d1;
+reg         o_pfq_empty_d1;
+reg  [15:0]  o_pfq_addr_d1;
+reg  [2:0]  o_t_cycle;
+reg  [2:0]  o_latch;
+reg  [2:0]  o_status;
+reg  [19:0]  o_address_latch;
+reg  [7:0]  o_data_bus;
+reg  [1:0]  o_qs_out;
+reg  [7:0]  o_qs_byte;
+reg         o_biu_intr;
+reg [1:0] qs_out; reg [7:0] qs_byte; reg biu_intr;
+assign QS_OUT = o_qs_out; assign QS_BYTE = o_qs_byte; assign BIU_INTR = o_biu_intr;
 
 always @(posedge CORE_CLK_INT) begin
     if (RESET_INT) begin
@@ -608,8 +642,8 @@ always @(posedge CORE_CLK_INT) begin
         q0 = 8'h0; q1 = 8'h0; q2 = 8'h0; q3 = 8'h0;  qlen = 3'd0;
         pc = 16'h0;  taken0 = 8'h0;  taken1 = 8'h0;  taken2 = 8'h0;  ntaken = 2'd0;
         preread = 1'b0;  end_armed = 1'b0;  end_after_done = 1'b0;  end_ad_n = 12'd0;
-        eu_ip = 16'h0;  queue_op = QO_IDLE;  QS_OUT = QO_IDLE;
-        queue_byte = 8'h0;  QS_BYTE = 8'h0;
+        eu_ip = 16'h0;  queue_op = QO_IDLE;  qs_out = QO_IDLE;
+        queue_byte = 8'h0;  qs_byte = 8'h0;
         op_ip = 16'h0;  op_byte = 8'h0;
         reg_es = 16'h0; reg_ss = 16'h0; reg_cs = 16'hFFFF; reg_ds = 16'h0;
         reg_rm = 16'h0; reg_reg = 16'h0;
@@ -622,7 +656,7 @@ always @(posedge CORE_CLK_INT) begin
         return_data = 16'h0;  done = 1'b0;
         eu_req_d1 = 1'b0;  strobe_d1 = 1'b0;
         pfq_top_d1 = 8'h0;  pfq_empty_d1 = 1'b1;  pfq_addr_d1 = 16'h0;
-        BIU_INTR = 1'b0;
+        biu_intr = 1'b0;
         inta_lock = 1'b0;  t3_last = 1'b1;  nmi_d1 = 1'b0;  nmi_d2 = 1'b0;  nmi_caught = 1'b0;
     end else begin
         done = 1'b0;
@@ -635,7 +669,7 @@ always @(posedge CORE_CLK_INT) begin
         nmi_d1 = NMI;
 
         if (step) begin
-            BIU_INTR = INTR;                    // sampled at the CLK edge
+            biu_intr = INTR;                    // sampled at the CLK edge
 
             // MartyPC runs the request's wait loops cycle by cycle; the
             // conditions are checked at the boundary BEFORE each cycle, which
@@ -643,8 +677,8 @@ always @(posedge CORE_CLK_INT) begin
             do_cycle;
 
             // queue status: what the EU did in the cycle that just ended
-            QS_OUT   = queue_op;
-            QS_BYTE  = queue_byte;
+            qs_out   = queue_op;
+            qs_byte  = queue_byte;
             queue_op = QO_IDLE;
 
             if (counter_cycles && counter != 13'd0) counter = counter - 13'd1;
@@ -911,6 +945,32 @@ always @(posedge CORE_CLK_INT) begin
         pfq_empty_d1 = ntaken == 2'd0 && qlen == 3'd0;
         pfq_addr_d1  = eu_ip;
     end
+    o_reg_es <= reg_es;
+    o_reg_ss <= reg_ss;
+    o_reg_cs <= reg_cs;
+    o_reg_ds <= reg_ds;
+    o_reg_rm <= reg_rm;
+    o_reg_reg <= reg_reg;
+    o_return_data <= return_data;
+    o_since_dispatch <= since_dispatch;
+    o_since_read <= since_read;
+    o_since_done <= since_done;
+    o_sr_armed <= sr_armed;
+    o_done <= done;
+    o_nmi_caught <= nmi_caught;
+    o_counter <= counter;
+    o_inta_lock <= inta_lock;
+    o_pfq_top_d1 <= pfq_top_d1;
+    o_pfq_empty_d1 <= pfq_empty_d1;
+    o_pfq_addr_d1 <= pfq_addr_d1;
+    o_t_cycle <= t_cycle;
+    o_latch <= latch;
+    o_status <= status;
+    o_address_latch <= address_latch;
+    o_data_bus <= data_bus;
+    o_qs_out <= qs_out;
+    o_qs_byte <= qs_byte;
+    o_biu_intr <= biu_intr;
 end
 
 endmodule
