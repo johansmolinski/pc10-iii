@@ -26,13 +26,20 @@ module KF8237 (
     output  logic           end_of_process_n_out,
     input   logic   [3:0]   address_in,
     output  logic   [15:0]  address_out,
+    output  logic   [15:0]  address_out_next,       // pc10-iii: address_out of the next clk
     output  logic           output_highst_address,
     output  logic           hold_request,
     output  logic   [3:0]   dma_acknowledge,
+    output  logic   [3:0]   dma_acknowledge_next,   // pc10-iii: DACK of the next clk
     output  logic           address_enable,
     output  logic           address_strobe,
     output  logic           memory_read_n,
-    output  logic           memory_write_n
+    output  logic           memory_write_n,
+    // pc10-iii: the next clk's values of the strobes (without reset)
+    output  logic           io_read_n_next,
+    output  logic           io_write_n_next,
+    output  logic           memory_read_n_next,
+    output  logic           memory_write_n_next
 );
 
 
@@ -173,7 +180,8 @@ module KF8237 (
         .next_word                          (next_word),
         .update_high_address                (update_high_address),
         .underflow                          (underflow),
-        .transfer_address                   (address_out)
+        .transfer_address                   (address_out),
+        .transfer_address_next              (address_out_next)
     );
 
 
@@ -223,11 +231,16 @@ module KF8237 (
         .hold_request                       (hold_request),
         .hold_acknowledge                   (hold_acknowledge),
         .dma_acknowledge                    (dma_acknowledge),
+        .dma_acknowledge_next               (dma_acknowledge_next),
         .address_enable                     (address_enable),
         .address_strobe                     (address_strobe),
         .output_highst_address              (output_highst_address),
         .memory_read_n                      (memory_read_n),
         .memory_write_n                     (memory_write_n),
+        .io_read_n_out_next                 (io_read_n_next),
+        .io_write_n_out_next                (io_write_n_next),
+        .memory_read_n_next                 (memory_read_n_next),
+        .memory_write_n_next                (memory_write_n_next),
         .io_read_n_out                      (io_read_n_out),
         .io_read_n_io                       (io_read_n_io),
         .io_write_n_out                     (io_write_n_out),

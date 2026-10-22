@@ -107,10 +107,11 @@ cpu8088 u_cpu (
 );
 
 // ------------------------------------------------------------ system board
-logic [19:0] isa_addr;
+logic [19:0] isa_addr, isa_addr_next;
 logic [7:0]  isa_dout, isa_din;
 logic        isa_dsel, isa_memr_n, isa_memw_n, isa_ior_n, isa_iow_n;
-logic        isa_aen, isa_ale, isa_ready, isa_tc;
+logic        isa_aen, isa_aen_next, isa_ale, isa_ready, isa_tc;
+logic        isa_ior_n_next, isa_iow_n_next, isa_memr_n_next, isa_memw_n_next;
 logic [7:2]  isa_irq;
 logic [3:1]  isa_drq;
 logic [3:0]  isa_dack_n;
@@ -139,6 +140,12 @@ xt_board #(.RAM_KB(RAM_KB)) u_board (
     .rom_addr     (rom_addr),
     .rom_rdata    (rom_rdata),
     .isa_addr     (isa_addr),
+    .isa_addr_next(isa_addr_next),
+    .isa_aen_next (isa_aen_next),
+    .isa_ior_n_next(isa_ior_n_next),
+    .isa_iow_n_next(isa_iow_n_next),
+    .isa_memr_n_next(isa_memr_n_next),
+    .isa_memw_n_next(isa_memw_n_next),
     .isa_dout     (isa_dout),
     .isa_din      (isa_din),
     .isa_dsel     (isa_dsel),
@@ -164,11 +171,14 @@ xt_board #(.RAM_KB(RAM_KB)) u_board (
 logic [7:0] cga_din;
 logic       cga_dsel, cga_ready;
 
-cga_card u_cga (
+cga_card #(.REG_READY(1'b1)) u_cga (
     .clk        (clk),
     .reset      (reset),
     .ce_14m     (ce_14m),
     .isa_addr   (isa_addr),
+    .isa_addr_next  (isa_addr_next),
+    .isa_memr_n_next(isa_memr_n_next),
+    .isa_memw_n_next(isa_memw_n_next),
     .isa_dout   (isa_dout),
     .isa_din    (cga_din),
     .isa_dsel   (cga_dsel),
@@ -202,10 +212,14 @@ logic       fdc_dsel, fdc_ready;
 logic [7:2] fdc_irq;
 logic [3:1] fdc_drq;
 
-fdc_card u_fdc (
+fdc_card #(.REG_DECODE(1'b1)) u_fdc (
     .clk         (clk),
     .reset       (reset),
     .isa_addr    (isa_addr),
+    .isa_addr_next(isa_addr_next),
+    .isa_aen_next(isa_aen_next),
+    .isa_ior_n_next(isa_ior_n_next),
+    .isa_iow_n_next(isa_iow_n_next),
     .isa_dout    (isa_dout),
     .isa_din     (fdc_din),
     .isa_dsel    (fdc_dsel),

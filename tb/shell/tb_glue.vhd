@@ -2,7 +2,7 @@
 --   keyboard.vhd: make/break codes, the MEGA + digit Fn layer, the busy handshake
 --   pc_bios.vhd:  the window reads the RAM 1:1 (the firmware right-aligns the image), 0xFF
 --                 while the gate is closed
---   pc_ram.vhd:   2-clock read latency with ack, the size limit (0xFF above it)
+--   pc_ram.vhd:   6-clock read latency with ack, the size limit (0xFF above it)
 --   pc_font.vhd:  the default font copied into the font port after the reset, a 2 KB font
 --                 loaded by QNICE and copied to 0x1800 and 0x1000
 library ieee;
@@ -160,7 +160,7 @@ begin
             n := n + 1;
             exit when mack = '1';
          end loop;
-         assert n = 4 report "RAM ack after " & integer'image(n) & " TB waits (expected 4: ack 4 clocks after ram_en)" severity failure;
+         assert n = 6 report "RAM ack after " & integer'image(n) & " TB waits (expected 6: ack 6 clocks after ram_en)" severity failure;
          assert mrd = d report "RAM " & to_hstring(to_unsigned(a, 20)) & ": " & to_hstring(mrd)
                                 & " expected " & to_hstring(d) severity failure;
       end procedure;

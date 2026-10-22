@@ -64,7 +64,7 @@ module upd765 #(
     input  logic        drv_ts,         // TS pin (two-sided)
     input  logic        drv_spin,       // index pulses come: drive selected, medium in, motor on
     input  logic [7:0]  drv_cyl,        // physical head position = C of the ID fields
-    input  logic [7:0]  geo_tracks,     // medium geometry (selected drive)
+    input  logic        geo_cyl_ok,     // drv_cyl < the medium's tracks (pc10-iii: computed per drive by the card)
     input  logic [1:0]  geo_heads,
     input  logic [5:0]  geo_spt,
 
@@ -172,7 +172,7 @@ always_ff @(posedge clk) begin
 end
 
 // the surface under the head (events are one-clk pulses after ev_adv)
-wire        trk_fmt  = drv_spin && drv_cyl < geo_tracks && {1'b0, hd} < geo_heads;
+wire        trk_fmt  = drv_spin && geo_cyl_ok && {1'b0, hd} < geo_heads;
 wire        in_sec   = rsec != 5'd31 && {1'b0, rsec} < geo_spt;
 wire        ev_index = ev_adv && rpos == 14'd0 && drv_spin;
 wire        ev_id    = ev_adv && trk_fmt && in_sec && roff == 11'(ID_END);
@@ -187,6 +187,8 @@ wire [7:0]  id_r     = 8'(rsec) + 8'd1;
 ph_t        ph;
 ex_t        ex;
 op_t        op;
+// pc10-iii (timing): decodes of op as registers of their own, loaded with op
+logic       op_rtrk, op_rdany;          // op == OP_RTRK, op == OP_RD || op == OP_RDDEL
 logic [3:0] cmd_len, cmd_n;
 logic [7:0] cmd_buf [9];
 logic       exec_go;
@@ -208,6 +210,7 @@ logic       dir_rd, dir_wr;            // data direction of the current command
 logic       idx_cnt;                   // one index pulse seen while searching
 logic       seen_id, seen_wc;
 logic       xfer;                      // this sector's data go to/from the host
+(* max_fanout = 24 *)                  // pc10-iii (timing): it drives ~100 loads
 logic       xslot;                     // slot of the next sector transfer
 logic       cm_flag, cm_term, nd_flag;
 logic       tc_seen, wr_err;
@@ -291,7 +294,7 @@ logic [16:0] pf_tag;
 always_comb begin
     pf_ok  = 1'b0;
     pf_tag = {drv_cyl, hd, r_r + 8'd1};
-    if (op == OP_RD || op == OP_RDDEL) begin
+    if (op_rdany) begin
         if (r_r != eot_r) begin
             pf_ok  = c_r == drv_cyl && h_r == {7'd0, hd} && n_r == 8'd2 &&
                      r_r + 8'd1 <= {2'b00, geo_spt};
@@ -302,14 +305,14 @@ always_comb begin
     end
 end
 
-wire [16:0] cur_tag  = {drv_cyl, hd, (op == OP_RTRK) ? id_r : r_r};
+wire [16:0] cur_tag  = {drv_cyl, hd, op_rtrk ? id_r : r_r};
 wire        slot_free = slot_st[xslot] != SL_DIRTY && slot_st[xslot] != SL_BUSYW;
 wire        wslot     = slot_st[0] != SL_DIRTY;    // slot to commit next
 wire        drain_ok  = !dir_wr || (slot_st[0] != SL_DIRTY && slot_st[0] != SL_BUSYW &&
                                     slot_st[1] != SL_DIRTY && slot_st[1] != SL_BUSYW && !x_busy);
 wire [7:0]  st0_cmd  = {2'b00, 1'b0, 1'b0, !drv_ready, hd, us};
 wire        fmt_store = n_r == 8'd2 && fid[2] >= 8'd1 && fid[2] <= {2'b00, geo_spt} &&
-                        drv_cyl < geo_tracks && {1'b0, hd} < geo_heads;
+                        geo_cyl_ok && {1'b0, hd} < geo_heads;
 wire [13:0] fpitch   = 14'd62 + (14'd128 << n_r[2:0]) + 14'(gpl_r);
 wire [16:0] step_us  = 17'((16 - int'(srt)) * 1000 * TIME_SCALE);
 
@@ -393,6 +396,7 @@ always_ff @(posedge clk) begin
 
     if (reset) begin
         ph <= PH_RESET;  ex <= EX_IDLE;  op <= OP_INV;
+        op_rtrk <= 1'b0;  op_rdany <= 1'b0;
         rst_cnt <= 11'(RESET_US);
         cmd_n <= 4'd0;  cmd_len <= 4'd1;  res_i <= 3'd0;  res_n <= 3'd0;
         rqm_dly <= 5'd0;
@@ -492,6 +496,8 @@ always_ff @(posedge clk) begin
             cmd_buf[cmd_n] <= cpu_wdata;
             if (cmd_n == 4'd0) begin
                 op <= dec_op;  cmd_len <= dec_len;
+                op_rtrk  <= dec_op == OP_RTRK;
+                op_rdany <= dec_op == OP_RD || dec_op == OP_RDDEL;
                 mt <= cpu_wdata[7];  mf <= cpu_wdata[6];  sk <= cpu_wdata[5];
                 if (dec_op == OP_INV) begin
                     res[0] <= 8'h80;  res_n <= 3'd1;  res_i <= 3'd0;
@@ -775,6 +781,12 @@ always_ff @(posedge clk) begin
         end
     end
 end
+
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (!reset && (op_rtrk != (op == OP_RTRK) || op_rdany != (op == OP_RD || op == OP_RDDEL)))
+        $fatal(1, "upd765: registered op decodes differ from op");
+`endif
 
 // ======================================================================
 // seeks: one step engine per unit (overlapped seeks), all step pulses go to

@@ -55,11 +55,17 @@ module KF8237_Timing_And_Control (
     output  logic           hold_request,
     input   logic           hold_acknowledge,
     output  logic   [3:0]   dma_acknowledge,
+    output  logic   [3:0]   dma_acknowledge_next,   // pc10-iii: the value of the next clk
     output  logic           address_enable,
     output  logic           address_strobe,
     output  logic           output_highst_address,
     output  logic           memory_read_n,
     output  logic           memory_write_n,
+    // pc10-iii: the next clk's values of the strobes (without reset)
+    output  logic           io_read_n_out_next,
+    output  logic           io_write_n_out_next,
+    output  logic           memory_read_n_next,
+    output  logic           memory_write_n_next,
     output  logic           io_read_n_out,
     output  logic           io_read_n_io,
     output  logic           io_write_n_out,
@@ -235,6 +241,76 @@ module KF8237_Timing_And_Control (
         endcase
     end
 
+    // pc10-iii (timing): the same decoder with READY = 1, for DACK (below).
+    // READY only decides between S4 and staying in S2/S3/SW, so
+    // next_state_r1 equals next_state except in S2/S3/SW without READY: there
+    // next_state can be S2 (compressed timing, verify) where next_state_r1 is
+    // S4. The only difference that matters is next_state == S2 in S2, which
+    // reloads dma_acknowledge_ff with dma_acknowledge_internal - the value it
+    // already has (it got it on entering S2, and the internal value only
+    // changes in SI).
+    state_t         next_state_r1;
+    always_comb begin
+        next_state_r1 = state;
+
+        casez (state)
+            SI: begin
+                if (0 != encoded_dma)
+                    next_state_r1 = S0;
+            end
+            S0: begin
+                if (hold_acknowledge)
+                    next_state_r1 = S1;
+            end
+            S1: begin
+                if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE) begin
+                    next_state_r1 = S4;
+                end
+                else
+                    next_state_r1 = S2;
+            end
+            S2: begin
+                if (~compressed_timing)
+                    next_state_r1 = S3;
+                else if (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY) begin
+                    if (1'b1)
+                        next_state_r1 = S4;
+                end
+                else
+                    next_state_r1 = SW;
+            end
+            S3: begin
+                if (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY) begin
+                    if (1'b1)
+                        next_state_r1 = S4;
+                end
+                else
+                    next_state_r1 = SW;
+            end
+            SW: begin
+                if (1'b1)
+                    next_state_r1 = S4;
+            end
+            S4: begin
+                if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE)
+                    if (0 == (dma_acknowledge_internal & dma_request_state))
+                        next_state_r1 = SI;
+                    else
+                        next_state_r1 = S4;
+                else if (transfer_mode[dma_select] == `TRANSFER_MODE_SINGLE)
+                    next_state_r1 = SI;
+                else if ((transfer_mode[dma_select] == `TRANSFER_MODE_DEMAND) && (0 == (dma_acknowledge_internal & dma_request_state)))
+                    next_state_r1 = SI;
+                else if (end_of_process_internal)
+                    next_state_r1 = SI;
+                else
+                    next_state_r1 = (reoutput_high_address) ? S1 : S2;
+            end
+            default: begin
+            end
+        endcase
+    end
+
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             state <= SI;
@@ -282,7 +358,17 @@ module KF8237_Timing_And_Control (
     always_comb begin
         address_hold_config         = ((4'b0001 == dma_acknowledge_internal) & (chanel_0_address_hold_enable));
         decrement_address_config    = address_decrement_select[dma_select];
-        next_word                   = ((next_state == S4) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ? 1'b1 : 1'b0;
+        // pc10-iii (timing): READY last. next_state is S4 without READY only
+        // from S1 in cascade mode (no next_word) and from S4 in cascade mode
+        // (likewise); with READY from S2 (compressed timing, verify), S3
+        // (verify) and SW. So this is the original expression, with READY one
+        // LUT before the address and count registers' clock enables instead of
+        // at the input of the state decoder (checked in simulation below).
+        //   next_word                   = ((next_state == S4) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ? 1'b1 : 1'b0;
+        next_word                   = ready && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE) &&
+                                      (((state == S2) && compressed_timing && (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY)) ||
+                                       ((state == S3) && (transfer_type[dma_select] == `TRANSFER_TYPE_VERIFY)) ||
+                                       (state == SW));
         // TODO: output_temporary_data  (Memory-to-Memory)
 
         casez (state)
@@ -331,6 +417,10 @@ module KF8237_Timing_And_Control (
 
     //
     // Hold Request Signal
+    // pc10-iii (timing): next_state_r1 (the decoder with READY = 1, below)
+    // here and in the two blocks after the address enable: READY never makes
+    // next_state S0 or SI, and from S1 it has no effect, so these are exact.
+    // For dma_acknowledge_ff see dack_sense_next below.
     //
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
@@ -338,9 +428,9 @@ module KF8237_Timing_And_Control (
         else if (master_clear)
             hold_request <= 1'b0;
         else if (cpu_clock_posedge)
-            if (next_state == S0)
+            if (next_state_r1 == S0)
                 hold_request <= 1'b1;
-            else if (next_state == SI)
+            else if (next_state_r1 == SI)
                 hold_request <= 1'b0;
             else
                 hold_request <= hold_request;
@@ -399,7 +489,7 @@ module KF8237_Timing_And_Control (
         else if (cpu_clock_negedge)
             if (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE)
                 output_highst_address <= 1'b0;
-            else if ((state == S1) && (next_state == S2))
+            else if ((state == S1) && (next_state_r1 == S2))
                 output_highst_address <= 1'b1;
             else
                 output_highst_address <= 1'b0;
@@ -409,24 +499,92 @@ module KF8237_Timing_And_Control (
 
     //
     // DMA Acknowledge Signal
+    // pc10-iii (timing): next_state_r1, see dack_sense_next below
     //
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             dma_acknowledge_ff <= 0;
-        else if (master_clear)
-            dma_acknowledge_ff <= 0;
-        else if (cpu_clock_negedge)
-            if (next_state == S2)
-                dma_acknowledge_ff <= dma_acknowledge_internal;
-            else if (next_state == SI)
-                dma_acknowledge_ff <= 0;
-            else
-                dma_acknowledge_ff <= dma_acknowledge_ff;
         else
-            dma_acknowledge_ff <= dma_acknowledge_ff;
+            dma_acknowledge_ff <= dma_acknowledge_ff_next;
     end
 
-    assign  dma_acknowledge = (dack_sense_active_high) ? dma_acknowledge_ff : ~dma_acknowledge_ff;
+    // pc10-iii (timing): DACK is a register of its own instead of the XOR of the
+    // polarity bit and dma_acknowledge_ff, which the system board decodes into
+    // the bus address. Its D input is the XOR of the two registers' D inputs,
+    // so it equals the original combinational output in every clk (checked in
+    // simulation below). The board also gets that D input
+    // (dma_acknowledge_next) to register what it derives from DACK.
+    //   assign  dma_acknowledge = (dack_sense_active_high) ? dma_acknowledge_ff : ~dma_acknowledge_ff;
+    logic           dack_sense_next;
+    wire            dack_no_req = 0 == (dma_acknowledge_internal & dma_request_state);
+    wire            dack_s4_end = (transfer_mode[dma_select] == `TRANSFER_MODE_CASCADE) ? dack_no_req :
+                                  ((transfer_mode[dma_select] == `TRANSFER_MODE_SINGLE) ||
+                                   ((transfer_mode[dma_select] == `TRANSFER_MODE_DEMAND) && dack_no_req) ||
+                                   end_of_process_internal);
+    wire            dack_to_s2  = ((state == S1) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ||
+                                  ((state == S4) && !dack_s4_end && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE) &&
+                                   !reoutput_high_address);
+    wire            dack_to_si  = (state == S4) && dack_s4_end;
+    logic   [3:0]   dma_acknowledge_ff_next;
+    logic   [3:0]   dma_acknowledge_q;
+    always_comb begin
+        if (master_clear)
+            dack_sense_next = 1'b0;
+        else if (write_command_register)
+            dack_sense_next = internal_data_bus[7];
+        else
+            dack_sense_next = dack_sense_active_high;
+
+        // Only the transitions out of S1 and S4, written out from those cases
+        // of the state decoder, load the flip-flop. The original also did
+        // "next_state == SI -> 0" in SI, where it is 0 already (cleared when
+        // SI is entered: from S4, by reset, by master clear), and
+        // "next_state == S2 -> dma_acknowledge_internal" in S2 (compressed
+        // timing, verify, not ready), where it holds that value already
+        // (loaded on entering S2; the internal value only changes in SI).
+        // This keeps READY and the DMA requests/masks (SI -> S0) out of DACK.
+        if (master_clear)
+            dma_acknowledge_ff_next = 0;
+        else if (cpu_clock_negedge)
+            if (dack_to_s2)
+                dma_acknowledge_ff_next = dma_acknowledge_internal;
+            else if (dack_to_si)
+                dma_acknowledge_ff_next = 0;
+            else
+                dma_acknowledge_ff_next = dma_acknowledge_ff;
+        else
+            dma_acknowledge_ff_next = dma_acknowledge_ff;
+    end
+    assign  dma_acknowledge_next = (dack_sense_next) ? dma_acknowledge_ff_next : ~dma_acknowledge_ff_next;
+
+    always_ff @(posedge clock, posedge reset) begin
+        if (reset)
+            dma_acknowledge_q <= 4'b1111;       // dack_sense_active_high = 0, ff = 0
+        else
+            dma_acknowledge_q <= dma_acknowledge_next;
+    end
+    assign  dma_acknowledge = dma_acknowledge_q;
+
+`ifndef SYNTHESIS
+    always_ff @(posedge clock)
+        if (!reset && (dack_to_s2 !== (((state == S1) || (state == S4)) && (next_state == S2)) ||
+                       dack_to_si !== ((state == S4) && (next_state == SI))))
+            $fatal(1, "KF8237: written-out S1/S4 transitions differ from the state decoder");
+    always_ff @(posedge clock)
+        if (!reset && ((next_state_r1 == S0) !== (next_state == S0) || (next_state_r1 == SI) !== (next_state == SI) ||
+                       (state == S1 && (next_state_r1 == S2) !== (next_state == S2))))
+            $fatal(1, "KF8237: state decode without READY differs where it must not");
+    always_ff @(posedge clock)
+        if (!reset && !master_clear && cpu_clock_negedge && dma_acknowledge_ff_next !==
+            ((next_state == S2) ? dma_acknowledge_internal : (next_state == SI) ? 4'b0000 : dma_acknowledge_ff))
+            $fatal(1, "KF8237: DACK next value without READY differs from the original");
+    always_ff @(posedge clock)
+        if (!reset && next_word !== (((next_state == S4) && (transfer_mode[dma_select] != `TRANSFER_MODE_CASCADE)) ? 1'b1 : 1'b0))
+            $fatal(1, "KF8237: next_word differs from the original");
+    always_ff @(posedge clock)
+        if (!reset && dma_acknowledge_q !== ((dack_sense_active_high) ? dma_acknowledge_ff : ~dma_acknowledge_ff))
+            $fatal(1, "KF8237: registered DACK differs from the original");
+`endif
 
     //
     // IO Read Signal
@@ -447,39 +605,49 @@ module KF8237_Timing_And_Control (
             io_read_n_io <= io_read_n_io;
     end
 
+    // pc10-iii (timing): the D input written out and exported (io_read_n_out_next)
+    always_comb begin
+        if (master_clear)
+            io_read_n_out_next = 1'b1;
+        else if (cpu_clock_posedge)
+            if ((state == S2) && (transfer_type[dma_select] == `TRANSFER_TYPE_WRITE))
+                io_read_n_out_next = 1'b0;
+            else if (state == S4)
+                io_read_n_out_next = 1'b1;
+            else
+                io_read_n_out_next = io_read_n_out;
+        else
+            io_read_n_out_next = io_read_n_out;
+    end
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             io_read_n_out <= 1'b1;
-        else if (master_clear)
-            io_read_n_out <= 1'b1;
-        else if (cpu_clock_posedge)
-            if ((state == S2) && (transfer_type[dma_select] == `TRANSFER_TYPE_WRITE))
-                io_read_n_out <= 1'b0;
-            else if (state == S4)
-                io_read_n_out <= 1'b1;
-            else
-                io_read_n_out <= io_read_n_out;
         else
-            io_read_n_out <= io_read_n_out;
+            io_read_n_out <= io_read_n_out_next;
     end
 
     //
     // Memory Read Signal
     //
+    // pc10-iii (timing): the D input written out and exported (memory_read_n_next)
+    always_comb begin
+        if (master_clear)
+            memory_read_n_next = 1'b1;
+        else if (cpu_clock_posedge)
+            if ((state == S2) && (transfer_type[dma_select] == `TRANSFER_TYPE_READ))
+                memory_read_n_next = 1'b0;
+            else if (state == S4)
+                memory_read_n_next = 1'b1;
+            else
+                memory_read_n_next = memory_read_n;
+        else
+            memory_read_n_next = memory_read_n;
+    end
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             memory_read_n <= 1'b1;
-        else if (master_clear)
-            memory_read_n <= 1'b1;
-        else if (cpu_clock_posedge)
-            if ((state == S2) && (transfer_type[dma_select] == `TRANSFER_TYPE_READ))
-                memory_read_n <= 1'b0;
-            else if (state == S4)
-                memory_read_n <= 1'b1;
-            else
-                memory_read_n <= memory_read_n;
         else
-            memory_read_n <= memory_read_n;
+            memory_read_n <= memory_read_n_next;
     end
 
     //
@@ -501,49 +669,59 @@ module KF8237_Timing_And_Control (
             io_write_n_io <= io_write_n_io;
     end
 
+    // pc10-iii (timing): the D input written out and exported (io_write_n_out_next)
+    always_comb begin
+        if (master_clear)
+            io_write_n_out_next = 1'b1;
+        else if (cpu_clock_posedge)
+            if (state == S4)
+                io_write_n_out_next = 1'b1;
+            else if (transfer_type[dma_select] == `TRANSFER_TYPE_READ)
+                if ((state == S2) && ((extended_write_selection) || (compressed_timing)))
+                    io_write_n_out_next = 1'b0;
+                else if (state == S3)
+                    io_write_n_out_next = 1'b0;
+                else
+                    io_write_n_out_next = io_write_n_out;
+            else
+                io_write_n_out_next = io_write_n_out;
+        else
+            io_write_n_out_next = io_write_n_out;
+    end
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             io_write_n_out <= 1'b1;
-        else if (master_clear)
-            io_write_n_out <= 1'b1;
-        else if (cpu_clock_posedge)
-            if (state == S4)
-                io_write_n_out <= 1'b1;
-            else if (transfer_type[dma_select] == `TRANSFER_TYPE_READ)
-                if ((state == S2) && ((extended_write_selection) || (compressed_timing)))
-                    io_write_n_out <= 1'b0;
-                else if (state == S3)
-                    io_write_n_out <= 1'b0;
-                else
-                    io_write_n_out <= io_write_n_out;
-            else
-                io_write_n_out <= io_write_n_out;
         else
-            io_write_n_out <= io_write_n_out;
+            io_write_n_out <= io_write_n_out_next;
     end
 
     //
     // Memory Write Signal
     //
+    // pc10-iii (timing): the D input written out and exported (memory_write_n_next)
+    always_comb begin
+        if (master_clear)
+            memory_write_n_next = 1'b1;
+        else if (cpu_clock_posedge)
+            if (state == S4)
+                memory_write_n_next = 1'b1;
+            else if (transfer_type[dma_select] == `TRANSFER_TYPE_WRITE)
+                if ((state == S2) && ((extended_write_selection) || (compressed_timing)))
+                    memory_write_n_next = 1'b0;
+                else if (state == S3)
+                    memory_write_n_next = 1'b0;
+                else
+                    memory_write_n_next = memory_write_n;
+            else
+                memory_write_n_next = memory_write_n;
+        else
+            memory_write_n_next = memory_write_n;
+    end
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             memory_write_n <= 1'b1;
-        else if (master_clear)
-            memory_write_n <= 1'b1;
-        else if (cpu_clock_posedge)
-            if (state == S4)
-                memory_write_n <= 1'b1;
-            else if (transfer_type[dma_select] == `TRANSFER_TYPE_WRITE)
-                if ((state == S2) && ((extended_write_selection) || (compressed_timing)))
-                    memory_write_n <= 1'b0;
-                else if (state == S3)
-                    memory_write_n <= 1'b0;
-                else
-                    memory_write_n <= memory_write_n;
-            else
-                memory_write_n <= memory_write_n;
         else
-            memory_write_n <= memory_write_n;
+            memory_write_n <= memory_write_n_next;
     end
 
     //

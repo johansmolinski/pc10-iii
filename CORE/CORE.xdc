@@ -41,3 +41,9 @@ set_multicycle_path -hold 3 -from [get_cells -hierarchical -filter {NAME =~ CORE
 ## slots. Port names are the SPI ones of the board XDCs: mosi = CMD, miso = DAT0, reset = DAT3.
 set_property -dict {PULLUP TRUE} [get_ports {sd_mosi_o sd_miso_i sd_d1_i sd_d2_i sd_reset_o}]
 set_property -dict {PULLUP TRUE} [get_ports {sd2_mosi_o sd2_miso_i sd2_d1_i sd2_d2_i sd2_reset_o}]
+
+## The PC's reset (mega65.vhd main_pc_reset, ~2300 loads all over pc_system, many of them the
+## KF chips' asynchronous clears): the max_fanout attribute is not honoured by synthesis there,
+## so let physical optimization replicate the register by placement (same D, same timing:
+## no change of behaviour). doc/timing.md.
+set_property FORCE_MAX_FANOUT 100 [get_nets -of_objects [get_pins CORE/main_pc_reset_reg/Q]]

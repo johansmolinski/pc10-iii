@@ -1,6 +1,7 @@
 #include <unistd.h>
 // sys_run.cpp - Verilator driver for the pc_system simulation.
 //   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-i itrace.txt from_ms] [-q]
+//           [-a floppy.img] [-d dip_sw1] [-L ram_latency_clk]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
 #include <cstdio>
@@ -20,6 +21,7 @@ int main(int argc, char **argv) {
     double itrace_from = 0.0;
     double secs = 1.0;
     bool quiet = false;
+    int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 6)
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-b") && i + 1 < argc) bios = argv[++i];
@@ -28,6 +30,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-d") && i + 1 < argc) dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-q")) quiet = true;
         else if (!strcmp(argv[i], "-a") && i + 1 < argc) fdimg = argv[++i];
+        else if (!strcmp(argv[i], "-L") && i + 1 < argc) ramlat = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
     }
     if (!bios) { fprintf(stderr, "usage: sys_run -b bios.rom [-s secs] [-t trace]\n"); return 1; }
@@ -47,8 +50,9 @@ int main(int argc, char **argv) {
     fclose(h);
 
     std::string plus = "+rom=" + hex;
-    const char *vargs[] = {argv[0], plus.c_str()};
-    Verilated::commandArgs(2, vargs);
+    std::string plat = "+ramlat=" + std::to_string(ramlat);
+    const char *vargs[] = {argv[0], plus.c_str(), plat.c_str()};
+    Verilated::commandArgs(3, vargs);
     Vtb_sys *tb = new Vtb_sys;
     FILE *tf = trace ? fopen(trace, "w") : nullptr;
     FILE *itf = itrace ? fopen(itrace, "w") : nullptr;

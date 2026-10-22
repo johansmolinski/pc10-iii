@@ -52,12 +52,14 @@ BIOS gate of `pc_bios.vhd` is closed.
 ## 3. Memory
 
 **System RAM** (`pc_ram.vhd`): 20 banks of 32 KB (8 RAMB36 each, 160 in
-all). No QNICE port (Megamiga hard rule 4). The request is registered and
-decoded first, with one copy of address, data and write enable per bank, and
-the banks' outputs go through a registered multiplexer: read data and
-`ram_ack` come **3 clocks** after `ram_en` (the board waits for `ram_ack`).
-With the request fanning out to 160 tiles from one register (2 clocks), the
-first real-PC build missed by up to 3.3 ns. The menu's memory size
+all). No QNICE port (Megamiga hard rule 4). The request is registered, then
+copied and decoded into one register set per group of 5 banks and one per
+bank (address, data, write enable), and the banks' outputs go through the
+block RAMs' output registers into a registered multiplexer: read data and
+`ram_ack` come **6 clocks** after `ram_en` (the board waits for `ram_ack`;
+doc/timing.md section 2.10 shows why the board does not see it). With the
+request fanning out to 160 tiles from one register (2 clocks), the first
+real-PC build missed by up to 3.3 ns; 4 clocks still missed by 0.75 ns. The menu's memory size
 (640/512/256/128 KB) limits it at run time: above the limit reads return 0xFF
 and writes are dropped, both acknowledged. `tb/sys` boots GLaBIOS with a
 3-clock RAM model (section 9).
@@ -294,7 +296,7 @@ directories (`rtl/system/kf/KF82xx`).
 
 Tests (`tb/shell/run.sh`, about a minute):
 - `tb_glue.vhd` (ghdl): keyboard codes and the Fn layer; the BIOS window
-  (1:1, 0xFF while the gate is closed); RAM ack after 4 clocks and the size
+  (1:1, 0xFF while the gate is closed); RAM ack after 6 clocks and the size
   limit; the CGA font: the default copied after the reset (8192 writes, a
   glyph and its thin copy), a 2 KB font from QNICE copied to 0x1800 and 0x1000;
 - `tb_fdd.vhd` (ghdl): `pc_fdd_sd` against a model of the engine port (READY,
@@ -312,7 +314,8 @@ stops after the first, no re-issue after preemption, no retry, no write
 protection check); `pc_font` 3 of 4 (the survivor, no copy at power-up, is
 equivalent in the bench: the reset copies too).
 
-The system simulation `tb/sys` (main's bench, not changed) was run with
+The system simulation `tb/sys` (main's bench; it has a RAM latency option
+`-L n` since doc/timing.md, default 1) was run with
 GLaBIOS 0.4.2 and a RAM model answering after 1 and 4 clocks: the whole
 output (CS:IP every 50 ms for the first 1.6 s, still in GLaBIOS's memory test,
 and the screen) is identical, as for 3 clocks over 0.8 s (the board waits
@@ -361,6 +364,7 @@ The bitstream is written although timing fails; it was not loaded on a MEGA65.
 | `pc10-real-b` | 28.6 MHz video clock, RAM banks, keyboard pipeline, BIOS without adder | -5.756 | 599 |
 | `pc10-real-c` | RAM input register (4-clock ack), PC reset replicated | -5.710 | 582 |
 | `pc10-real-d` | = c plus a firmware change (same netlist) | -5.710 | 582 |
+| `bt-j` | branch board-timing: everything outside the CPU retimed (doc/timing.md) | -6.133 | 228, all in `rtl/cpu` |
 
 WHS +0.018 ns. Per clock (d): main_clk -5.710, video_clk +1.492,
 qnice_clk +0.676, hdmi_clk +2.187, hr_clk +0.074.
@@ -447,9 +451,10 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
 
 ## 12. Open issues
 
-- **Timing:** see section 11. The CPU (cpu-timing branch), the 8237 path of
-  the board, the FDC, and the paths out of the board's and the CPU's
-  combinational outputs (into the FDC, the BIOS ROM address, `pc_ram`).
+- **Timing:** see section 11. The CPU (cpu-timing branch). Everything else
+  (the 8237 path of the board, the 8253, the FDC, the paths out of the
+  board's and the CPU's combinational outputs into the FDC, the BIOS ROM
+  address and `pc_ram`) closes since branch board-timing: doc/timing.md.
 - **Reference builds** need a reference within -1.0 ns WNS (section 10):
   rebuild in full once the CPU fix is merged, then use that build as `REF=`.
 - **Not on hardware:** nothing of this has run on a MEGA65 (no bitstream was

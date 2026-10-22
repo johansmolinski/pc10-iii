@@ -35,7 +35,8 @@ module KF8237_Address_And_Count_Registers (
     input   logic           next_word,
     output  logic           underflow,
     output  logic           update_high_address,
-    output  logic   [15:0]  transfer_address
+    output  logic   [15:0]  transfer_address,
+    output  logic   [15:0]  transfer_address_next   // pc10-iii: its D input
 );
     import KF8237_Common_Package::bit2num;
 
@@ -212,15 +213,22 @@ module KF8237_Address_And_Count_Registers (
     //
     // Transfer Addres
     //
+    // pc10-iii (timing): the D input is exported, for the system board's bus
+    // address register
+    always_comb begin
+        if (master_clear)
+            transfer_address_next = 0;
+        else if (cpu_clock_negedge)
+            transfer_address_next = current_address[dma_select];
+        else
+            transfer_address_next = transfer_address;
+    end
+
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             transfer_address <= 0;
-        else if (master_clear)
-            transfer_address <= 0;
-        else if (cpu_clock_negedge)
-            transfer_address <= current_address[dma_select];
         else
-            transfer_address <= transfer_address;
+            transfer_address <= transfer_address_next;
     end
 
     //

@@ -68,6 +68,7 @@ The bus a card sees, all on `clk`. Signals are levels, valid for the many
 | `isa_dack_n[3:0]` | in | DACK0-DACK3 (0 = refresh) |
 | `isa_tc` | in | terminal count |
 | `isa_reset` | in | RESET DRV |
+| `isa_addr_next`, `isa_aen_next`, `isa_memr_n_next`, `isa_memw_n_next`, `isa_ior_n_next`, `isa_iow_n_next` | in | the values these signals will have in the next `clk` (the strobes' except in the first `clk` of a reset). Optional: for a card that registers its decode or strobe edges (the FDC, the CGA's IOCHRDY; doc/timing.md) |
 
 A card's read data must be valid within 2 `clk` of the strobe going low and
 held while it stays low.
@@ -135,9 +136,10 @@ module pc_system #(
 ```
 
 Notes (2026-10-21, from the shell build):
-- `ram_ack` may come later than 1 clk (the shell answers after 2: the request
-  is registered before it fans out to 160 BRAM tiles); `xt_board` takes read
-  data at `ram_ack`, well before the CPU samples it at the end of T3.
+- `ram_ack` may come later than 1 clk (the shell answers after 6: the request
+  is pipelined on its way to and from 160 BRAM tiles, doc/timing.md);
+  `xt_board` takes read data at `ram_ack`, well before the CPU samples it at
+  the end of T3.
 - The keyboard self-test answer (0xAA after the BIOS holds the clock low for
   more than ~10 ms) comes from `xt_board`; the glue only sends scan codes.
 - The CGA's 59.92 Hz against HDMI's 60 Hz drops or repeats a frame about

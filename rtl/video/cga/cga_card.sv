@@ -37,7 +37,11 @@ module cga_card #(
     parameter int AP_X = 128,
     parameter int AP_W = 768,
     parameter int AP_Y = 17,
-    parameter int AP_H = 245
+    parameter int AP_H = 245,
+    // pc10-iii (timing, doc/timing.md): 1 = IOCHRDY from a registered memory
+    // select (isa_addr_next, isa_memr_n_next, isa_memw_n_next: the bus of the
+    // next clk); 0 = from the card bus alone
+    parameter bit REG_READY = 1'b0
 ) (
     input  logic        clk,           // 100.2273 MHz
     input  logic        reset,
@@ -45,6 +49,9 @@ module cga_card #(
 
     // card bus
     input  logic [19:0] isa_addr,
+    input  logic [19:0] isa_addr_next,     // REG_READY: isa_addr of the next clk
+    input  logic        isa_memr_n_next,   // REG_READY: isa_memr_n of the next clk
+    input  logic        isa_memw_n_next,   // REG_READY: isa_memw_n of the next clk
     input  logic [7:0]  isa_dout,      // data from the CPU/DMA
     output logic [7:0]  isa_din,       // data to the CPU (0 when not selected)
     output logic        isa_dsel,      // the card drives isa_din
@@ -217,7 +224,20 @@ wire         mem_any   = mem_rd || mem_wr;
 wire         slot      = acc && mem_any && dc == 4'd14 && el >= lead + 5'd9;
 // a board that ends the strobe early (ignoring IOCHRDY) still gets its write
 wire         acc_abort = acc && !mem_any;
-assign       isa_ready = !(acc && mem_any && !slot);
+// pc10-iii (timing): with REG_READY, IOCHRDY uses mem_any one clk ahead in a
+// register (equal in every clk but a reset's first, where the board's READY
+// and the 8237 are in reset themselves; doc/timing.md 2.11). The card's own
+// state keeps using mem_any.
+logic        mem_any_q;
+always_ff @(posedge clk)
+    mem_any_q <= isa_addr_next[19:15] == 5'b10111 && (!isa_memr_n_next || !isa_memw_n_next);
+wire         slot_due  = dc == 4'd14 && el >= lead + 5'd9;
+assign       isa_ready = REG_READY ? !(acc && mem_any_q && !slot_due) : !(acc && mem_any && !slot);
+`ifndef SYNTHESIS
+always_ff @(posedge clk)
+    if (REG_READY && !reset && mem_any_q !== mem_any)
+        $fatal(1, "cga_card: registered memory select differs from the bus");
+`endif
 
 // snow: the byte of the last CPU access replaces the next odd hchar's
 // character and attribute in 80-column text mode

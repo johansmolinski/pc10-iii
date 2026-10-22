@@ -359,8 +359,33 @@ module KF8253_Counter (
     // Generate next count value.
     logic   [16:0]  dec_count;
     logic   [16:0]  dec2_count;
-    assign dec_count  = decrement(count, select_bcd);
-    assign dec2_count = decrement(dec_count, select_bcd);
+    // pc10-iii (timing): the decrements are registers, computed from count and
+    // select_bcd of the previous clk. Their only users (count_next and
+    // count_period) matter only in a clk with start_counting & count_edge, and
+    // there count and select_bcd are those of the previous clk: count changes
+    // at a count edge (one clk in 84) or while start_counting is 0, and
+    // start_counting rises at write_counter, an I/O write that cannot follow
+    // the control word write (which drops it and is the only thing that changes
+    // select_bcd) by one clk. Checked in simulation below.
+    //   assign dec_count  = decrement(count, select_bcd);
+    //   assign dec2_count = decrement(dec_count, select_bcd);
+    always_ff @(posedge clock, posedge reset) begin
+        if (reset) begin
+            dec_count  <= 17'b0_0000_0000_0000_0000;
+            dec2_count <= 17'b0_0000_0000_0000_0000;
+        end
+        else begin
+            dec_count  <= decrement(count, select_bcd);
+            dec2_count <= decrement(decrement(count, select_bcd), select_bcd);
+        end
+    end
+`ifndef SYNTHESIS
+    always_ff @(posedge clock)
+        if (!reset && start_counting && count_edge &&
+            (dec_count !== decrement(count, select_bcd) ||
+             dec2_count !== decrement(decrement(count, select_bcd), select_bcd)))
+            $fatal(1, "KF8253: registered decrement used in a clk after count changed");
+`endif
 
     always_comb begin
         count_next = dec_count;
