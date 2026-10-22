@@ -4,7 +4,8 @@
 // GPL-3.0-or-later, pc10-iii.
 
 module pc_system #(
-    parameter int RAM_KB = 640
+    parameter int RAM_KB = 640,
+    parameter int DRQ0_SKEW = 0          // simulation only (xt_board)
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -141,7 +142,7 @@ logic [7:2]  isa_irq;
 logic [3:1]  isa_drq;
 logic [3:0]  isa_dack_n;
 
-xt_board #(.RAM_KB(RAM_KB)) u_board (
+xt_board #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW)) u_board (
     .clk          (clk),
     .reset        (reset),
     .cpu_step     (cpu_step),

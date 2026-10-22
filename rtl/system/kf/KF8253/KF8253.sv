@@ -5,7 +5,9 @@
 // Written by Kitune-san
 //
 
-module KF8253 (
+module KF8253 #(
+    parameter bit COUNTER_1_OUT_INIT = 1'b0   // pc10-iii, see KF8253_Counter
+) (
     // Bus
     input   logic           clock,
     input   logic           reset,
@@ -98,7 +100,7 @@ module KF8253 (
     //
     // Counter #1
     //
-    KF8253_Counter u_KF8253_Counter_1 (
+    KF8253_Counter #(.OUT_INIT(COUNTER_1_OUT_INIT)) u_KF8253_Counter_1 (
         // Bus
         .clock                  (clock),
         .reset                  (reset),

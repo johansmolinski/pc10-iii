@@ -20,7 +20,12 @@
 // GPL-3.0-or-later, pc10-iii.
 
 module xt_board #(
-    parameter int RAM_KB = 640
+    parameter int RAM_KB = 640,
+    // simulation only: DRQ0 n CPU clocks late. MartyPC starts its refresh
+    // schedule when its device loop sees the PIT write (here 7 clocks after
+    // the 8253's reload); tb/sys sets this to compare traces past the first
+    // refresh. 0 = the hardware.
+    parameter int DRQ0_SKEW = 0
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -155,7 +160,7 @@ always_ff @(posedge clk)
 `endif
 
 // ------------------------------------------------------------ DMA: hold logic
-logic       hold_request, hrq_ff1, hrq_ff2, hold_ack, dma_wait;
+logic       hold_request, hold_request_next, hrq_ff1, hrq_ff2, hold_ack, dma_wait;
 logic       aen_next, dma_wait_next;    // their D inputs (for the bus address register)
 wire        cpu_passive = cpu_s2_s0[1] & cpu_s2_s0[0];       // S1 S0 = 11
 always_comb begin
@@ -167,8 +172,10 @@ always_comb begin
     end else if (cpu_step) begin
         // the DMA takes the bus only when the CPU is not inside a
         // transfer: at its T4 or with an idle bus (the status pins
-        // go passive in T3 already). CAL: against MartyPC's HOLDA.
-        aen_next      = hold_ack && (aen || cpu_bus_t == T4 || cpu_bus_t == TI);
+        // go passive in T3 already). CAL: against MartyPC's HOLDA. AEN
+        // ends in the CPU clock where the 8237 drops HRQ (enters SI): five
+        // clocks for a transfer (S1 S2 S3 SW S4), as MartyPC's.
+        aen_next      = hold_ack && hold_request_next && (aen || cpu_bus_t == T4 || cpu_bus_t == TI);
         dma_wait_next = aen;
     end
 end
@@ -235,6 +242,7 @@ KF8237 u_dma (
     .address_out_next       (dma_addr_next),    // pc10-iii
     .output_highst_address  (),
     .hold_request           (hold_request),
+    .hold_request_next      (hold_request_next),
     .dma_acknowledge        (dack_n),           // a register (pc10-iii)
     .dma_acknowledge_next   (dack_n_next),
     .address_enable         (),
@@ -289,7 +297,12 @@ logic [7:0] pb;                          // 8255 port B
 logic       pb_io;
 wire        pb_drv = !pb_io;
 
-KF8253 u_pit (
+// OUT1 before the BIOS programs counter 1: high (the 8253 leaves it
+// undefined). Low would make the mode-2 control word a rising edge, so DRQ0
+// would wait, masked, until the BIOS unmasks channel 0; MartyPC's refresh
+// (a schedule from the count write, no request before its first terminal
+// count) has no such request. CAL: MartyPC.
+KF8253 #(.COUNTER_1_OUT_INIT(1'b1)) u_pit (
     .clock          (clk),
     .reset          (reset),
     .chip_select_n  (~cs_pit),
@@ -312,12 +325,19 @@ KF8253 u_pit (
 assign speaker = out2 & pb_drv & pb[1];
 
 // DRQ0: a rising OUT1 sets the refresh request, DACK0 clears it (74LS74)
-logic out1_d;
+logic out1_d, out1_s;
+generate if (DRQ0_SKEW == 0) begin : g_drq0
+    assign out1_s = out1;
+end else begin : g_drq0_skew
+    logic [DRQ0_SKEW*21-1:0] sh;
+    always_ff @(posedge clk) sh <= {sh[DRQ0_SKEW*21-2:0], out1};
+    assign out1_s = sh[DRQ0_SKEW*21-1];
+end endgenerate
 always_ff @(posedge clk) begin
-    out1_d <= out1;
+    out1_d <= out1_s;
     if (reset) drq0 <= 1'b0;
     else if (!dack_n[0]) drq0 <= 1'b0;
-    else if (out1 && !out1_d) drq0 <= 1'b1;
+    else if (out1_s && !out1_d) drq0 <= 1'b1;
 end
 
 // ------------------------------------------------------------ 8259

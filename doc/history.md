@@ -748,3 +748,33 @@ write-through). Design, timing model, the shell plan: `doc/hdc.md`.
 - `pc_system`/contract: `hdc_enable`, `hdc_variant`, `hdc_rom_addr/rdata`,
   `hd_*`, `hd_sp_*`; the shell ties the card off (`hdc_enable = 0`) until
   the SD backend exists (doc/hdc.md section 8).
+
+## 2026-10-22 - Refresh DMA against MartyPC; the BIU's blocking assignments
+
+- **8253:** a control word set OUT from the OLD mode for one clk (KF8253: mode
+  0 after reset, so OUT low), then from the new one: a false edge on OUT. The
+  control word now sets OUT from the new mode at once. OUT before the first
+  control word is undefined on the 8253 (`OUT_INIT`); counter 1 starts high,
+  so the BIOS's mode-2 control word is no OUT1 edge and DRQ0 is not pending,
+  masked, until the BIOS unmasks channel 0 (MartyPC's refresh has no such
+  request). First difference to MartyPC: clock 208,499 -> 208,539.
+- **Refresh phase:** MartyPC starts its refresh schedule when its device loop
+  sees the PIT write, 7 CPU clocks after the 8253 reloads (its tick
+  accumulator is unused). The hardware stays as it is; `DRQ0_SKEW` (tb/sys
+  `make DRQ0_SKEW=7`, simulation only) delays DRQ0 to compare traces past it.
+- **AEN** ends in the CPU clock where the 8237 drops HRQ (`hold_request_next`
+  from the 8237): five clocks per transfer (S1 S2 S3 SW S4) as MartyPC's, one
+  wait state less for the CPU cycle the refresh holds. With the skew: first
+  difference 208,613 (the second refresh, during a code fetch: our HOLDA one
+  clock early).
+- tb/sys trace: the address column is the CPU's address latch (MartyPC's
+  column; it used to be the board's bus address, the DMA address during a
+  transfer); DMA markers R H F A K plus the 8237 state (`/0 /1 /2 /3 /W /4`).
+- **Found:** biu88's clocked block assigns its state with blocking `=`, so in
+  Verilator the EU and xt_board, clocked on the same edge, read the BIU's
+  outputs AFTER the edge (seen: `hrq_ff1` loads the passive status of T3 in
+  the edge that leaves T2). On the FPGA they read them before the edge. The
+  simulated cycle timing (SST, tb/sys) can therefore differ from the
+  bitstream's wherever a clocked reader samples BIU outputs on `cpu_step`.
+  The second refresh's one-clock-early HOLDA is exactly that case. Handed to
+  the cpu-timing work; board calibration waits for its answer.

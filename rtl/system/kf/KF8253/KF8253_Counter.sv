@@ -7,7 +7,11 @@
 
 `include "KF8253_Definitions.svh"
 
-module KF8253_Counter (
+module KF8253_Counter #(
+    // OUT before the first control word (pc10-iii): undefined on the 8253;
+    // the board picks it (xt_board: counter 1 high, see the DRQ0 note there)
+    parameter bit OUT_INIT = 1'b0
+) (
     // Bus
     input   logic           clock,
     input   logic           reset,
@@ -498,9 +502,31 @@ module KF8253_Counter (
     end
 
     // Output
+    logic programmed;                   // a control word was written (pc10-iii)
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
-            counter_out <= 1'b0;
+            programmed <= 1'b0;
+        else if (update_counter_config)
+            programmed <= 1'b1;
+    end
+
+    always_ff @(posedge clock, posedge reset) begin
+        if (reset)
+            counter_out <= OUT_INIT;
+        else if (update_counter_config)
+            // the control word sets OUT from the NEW mode (pc10-iii: the
+            // original used the old mode for one clk, a false edge on OUT)
+            casez (internal_data_bus[3:1])
+                `KF8253_CONTROL_MODE_0: counter_out <= 1'b0;
+                `KF8253_CONTROL_MODE_1: counter_out <= 1'b1;
+                `KF8253_CONTROL_MODE_2: counter_out <= 1'b1;
+                `KF8253_CONTROL_MODE_3: counter_out <= 1'b1;
+                `KF8253_CONTROL_MODE_4: counter_out <= 1'b1;
+                `KF8253_CONTROL_MODE_5: counter_out <= 1'b1;
+                default        : counter_out <= 1'b0;
+            endcase
+        else if (start_counting == 1'b0 && !programmed)
+            counter_out <= OUT_INIT;
         else if (start_counting == 1'b0) begin
             casez (select_mode)
                 `KF8253_CONTROL_MODE_0: counter_out <= 1'b0;

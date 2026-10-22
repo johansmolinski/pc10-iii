@@ -53,6 +53,7 @@ module KF8237_Timing_And_Control (
 
     // External signals
     output  logic           hold_request,
+    output  logic           hold_request_next,      // pc10-iii: its D input
     input   logic           hold_acknowledge,
     output  logic   [3:0]   dma_acknowledge,
     output  logic   [3:0]   dma_acknowledge_next,   // pc10-iii: the value of the next clk
@@ -422,20 +423,26 @@ module KF8237_Timing_And_Control (
     // next_state S0 or SI, and from S1 it has no effect, so these are exact.
     // For dma_acknowledge_ff see dack_sense_next below.
     //
+    always_comb begin
+        if (reset)
+            hold_request_next = 1'b0;
+        else if (master_clear)
+            hold_request_next = 1'b0;
+        else if (cpu_clock_posedge)
+            if (next_state_r1 == S0)
+                hold_request_next = 1'b1;
+            else if (next_state_r1 == SI)
+                hold_request_next = 1'b0;
+            else
+                hold_request_next = hold_request;
+        else
+            hold_request_next = hold_request;
+    end
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
             hold_request <= 1'b0;
-        else if (master_clear)
-            hold_request <= 1'b0;
-        else if (cpu_clock_posedge)
-            if (next_state_r1 == S0)
-                hold_request <= 1'b1;
-            else if (next_state_r1 == SI)
-                hold_request <= 1'b0;
-            else
-                hold_request <= hold_request;
         else
-            hold_request <= hold_request;
+            hold_request <= hold_request_next;
     end
 
     //

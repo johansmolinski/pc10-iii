@@ -4,7 +4,8 @@
 // +xub=<hex file> (16 KB, C8000-CBFFF; 0xFF without one).
 
 module tb_sys #(
-    parameter int RAM_KB = 640
+    parameter int RAM_KB = 640,
+    parameter int DRQ0_SKEW = 0
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -104,7 +105,7 @@ end
 assign ram_ack   = ack_sh[ram_lat - 1];
 assign ram_rdata = rd_sh[ram_lat - 1];
 
-pc_system #(.RAM_KB(RAM_KB)) u_pc (
+pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW)) u_pc (
     .clk        (clk),
     .reset      (reset),
     .ram_addr   (ram_addr),
@@ -185,7 +186,7 @@ assign cs       = u_pc.u_cpu.biu.reg_cs;
 assign ip       = u_pc.u_cpu.biu.eu_ip;
 assign bus_t    = u_pc.cpu_bus_t;
 assign bus_type = u_pc.cpu_bus_type;
-assign bus_addr = u_pc.u_board.bus_addr;
+assign bus_addr = u_pc.u_board.cpu_addr;  // the CPU's latched address (as MartyPC's trace)
 assign bus_data = u_pc.cpu_bus_type == 3'd6 || u_pc.cpu_bus_type == 3'd2 ? u_pc.isa_dout : u_pc.cpu_din;
 assign qs       = u_pc.cpu_qs;
 

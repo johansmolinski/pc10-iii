@@ -17,11 +17,13 @@ SRC  = $(CPU)/eu.v $(CPU)/biu88.v $(CPU)/eu_rom.v $(RTL)/cpu/cpu8088.sv \
 INC  = -I$(KF)/KF8237 -I$(KF)/KF8253 -I$(KF)/KF8255 -I$(KF)/KF8259
 OBJ ?= obj
 RAM_KB ?= 640
+# DRQ0_SKEW=7: MartyPC's refresh phase (trace comparison with MartyPC)
+DRQ0_SKEW ?= 0
 JOBS ?= 0
 
 $(OBJ)/sys_run: $(SRC) sys_run.cpp
 	verilator --cc --exe --build -O3 -j $(JOBS) -Wno-fatal -Wno-lint -Wno-style \
 	    --public-flat-rw --Mdir $(OBJ) --top-module tb_sys $(INC) \
-	    +define+MCL86_ROM='"$(ROMHEX)"' -GRAM_KB=$(RAM_KB) \
+	    +define+MCL86_ROM='"$(ROMHEX)"' -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) \
 	    $(SRC) sys_run.cpp -o sys_run -CFLAGS -O2
 	@true

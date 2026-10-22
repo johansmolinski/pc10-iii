@@ -261,13 +261,17 @@ int main(int argc, char **argv) {
             if (tf) {
                 static const char *tn[] = {"Ti", "T1", "T2", "T3", "Tw", "T4", "?6", "T0"};
                 static const char *bt[] = {"INTA", "IOR", "IOW", "HALT", "CODE", "MEMR", "MEMW", "-"};
-                // DMA markers: R = DRQ0, H = HRQ, A = AEN, K = DACK0
+                // DMA markers: R = DRQ0, H = HRQ, F = the first HOLDA flip-flop, A = AEN, K = DACK0
                 auto *rp = tb->rootp;
-                char dm[8]; int dn = 0;
+                char dm[12]; int dn = 0;
                 if (rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__drq0) dm[dn++] = 'R';
                 if (rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__hold_request) dm[dn++] = 'H';
+                if (rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__hrq_ff1) dm[dn++] = 'F';
                 if (rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__aen) dm[dn++] = 'A';
                 if (!(rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__dack_n & 1)) dm[dn++] = 'K';
+                // the 8237's state (SI S0 S1 S2 S3 SW S4), when not idle
+                int ds = rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__u_dma__DOT__u_Timing_And_Control__DOT__state;
+                if (ds > 0 && ds < 7) { dm[dn++] = '/'; dm[dn++] = "I0123W4"[ds]; }
                 dm[dn] = 0;
                 fprintf(tf, "%llu %s %s %05X %02X qs%d %04X:%04X%s%s\n", steps, tn[tb->bus_t & 7],
                         bt[tb->bus_type & 7], tb->bus_addr, tb->bus_data, tb->qs, tb->cs, tb->ip,
