@@ -14,7 +14,8 @@ Cylinder 0 (outside the partition):
   C0 H0 S2  LBA 1       a text, printed by the MBR
   C0 H1 S10 LBA 26-45   20 sectors of a pattern, read and summed by the MBR
   C0 H2 S16 LBA 49-51   written by the MBR (3 sectors, pattern 5Ah + 3i)
-  C0 H3 S9  LBA 60      written by the MBR (a copy of itself)
+  C0 H3 S9  LBA 59      written by the MBR (a copy of itself from memory, with the
+                        boot drive 80h in its `drive` byte)
 
 GPL-3.0-or-later, pc10-iii.
 """
@@ -48,15 +49,24 @@ def write_pattern():
     return bytes(((0x5A + 3 * i) & 0xFF) for i in range(3 * 512))
 
 
-def build(out):
+def assemble(workdir):
+    """mbr.S with the expected sum: (code, expected sum, offset of `drive`)"""
     rp = read_pattern()
     expsum = sum(rp[i] | (rp[i + 1] << 8) for i in range(0, len(rp), 2)) & 0xFFFF
-    with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(out))) as t:
+    with tempfile.TemporaryDirectory(dir=workdir) as t:
         o, b = os.path.join(t, 'mbr.o'), os.path.join(t, 'mbr.bin')
         subprocess.run(['as', '--32', '--defsym', 'EXPSUM=%d' % expsum, '-o', o, os.path.join(HERE, 'mbr.S')],
                        check=True)
         subprocess.run(['ld', '-m', 'elf_i386', '-Ttext', '0x7c00', '--oformat', 'binary', '-o', b, o], check=True)
         code = open(b, 'rb').read()
+        nm = subprocess.run(['nm', o], check=True, capture_output=True, text=True).stdout
+    drive = next(int(l.split()[0], 16) for l in nm.splitlines() if l.split()[-1] == 'drive')
+    return code, expsum, drive
+
+
+def build(out):
+    rp = read_pattern()
+    code, expsum, _ = assemble(os.path.dirname(os.path.abspath(out)))
     if len(code) > 446:
         sys.exit('MBR code is %d bytes (max 446)' % len(code))
     img = bytearray(SECTORS * 512)
@@ -98,6 +108,8 @@ def check(orig, new):
     exp[w0 * 512:(w0 + 3) * 512] = write_pattern()
     t = lba(0, 3, 9)
     exp[t * 512:(t + 1) * 512] = a[0:512]
+    _, _, drive = assemble(os.path.dirname(os.path.abspath(new)))
+    exp[t * 512 + drive] = 0x80                 # the boot drive the MBR stored
     for l in range(len(a) // 512):
         if b[l * 512:(l + 1) * 512] != exp[l * 512:(l + 1) * 512]:
             what = 'written by the MBR' if l in (w0, w0 + 1, w0 + 2, t) else 'not written'
@@ -105,7 +117,7 @@ def check(orig, new):
             ok = False
     changed = [l for l in range(len(a) // 512) if a[l * 512:(l + 1) * 512] != b[l * 512:(l + 1) * 512]]
     print('changed sectors: %s' % changed)
-    print('check %s' % ('OK: LBA 49-51 hold the pattern, LBA 60 the MBR, nothing else changed' if ok else 'FAILED'))
+    print('check %s' % ('OK: LBA 49-51 hold the pattern, LBA 59 the MBR, nothing else changed' if ok else 'FAILED'))
     return ok
 
 

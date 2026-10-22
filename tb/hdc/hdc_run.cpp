@@ -305,8 +305,6 @@ struct Sim {
     }
 };
 
-static std::string hexs(int v) { char b[8]; snprintf(b, sizeof b, "%02X", v); return b; }
-
 // ------------------------------------------------------------ tests
 static void t_reset(Sim &s) {
     // power-on: BSY for RESET_US, then the signature
