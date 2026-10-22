@@ -878,3 +878,20 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   CGA's write fallbacks work around it). MartyPC: AMWC from T2, CGA writes
   not ready from T2 on. To settle against MartyPC's CGA write cycles
   (first at reference clock 2,443,292).
+
+## 2026-10-22 - Build pc10-real-e: the whole core meets 100.2273 MHz
+
+- Full R6 build of main 7437964 (board timing, CPU timing, registered
+  `pc_clocks` enables, `cpu8088.xdc` scoped to cpu8088), fedora
+  `~/pcxt-builds/pc10-real-e` (kept for incremental builds, `REF=pc10-real-e`),
+  reports in `~/pcxt-work/builds/pc10-real-e/`.
+- Setup met everywhere: main_clk WNS +0.065 ns (the PC), hdmi +1.874, qnice
+  +0.332, hr_clk +0.922. Utilization: 28,004 LUTs (20.9%), 20,443 FFs, 238.5
+  BRAM tiles (65.3%). The microcode image was read by synthesis.
+- Hold: one endpoint, -0.007 ns, the framework's HyperRAM input `hr_d_io[4]`
+  -> IDDR (clock hr_rwds, 100% I/O-buffer delay), the path Megamiga knows
+  (fastdisk-b missed it by 0.054 ns). It moves with placement (pc10-real-d
+  +0.240, bt-j +0.021) and does not touch PC logic; the build script reports
+  TIMING-FAILED because of it.
+- The main checkout's `M2M/QNICE` submodule was not initialized (earlier builds
+  came from worktrees): `git submodule update --init M2M/QNICE`.
