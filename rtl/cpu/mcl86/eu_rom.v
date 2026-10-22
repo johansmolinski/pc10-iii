@@ -18,7 +18,10 @@ module EU8Kx32 #(
     output reg [31:0] douta
 );
 
-reg [31:0] rom [0:8191];
+// pc10-iii: a block RAM (8 RAMB36), named so that timing-driven synthesis
+// does not move it into LUTs (it did in some runs: ~3500 LUTs, and a spread
+// placement that cost more than the block RAM's clock-to-output).
+(* rom_style = "block" *) reg [31:0] rom [0:8191];
 
 initial $readmemh(INIT_FILE, rom);
 
