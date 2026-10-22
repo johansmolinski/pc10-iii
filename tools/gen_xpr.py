@@ -24,10 +24,7 @@ VHDL = ["vhdl/globals.vhd", "vhdl/config.vhd", "vhdl/clk.vhd", "vhdl/keyboard.vh
         "vhdl/main.vhd", "vhdl/mega65.vhd"]
 KF_DIRS = ["KF8237", "KF8253", "KF8255", "KF8259"]
 # the PC (rtl/, doc/architecture.md section 2); --stub: the shell-only stand-in instead
-# (cpu8088's default CPU is z86; MCL86's eu.v/biu88.v (module biu88_mcl)/eu_rom.v
-# stay listed for CPU = "mcl86")
-PC = (["../rtl/cpu/mcl86/eu.v", "../rtl/cpu/mcl86/biu88.v", "../rtl/cpu/mcl86/eu_rom.v",
-       "../rtl/cpu/biu88.sv",
+PC = (["../rtl/cpu/biu88.sv",
        "../rtl/cpu/z8086/alu.sv", "../rtl/cpu/z8086/z86_tables.sv", "../rtl/cpu/z8086/z86_eu.sv",
        "../rtl/cpu/z8086/cpu_z86.sv", "../rtl/cpu/cpu8088.sv"]
       + [f for d in KF_DIRS for f in rtl("rtl/system/kf/%s/*.sv" % d)]
@@ -63,16 +60,13 @@ for path, t in CORE_FILES:
                 '          <Attr Name="UsedIn" Val="synthesis"/>\n'
                 '          <Attr Name="UsedIn" Val="simulation"/>\n'
                 '        </FileInfo>\n      </File>\n' % (path, ' SFType="%s"' % t if t else ""))
-# no Verilog include dir of Megamiga's AP68040; ours: the KF chips' .svh files, and the
-# microcode image of eu_rom.v, relative to the synthesis run directory (CORE/CORE-R6.runs/synth_1;
-# build_bitstream.tcl checks that synthesis read it)
+# no Verilog include dir of Megamiga's AP68040; ours: the KF chips' .svh files and the
+# z8086 overlay (no microcode image: it comes from the SD card, AGENTS.md rule 4)
 tail = re.sub(r'\s*<Option Name="VerilogDir"[^>]*/>', '', tail)
 tail = re.sub(r'\s*<Define Name[^>]*/>', '', tail)
 opts = "".join('\n        <Option Name="VerilogDir" Val="$PPRDIR/../rtl/system/kf/%s"/>' % d for d in KF_DIRS)
 if not stub:
     opts += '\n        <Option Name="VerilogDir" Val="$PPRDIR/../rtl/cpu/z8086"/>'   # z86_overlay.svh
-if not stub:
-    opts += '\n        <Define Name="MCL86_ROM" Val="&quot;../../../rtl/cpu/mcl86/microcode.hex&quot;"/>'
 tail = tail.replace("      <Config>", "      <Config>" + opts, 1)
 x = x[:m.start()] + head + "".join(keep) + tail + x[m.end():]
 

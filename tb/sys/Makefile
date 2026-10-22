@@ -5,24 +5,15 @@
 #   make MDA=1      build obj_mda/sys_run with the MDA fitted (MDA=2: Hercules,
 #                   obj_hgc); sys_run -m sets the mono DIP switches (doc/mda.md)
 
-#   make CPU=mcl86  the old CPU (MCL86's EU + biu88; obj_mcl86)
-# The z86 CPU's microcode bundle (tools/mkucode.py, not in the repository) is
+# The 8088's microcode bundle (tools/mkucode.py, not in the repository) is
 # read at run time: $$PC10_UCODE, else Z86_UCODE compiled in.
 
 RTL  = ../../rtl
-MCL  = $(RTL)/cpu/mcl86
 Z86  = $(RTL)/cpu/z8086
 KF   = $(RTL)/system/kf
-ROMHEX ?= $(abspath $(MCL))/microcode.hex
-CPU  ?= z86
 Z86_UCODE ?= $(HOME)/pcxt-work/ucode/8088.bin
-CPUSRC = $(MCL)/eu.v $(MCL)/biu88.v $(MCL)/eu_rom.v \
-         $(Z86)/z86_eu.sv $(Z86)/z86_tables.sv $(Z86)/alu.sv $(Z86)/cpu_z86.sv $(RTL)/cpu/biu88.sv
-ifeq ($(CPU),mcl86)
-CPUDEF = -I$(Z86) +define+CPU_MCL86 -CFLAGS -DCPU_MCL86
-else
+CPUSRC = $(Z86)/z86_eu.sv $(Z86)/z86_tables.sv $(Z86)/alu.sv $(Z86)/cpu_z86.sv $(RTL)/cpu/biu88.sv
 CPUDEF = -I$(Z86) -CFLAGS -DZ86_UCODE='\"$(Z86_UCODE)\"' -CFLAGS -I$(abspath ../common)
-endif
 CGA  ?= $(RTL)/video/cga/cga_crtc.sv $(RTL)/video/cga/cga_card.sv
 MDA  ?= 0
 VJ   ?= 0
@@ -34,9 +25,7 @@ SRC  = $(CPUSRC) $(RTL)/cpu/cpu8088.sv \
        $(CGA) $(MDASRC) $(RTL)/fdc/upd765.sv $(RTL)/fdc/fdc_secbuf.sv $(RTL)/fdc/fdc_card.sv \
        $(RTL)/hdc/hdc_secbuf.sv $(RTL)/hdc/ata_dev.sv $(RTL)/hdc/xtide_card.sv tb_sys.sv
 INC  = -I$(KF)/KF8237 -I$(KF)/KF8253 -I$(KF)/KF8255 -I$(KF)/KF8259
-ifeq ($(CPU),mcl86)
-OBJ ?= obj_mcl86
-else ifeq ($(MDA),1)
+ifeq ($(MDA),1)
 OBJ ?= obj_mda
 else ifeq ($(MDA),2)
 OBJ ?= obj_hgc
@@ -50,6 +39,6 @@ DRQ0_SKEW ?= 0
 $(OBJ)/sys_run: $(SRC) sys_run.cpp
 	verilator --cc --exe --build -O3 -j $(VJ) -Wno-fatal -Wno-lint -Wno-style \
 	    --public-flat-rw --Mdir $(OBJ) --top-module tb_sys $(INC) \
-	    +define+MCL86_ROM='"$(ROMHEX)"' -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) $(CPUDEF) \
+	    -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) $(CPUDEF) \
 	    $(SRC) sys_run.cpp -o sys_run -CFLAGS -O2
 	@true

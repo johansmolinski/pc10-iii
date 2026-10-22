@@ -18,8 +18,9 @@
 //   length number of cycles from the first byte to the next instruction
 //   trace  every cycle: ALE, bus status, T-state, address at T1, data at T3,
 //          queue operation and byte
-// Tests that start with a full queue (half of the suite) cannot be set up
-// through the bus; they get the state verdict only.
+// Tests that start with a prefetched queue (half of the suite) get the queue
+// installed through biu88's test port when the loader's JMP FAR flushes it.
+// The microcode bundle goes through the CPU's load port once, at the start.
 
 #include <cstdio>
 #include <cstdlib>
@@ -29,11 +30,9 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
-#include "Vtb_mcl86.h"
+#include "Vtb_z86.h"
 #include "verilated.h"
-#ifdef Z86
 #include "ucode_file.h"
-#endif
 
 enum { AX, BX, CX, DX, CS, SS, DS, ES, SP, BP, SI, DI, IP, FLAGS, NREG };
 static const char *REGN[NREG] = {"ax", "bx", "cx", "dx", "cs", "ss", "ds",
@@ -105,12 +104,12 @@ static bool read_test(std::istream &in, Test &t) {
 // ---------------------------------------------------------------- simulation
 
 struct Sim {
-    std::unique_ptr<Vtb_mcl86> top;
+    std::unique_ptr<Vtb_z86> top;
     double phase = 0.0;               // 8088 CLK phase in periods
     static constexpr double STEP = 4.7727272 / 100.0;  // per 100 MHz core clock
     uint64_t core_clocks = 0;
 
-    Sim() : top(new Vtb_mcl86) {}
+    Sim() : top(new Vtb_z86) {}
 
     // One core clock. Returns true when CLK rose (an 8088 cycle boundary).
     bool step() {
@@ -119,9 +118,7 @@ struct Sim {
         phase = next;
         double frac = phase - (int)phase;
         top->clk = frac < (1.0 / 3.0);
-#ifdef BIU88
         top->step = rose;           // biu88 advances at the CLK rising edge
-#endif
         top->core_clk = 0; top->eval();
         top->core_clk = 1; top->eval();
         core_clocks++;
@@ -226,13 +223,9 @@ static Result run_test(Sim &sim, const Test &t) {
     // MCL86 can start the next instruction while a write is still queued in
     // the BIU; let the bus drain so that the state verdict sees the memory
     int drain = 40;
-#ifdef BIU88
     bool tstarted = false, tdone = false;
     int tf_seen = 0;
     uint64_t cyc_start = 0, cyc_start_prev = 0, read_start = 0, disp_core = 0;
-#else
-    const bool tdone = true;
-#endif
     while ((!done || !tdone || drain-- > 0) && budget-- > 0) {
         const bool was_done = done;   // the cycle that ends the test is kept
         // run core clocks until the next CLK rising edge
@@ -241,18 +234,12 @@ static Result run_test(Sim &sim, const Test &t) {
             // the pins as they were during the cycle that is ending: biu88
             // changes them on the very clock where CLK rises
             snap_st = top->s2_s0; snap_ad = top->ad_out;
-#ifdef BIU88
             snap_qs = top->qs; snap_qb = top->qs_byte;
-#endif
             rose = sim.step();
             if (rose) g_cyc++;
-#ifdef BIU88
             if (rose) { cyc_start_prev = cyc_start; cyc_start = sim.core_clocks; }
-#endif
-#ifdef BIU88
             if (g_dump && top->qs != snap_qs)
                 printf("      qs c%ld%s %d -> %d\n", g_cyc, rose ? "(edge)" : "", snap_qs, (int)top->qs);
-#endif
             int st = top->s2_s0;
             // the 8288 latches the address when the status leaves passive
             if (status_core_prev == 7 && st != 7) {
@@ -284,7 +271,6 @@ static Result run_test(Sim &sim, const Test &t) {
 
             unsigned cmd = top->dbg_eu_cmd;
             int jump = ((cmd >> 9) & 1) && (((cmd >> 4) & 0x1F) == 0x19);
-#ifdef BIU88
             // install the prefetched queue once the loader's JMP FAR has
             // flushed (preload_at counted down) and the EU waits in its main
             // loop (0x0006-0x000C): the test then starts from an idle CPU, as
@@ -295,11 +281,9 @@ static Result run_test(Sim &sim, const Test &t) {
                 top->tb_preload = 1;
                 preload_at = 0;
             }
-#endif
             if (jump && !prev_jump) {
                 if (!test_mode && lptr >= loader.size()) {
                     test_mode = true;
-#ifdef BIU88
                     // the BIU flushes on the next clock; install the queue
                     // right after that
                     if (!t.queue.empty()) {
@@ -311,7 +295,6 @@ static Result run_test(Sim &sim, const Test &t) {
                         top->tb_ip = t.init[IP];
                         preload_at = 2;
                     }
-#endif
                 }
                 if (test_mode && started) qev_cur.push_back({'E', 0});
             }
@@ -323,7 +306,6 @@ static Result run_test(Sim &sim, const Test &t) {
             // strobes with QS code 11 are subsequent-byte reads.
             int strobe = ((cmd >> 12) & 3) == 1;
             int dispatch = top->dbg_dispatch;
-#ifdef BIU88
             // SST_UC=1 with -d: every microcode address the EU visits
             static const bool uc_trace = getenv("SST_UC") != nullptr;
             static unsigned prev_uc = ~0u;
@@ -337,7 +319,6 @@ static Result run_test(Sim &sim, const Test &t) {
                        (int)top->dbg_pfq_empty, (int)top->dbg_holding, (int)top->dbg_qlen,
                        (unsigned)top->dbg_pc, dispatch && !prev_dispatch ? "DISPATCH " : "",
                        strobe && !prev_strobe ? "STROBE " : "", jump && !prev_jump ? "JUMP" : "");
-#endif
             // a REP iteration re-dispatches the same opcode through MCL86's
             // main loop; the microcode marks those with flag bit 1
             if (dispatch && !prev_dispatch && test_mode && !(top->dbg_flags & 2)) {
@@ -360,9 +341,7 @@ static Result run_test(Sim &sim, const Test &t) {
                     // MCL86 keeps prefix state in flags 15..12, 5, 3, 1
                     r.regs[FLAGS] = (top->dbg_flags & 0x0FD5) | 0xF002;
                     done = true;
-#ifdef BIU88
                     disp_core = sim.core_clocks;
-#endif
                 } else {
                     qev_cur.push_back({'F', byte});
                 }
@@ -406,27 +385,15 @@ static Result run_test(Sim &sim, const Test &t) {
                    c.data, c.qop.c_str(),
                    (unsigned)top->dbg_ip, (unsigned)top->dbg_sp,
                    (unsigned)top->dbg_ss, done ? " (drain)" : !test_mode ? " (load)" : "");
-#ifdef BIU88
         if (g_dump && test_mode)
             printf("         ta=%u ql=%u cmd=%04X\n", (unsigned)top->dbg_ta_state,
                    (unsigned)top->dbg_queue_len, (unsigned)top->dbg_eu_cmd);
-#endif
 
-#ifdef BIU88
         {
             static const char *QSN[4] = {"-", "F", "E", "S"};
             c.qop = QSN[snap_qs & 3];
             c.qbyte = snap_qs ? snap_qb : 0;
         }
-#else
-        if (started && !qev_prev.empty()) {
-            c.qop = std::string(1, qev_prev[0].op);
-            c.qbyte = qev_prev[0].byte;
-        } else {
-            c.qop = "-";
-        }
-#endif
-#ifdef BIU88
         // the trace window comes from the QS pins: from the cycle that reports
         // the test's first byte (F) up to the cycle before the F of the next
         // instruction. The BIU may read that opcode before the EU dispatches
@@ -443,24 +410,13 @@ static Result run_test(Sim &sim, const Test &t) {
             }
         }
         (void)was_done;
-#else
-        if (started && !was_done) {
-            // a cycle belongs to the test from the one reporting the first F
-            if (cycle_no > 0 || !qev_prev.empty()) {
-                r.got.push_back(c);
-                cycle_no++;
-            }
-        }
-#endif
         qev_prev = qev_cur;
         qev_cur.clear();
     }
 
     r.ran = done;
     if (!done) { r.why = "timeout"; return r; }
-#ifdef BIU88
     if (tdone) r.lag = (int)((long)disp_core - (long)read_start);
-#endif
 
     // the cycle in which the next first byte left the queue belongs to the test
     // (its F would be reported one cycle later); it was pushed above already
@@ -500,11 +456,7 @@ static Result run_test(Sim &sim, const Test &t) {
     r.state_ok = why.empty();
     r.why = why;
 
-#ifdef BIU88
     const bool graded = true;          // the queue was installed
-#else
-    const bool graded = !r.prefetched;
-#endif
     if (graded) {
         r.len_ok = r.got.size() == t.cycles.size();
         bool ok = r.len_ok;
@@ -574,7 +526,6 @@ int main(int argc, char **argv) {
         else if (argv[i][0] != '+') files.push_back(argv[i]);
     }
     Sim sim;
-#ifdef Z86
     {
         // the microcode bundle through the CPU's load port, in reset
         std::vector<uint8_t> uc;
@@ -587,7 +538,6 @@ int main(int argc, char **argv) {
         }
         sim.top->ucl_we = 0;
     }
-#endif
     printf("%-10s %6s %6s %6s %6s %6s %6s\n", "file", "tests", "state",
            "plain", "length", "trace", "tmout");
     for (auto &fn : files) {
@@ -623,11 +573,7 @@ int main(int argc, char **argv) {
             if (r.lag > 21) lag1++;
             if (r.lag > 42) lag2++;
             if (r.state_ok) st++;
-#ifdef BIU88
             if (true) {
-#else
-            if (!r.prefetched) {
-#endif
                 plain++;
                 if (r.len_ok) len++;
                 if (r.trace_ok) tr++;

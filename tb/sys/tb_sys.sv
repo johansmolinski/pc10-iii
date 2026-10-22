@@ -129,13 +129,7 @@ end
 assign ram_ack   = ack_sh[ram_lat - 1];
 assign ram_rdata = rd_sh[ram_lat - 1];
 
-`ifdef CPU_MCL86
-localparam string CPU = "mcl86";
-`else
-localparam string CPU = "z86";
-`endif
-
-pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT), .CPU(CPU)) u_pc (
+pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT)) u_pc (
     .clk        (clk),
     .reset      (reset),
     .ucl_we     (ucl_we),
@@ -230,39 +224,22 @@ assign bus_addr = u_pc.u_board.cpu_addr;  // the CPU's latched address (as Marty
 assign bus_data = u_pc.cpu_bus_type == 3'd6 || u_pc.cpu_bus_type == 3'd2 ? u_pc.isa_dout : u_pc.cpu_din;
 assign qs       = u_pc.cpu_qs;
 
-`ifdef CPU_MCL86
-assign it_disp = ((u_pc.u_cpu.g_mcl86.eu.eu_rom_address >> 8) & 5'h1F) == 1;
-assign it_op   = u_pc.u_cpu.g_mcl86.biu.op_byte;
-assign it_ip   = u_pc.u_cpu.g_mcl86.biu.op_ip;
-assign it_ax   = u_pc.u_cpu.g_mcl86.eu.eu_register_ax;
-assign it_bx   = u_pc.u_cpu.g_mcl86.eu.eu_register_bx;
-assign it_cx   = u_pc.u_cpu.g_mcl86.eu.eu_register_cx;
-assign it_dx   = u_pc.u_cpu.g_mcl86.eu.eu_register_dx;
-assign it_sp   = u_pc.u_cpu.g_mcl86.eu.eu_register_sp;
-assign it_bp   = u_pc.u_cpu.g_mcl86.eu.eu_register_bp;
-assign it_si   = u_pc.u_cpu.g_mcl86.eu.eu_register_si;
-assign it_di   = u_pc.u_cpu.g_mcl86.eu.eu_register_di;
-assign it_ds   = u_pc.u_cpu.g_mcl86.biu.reg_ds;
-assign it_es   = u_pc.u_cpu.g_mcl86.biu.reg_es;
-assign it_ss   = u_pc.u_cpu.g_mcl86.biu.reg_ss;
-assign it_f    = u_pc.u_cpu.g_mcl86.eu.eu_flags;
-`else
 // the EU's first clock of an instruction (not an interrupt): its opcode is q_top
-assign it_disp = u_pc.u_cpu.g_z86.cpu.dbg_ce && u_pc.u_cpu.g_z86.cpu.eu.FC && !u_pc.u_cpu.g_z86.cpu.eu.irq_take;
-assign it_op   = u_pc.u_cpu.g_z86.cpu.eu.q_top;
-assign it_ip   = u_pc.u_cpu.g_z86.cpu.eu.biu_ip;
-assign it_ax   = u_pc.u_cpu.g_z86.cpu.eu.AX;
-assign it_bx   = u_pc.u_cpu.g_z86.cpu.eu.BX;
-assign it_cx   = u_pc.u_cpu.g_z86.cpu.eu.CX;
-assign it_dx   = u_pc.u_cpu.g_z86.cpu.eu.DX;
-assign it_sp   = u_pc.u_cpu.g_z86.cpu.eu.SP;
-assign it_bp   = u_pc.u_cpu.g_z86.cpu.eu.BP;
-assign it_si   = u_pc.u_cpu.g_z86.cpu.eu.SI;
-assign it_di   = u_pc.u_cpu.g_z86.cpu.eu.DI;
-assign it_ds   = u_pc.u_cpu.g_z86.cpu.eu.DS;
-assign it_es   = u_pc.u_cpu.g_z86.cpu.eu.ES;
-assign it_ss   = u_pc.u_cpu.g_z86.cpu.eu.SS;
-assign it_f    = u_pc.u_cpu.g_z86.cpu.eu.F;
+assign it_disp = u_pc.u_cpu.cpu.dbg_ce && u_pc.u_cpu.cpu.eu.FC && !u_pc.u_cpu.cpu.eu.irq_take;
+assign it_op   = u_pc.u_cpu.cpu.eu.q_top;
+assign it_ip   = u_pc.u_cpu.cpu.eu.biu_ip;
+assign it_ax   = u_pc.u_cpu.cpu.eu.AX;
+assign it_bx   = u_pc.u_cpu.cpu.eu.BX;
+assign it_cx   = u_pc.u_cpu.cpu.eu.CX;
+assign it_dx   = u_pc.u_cpu.cpu.eu.DX;
+assign it_sp   = u_pc.u_cpu.cpu.eu.SP;
+assign it_bp   = u_pc.u_cpu.cpu.eu.BP;
+assign it_si   = u_pc.u_cpu.cpu.eu.SI;
+assign it_di   = u_pc.u_cpu.cpu.eu.DI;
+assign it_ds   = u_pc.u_cpu.cpu.eu.DS;
+assign it_es   = u_pc.u_cpu.cpu.eu.ES;
+assign it_ss   = u_pc.u_cpu.cpu.eu.SS;
+assign it_f    = u_pc.u_cpu.cpu.eu.F;
 
 // +ztrace_from=<step> +ztrace_to=<step>: one line per EU clock (sys_run passes
 // plusargs through), the step number as the -t trace's first column
@@ -273,15 +250,14 @@ initial begin
 end
 always_ff @(posedge clk) if (u_pc.cpu_step && !reset) zsteps <= zsteps + 1;
 always_ff @(posedge clk)
-    if (zto != 0 && zsteps >= zfrom && zsteps < zto && u_pc.u_cpu.g_z86.cpu.dbg_ce)
+    if (zto != 0 && zsteps >= zfrom && zsteps < zto && u_pc.u_cpu.cpu.dbg_ce)
         $display("z %0d ls=%0d FC=%b SC=%b ROME=%b st=%b busy=%b row=%03h RNI=%b NXT=%b qe=%b qt=%02h IR=%02h ip=%04h t=%0d irq=%b int=%b F=%04h CX=%04h",
-                 zsteps, u_pc.u_cpu.g_z86.cpu.eu.loader_state, u_pc.u_cpu.g_z86.cpu.eu.FC,
-                 u_pc.u_cpu.g_z86.cpu.eu.SC, u_pc.u_cpu.g_z86.cpu.eu.ROME, u_pc.u_cpu.g_z86.cpu.eu.stall,
-                 u_pc.u_cpu.g_z86.cpu.eu.bus_busy, u_pc.u_cpu.g_z86.cpu.tables.uc_row,
-                 u_pc.u_cpu.g_z86.cpu.eu.RNI, u_pc.u_cpu.g_z86.cpu.eu.NXT, u_pc.u_cpu.g_z86.cpu.eu.q_empty,
-                 u_pc.u_cpu.g_z86.cpu.eu.q_top, u_pc.u_cpu.g_z86.cpu.eu.IR, u_pc.u_cpu.g_z86.cpu.eu.biu_ip,
-                 u_pc.cpu_bus_t, u_pc.u_cpu.g_z86.cpu.eu.irq_take, u_pc.u_cpu.g_z86.cpu.eu.int_cond,
-                 u_pc.u_cpu.g_z86.cpu.eu.F, u_pc.u_cpu.g_z86.cpu.eu.CX);
-`endif
+                 zsteps, u_pc.u_cpu.cpu.eu.loader_state, u_pc.u_cpu.cpu.eu.FC,
+                 u_pc.u_cpu.cpu.eu.SC, u_pc.u_cpu.cpu.eu.ROME, u_pc.u_cpu.cpu.eu.stall,
+                 u_pc.u_cpu.cpu.eu.bus_busy, u_pc.u_cpu.cpu.tables.uc_row,
+                 u_pc.u_cpu.cpu.eu.RNI, u_pc.u_cpu.cpu.eu.NXT, u_pc.u_cpu.cpu.eu.q_empty,
+                 u_pc.u_cpu.cpu.eu.q_top, u_pc.u_cpu.cpu.eu.IR, u_pc.u_cpu.cpu.eu.biu_ip,
+                 u_pc.cpu_bus_t, u_pc.u_cpu.cpu.eu.irq_take, u_pc.u_cpu.cpu.eu.int_cond,
+                 u_pc.u_cpu.cpu.eu.F, u_pc.u_cpu.cpu.eu.CX);
 
 endmodule

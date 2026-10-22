@@ -39,9 +39,7 @@
 #include "Vtb_sys.h"
 #include "Vtb_sys___024root.h"
 #include "verilated.h"
-#ifndef CPU_MCL86
 #include "ucode_file.h"
-#endif
 
 static const double CLK_HZ = 100227272.7;
 
@@ -254,7 +252,6 @@ int main(int argc, char **argv) {
         tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval();
     }
     tb->font_we = 0;
-#ifndef CPU_MCL86
     {
         // the 8088's microcode bundle through the CPU's load port, in reset
         // ($PC10_UCODE, else make Z86_UCODE=...), as the core's firmware loads it
@@ -267,7 +264,6 @@ int main(int argc, char **argv) {
         }
         tb->ucl_we = 0;
     }
-#endif
     if (!trace) unlink(hex.c_str());       // the ROM is loaded (initial block ran)
     if (xub) unlink(xhex.c_str());
     tb->reset = 0;

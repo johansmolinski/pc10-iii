@@ -1,11 +1,9 @@
-// cpu_ooc_top.v - the 8088 (rtl/cpu/cpu8088.sv; CPU = "z86": z8086 EU + its
-// tables + biu88, or "mcl86") with registered I/O, for an out-of-context Vivado run that measures the
+// cpu_ooc_top.v - the 8088 (rtl/cpu/cpu8088.sv: z8086 EU + its tables +
+// biu88) with registered I/O, for an out-of-context Vivado run that measures the
 // CPU alone at 100.2273 MHz (tools/ooc/cpu_ooc.tcl). The CPU's own timing
 // constraints (rtl/cpu/cpu8088.xdc) are read scoped to cpu8088, as in the
 // system.
-module cpu_ooc_top #(
-    parameter CPU = "z86"
-) (
+module cpu_ooc_top (
     input             clk,
     input             ucl_we_i,
     input      [12:0] ucl_addr_i,
@@ -41,7 +39,7 @@ wire [2:0]  s2_s0, bus_t, bus_type;
 wire [1:0]  qs;
 wire        lock_n, ale;
 
-cpu8088 #(.CPU(CPU)) cpu (
+cpu8088 cpu (
     .clk(clk), .reset(reset), .step(step),
     .ucl_we(ucl_we), .ucl_addr(ucl_addr), .ucl_data(ucl_data),
     .ready(ready), .intr(intr), .nmi(nmi), .test_n(1'b1),

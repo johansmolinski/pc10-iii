@@ -1,6 +1,6 @@
 // tb_z86.v - z8086 EU + biu88 (rtl/cpu/z8086/cpu_z86.sv) for the
-// SingleStepTests harness, with the dbg_* ports of tb_mcl86_biu88.v
-// (make CPU=z86). The microcode bundle comes in through ucl_* (sst_run.cpp
+// SingleStepTests harness (tb/sst), whose dbg_* conventions come from the
+// MCL86 era. The microcode bundle comes in through ucl_* (sst_run.cpp
 // streams the file while the CPU is in reset).
 //
 // The harness's MCL86 conventions are mapped:
@@ -14,7 +14,7 @@
 //   dbg_flags    bit 1 cleared (MCL86's REP re-dispatch marker; the harness
 //                sets it again).
 
-module tb_mcl86 (
+module tb_z86 (
     input             core_clk,
     input             clk,
     input             step,

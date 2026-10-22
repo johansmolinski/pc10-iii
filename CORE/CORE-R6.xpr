@@ -703,26 +703,8 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../rtl/cpu/mcl86/eu.v">
-        <FileInfo>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PPRDIR/../rtl/cpu/mcl86/biu88.v">
-        <FileInfo>
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
       <File Path="$PPRDIR/../rtl/cpu/biu88.sv">
         <FileInfo SFType="SVerilog">
-          <Attr Name="UsedIn" Val="synthesis"/>
-          <Attr Name="UsedIn" Val="simulation"/>
-        </FileInfo>
-      </File>
-      <File Path="$PPRDIR/../rtl/cpu/mcl86/eu_rom.v">
-        <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
@@ -955,7 +937,6 @@
         <Option Name="VerilogDir" Val="$PPRDIR/../rtl/system/kf/KF8255"/>
         <Option Name="VerilogDir" Val="$PPRDIR/../rtl/system/kf/KF8259"/>
         <Option Name="VerilogDir" Val="$PPRDIR/../rtl/cpu/z8086"/>
-        <Define Name="MCL86_ROM" Val="&quot;../../../rtl/cpu/mcl86/microcode.hex&quot;"/>
         <Option Name="DesignMode" Val="RTL"/>
         <Option Name="TopModule" Val="mega65_r6"/>
       </Config>

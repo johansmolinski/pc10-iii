@@ -1,6 +1,5 @@
 # cpu_ooc.tcl - out-of-context synthesis + implementation of the CPU alone
-# (rtl/cpu/cpu8088.sv, CPU = "z86": z8086 EU + tables + biu88; env OOC_CPU=mcl86
-# for MCL86's EU + biu88 + microcode ROM) for the MEGA65 R6 part
+# (rtl/cpu/cpu8088.sv: z8086 EU + tables + biu88) for the MEGA65 R6 part
 # at 100.2273 MHz, with the CPU's constraints (rtl/cpu/cpu8088.xdc, scoped to
 # cpu8088 as in the system).
 #   cd <repo>/tools/ooc && vivado -mode batch -source cpu_ooc.tcl [-tclargs synth|explore]
@@ -11,15 +10,13 @@
 # and a phys_opt_design after routing), otherwise the defaults.
 set here [file normalize [file dirname [info script]]]
 set cpu  [file normalize $here/../../rtl/cpu]
-set rtl  $cpu/mcl86
 set synth_only [expr {[llength $argv] > 0 && [lindex $argv 0] eq "synth"}]
 set explore    [expr {[llength $argv] > 0 && [lindex $argv 0] eq "explore"}]
 # optional second argument: another place_design directive (with "explore")
 set placedir   [expr {[llength $argv] > 1 ? [lindex $argv 1] : "Explore"}]
 file mkdir $here/out
 set_part xc7a200tfbg484-2
-set ooc_cpu [expr {[info exists env(OOC_CPU)] ? $env(OOC_CPU) : "z86"}]
-read_verilog [list $here/cpu_ooc_top.v $rtl/eu.v $rtl/biu88.v $rtl/eu_rom.v]
+read_verilog $here/cpu_ooc_top.v
 read_verilog -sv [list $cpu/z8086/alu.sv $cpu/z8086/z86_tables.sv $cpu/z8086/z86_eu.sv \
     $cpu/z8086/cpu_z86.sv $cpu/biu88.sv $cpu/cpu8088.sv]
 set clkxdc [open $here/out/clk.xdc w]
@@ -30,8 +27,7 @@ if {[file exists $cpu/cpu8088.xdc]} {
     read_xdc -ref cpu8088 $cpu/cpu8088.xdc
 }
 synth_design -top cpu_ooc_top -mode out_of_context -flatten_hierarchy rebuilt \
-    -include_dirs $cpu/z8086 -generic CPU=\"$ooc_cpu\" \
-    -verilog_define MCL86_ROM=\"$rtl/microcode.hex\"
+    -include_dirs $cpu/z8086
 report_utilization -file $here/out/synth_util.rpt
 report_timing_summary -max_paths 10 -file $here/out/synth_timing.rpt
 report_timing -max_paths 30 -nworst 1 -sort_by group -file $here/out/synth_paths.rpt

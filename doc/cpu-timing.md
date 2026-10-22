@@ -1,5 +1,8 @@
 # The 8088 at 100 MHz (timing closure of rtl/cpu)
 
+**Historical** (2026-10-22): this describes the MCL86 CPU and its biu88,
+both removed with the z86 work; the current CPU is in doc/z8086.md.
+
 Branch `cpu-timing`, 2026-10-21/22. The CPU (MCL86 EU + biu88 + microcode ROM)
 meets 100.2273 MHz on the R6 part without changing what it does on any clock
 the EU or an 8088 clock sample sees.

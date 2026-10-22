@@ -1288,3 +1288,17 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
     LOOP-fixed reference 2,439,294 (SW1 0x6D) and 2,439,417 with MartyPC's
     switches (`-d EE`), as phase A; the `-C` oracle 13,305 writes, 0 differ.
   - tb/cga, tb/mda, tb/fdc (208 checks), tb/hdc (3,184 checks) PASS.
+
+## 2026-10-22 - MCL86 removed (branch `z86`)
+
+- `rtl/cpu/mcl86/` (MCL86's EU, its microcode listing and image, biu88_mcl,
+  biu_max), `tb/sst/tb_mcl86*.v`, the microcode tools (`mcasm.py`,
+  `mcset.py`, `gen_ea_modes.py`, `gen_strings.py`, `gen_muldiv.py`) and the
+  `CPU` parameter of `cpu8088`/`pc_system` are gone; the project, the OOC
+  script and the build gate (the MCL86 microcode image) with them. MCL86
+  reached 99.99% of the suite's traces after two days of per-instruction
+  timing (the entries above); the z86 CPU reaches the same with Intel's
+  microcode and no instruction-specific timing. doc/cpu-timing.md is kept as
+  history.
+- Checks after the removal: tb/sys's trace against MartyPC identical over the
+  2M-clock reference, tb/shell PASS; the full gates in the entry below.

@@ -301,9 +301,7 @@ $R fetch <name> R6                                   # -> ~/pcxt-work/builds/<na
 
 `build_bitstream.tcl` writes the bitstream in any case and prints one
 `RESULT` line: `SIGNOFF-FAILED` (a gate), `TIMING-FAILED` (WNS or WHS < 0)
-or `OK`. Gates: synthesis read the MCL86 microcode image (`... microcode.hex'
-is read successfully` in its log; a missing image is only a warning and a dead
-CPU), `main_clk` 9.977 ns and `video_clk` 34.921 ns, the multicycle target of
+or `OK`. Gates: `main_clk` 9.977 ns and `video_clk` 34.921 ns, the multicycle target of
 the floppy geometry exists, `pc_ram` has its 160 block RAMs. It also writes
 `utilization_hierarchical.rpt` and `worst_paths.rpt` (50 paths, one per
 group) next to the bitstream; `rbuild.sh fetch` copies them.
@@ -316,11 +314,11 @@ to a normal run (`Reference DCP WNS -6.415 ns is less than the threshold
 value -1.000 ns`, build `pc10-real-c`). So the first build with the CPU
 timing fix is a full one, later ones can use it as their reference.
 
-**Microcode image:** `eu_rom.v` takes its path from the `MCL86_ROM` define,
-which the project sets to `../../../rtl/cpu/mcl86/microcode.hex` (relative to
-the synthesis run directory `CORE/CORE-R6.runs/synth_1`, which is where
-Vivado resolves `$readmemh` paths); the gate above catches a wrong path.
-The KF chips' `.svh` includes come from the project's Verilog include
+**Microcode:** none in the bitstream since 2026-10-22: the 8088 (z8086's EU)
+loads Intel's microcode from `/pc10/ucode.bin` (section 3). (Until then the
+MCL86 CPU's `eu_rom.v` read `rtl/cpu/mcl86/microcode.hex` through the
+`MCL86_ROM` define, with a gate on it.) The z8086 overlay's `.svh` and the KF
+chips' `.svh` includes come from the project's Verilog include
 directories (`rtl/system/kf/KF82xx`).
 
 Tests (`tb/shell/run.sh`, about a minute):
@@ -361,8 +359,10 @@ type (`.v`) (Megamiga hard rule 2).
 
 ### The CPU alone (out of context, R6 part xc7a200tfbg484-2, 100.2273 MHz)
 
-`tools/ooc/cpu_ooc.tcl`: MCL86 EU + biu88 + microcode ROM (rtl/cpu at
-`40a7663`) with registered I/O, synthesis + place + route.
+`tools/ooc/cpu_ooc.tcl`: the CPU with registered I/O, synthesis + place +
+route. The table below is the MCL86 CPU (MCL86 EU + biu88 + microcode ROM,
+rtl/cpu at `40a7663`); the z86 CPU's numbers are in doc/history.md
+(2026-10-22, phases A and B).
 
 | | |
 |---|---|

@@ -8,8 +8,7 @@ module pc_system #(
     // fitted video cards (doc/architecture.md section 4, doc/mda.md section 7)
     parameter bit CGA_FIT = 1'b1,       // IBM CGA at B8000-BFFFF, 3D0-3DF
     parameter int MDA_FIT = 0,          // 0 none, 1 IBM MDA, 2 Hercules (B0000, 3B0-3BF)
-    parameter int DRQ0_SKEW = 0,        // simulation only (xt_board)
-    parameter string CPU  = "z86"       // the 8088: "z86" (Intel's microcode) or "mcl86"
+    parameter int DRQ0_SKEW = 0         // simulation only (xt_board)
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -134,7 +133,7 @@ logic [2:0]  cpu_s2_s0, cpu_bus_t, cpu_bus_type;
 logic [1:0]  cpu_qs;
 logic        cpu_lock_n, cpu_ale, cpu_ready, cpu_intr, cpu_nmi;
 
-cpu8088 #(.CPU(CPU)) u_cpu (
+cpu8088 u_cpu (
     .clk      (clk),
     .reset    (reset),
     .step     (cpu_step),

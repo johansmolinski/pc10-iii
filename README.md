@@ -30,13 +30,14 @@ The full plan, with its research and open questions, is in
   Intel's own 8088 microcode, one microinstruction per 8088 clock, in front of
   `biu88`, our cycle-stepped bus interface unit ([doc/z8086.md](doc/z8086.md)).
   The microcode is not part of this repository or of the bitstream: you build
-  it from your own copy of Andrew Jenner's public data (below). The first CPU,
-  MicroCore Labs' MCL86 (MIT), is in `rtl/cpu/mcl86/`.
+  it from your own copy of Andrew Jenner's public data (below). (The first
+  CPU, MicroCore Labs' MCL86, is in the history: doc/history.md.)
 - `tb/sst/`: the SingleStepTests harness (Verilator + C++).
 - `rtl/video/cga/`: the IBM CGA card (MC6845, wait states, snow), timed
   after MartyPC; `tb/cga/`: its testbench (`make run`). See
   [doc/cga.md](doc/cga.md).
-- `tools/`: `mcasm.py`, the MCL86 microcode assembler.
+- `tools/`: `mkucode.py`, the microcode bundle; `ctrace_diff.py`, the cycle
+  trace comparison with MartyPC.
 
 ## The 8088's microcode
 
@@ -80,5 +81,5 @@ Each line of `make run` gives, per opcode file:
 ## Licence
 
 GPL-3.0 (see `LICENSE`), like the MiSTer2MEGA65 framework. z8086 is Apache
-2.0 (`rtl/cpu/z8086/LICENSE`, `NOTICE`), MCL86 is MIT licensed; their notices
-are kept with their sources.
+2.0 (`rtl/cpu/z8086/LICENSE`, `NOTICE`); its notice is kept with its
+sources.

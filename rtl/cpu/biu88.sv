@@ -4,8 +4,8 @@
 // The BIU advances once per 8088 clock (input `step`, one clk wide, at each
 // rising edge of the 8088 CLK) and models the 8088 BIU as the MartyPC emulator
 // does (cpu_808x/biu.rs, cycle.rs, queue.rs; MIT licence, Copyright 2022-2026
-// Daniel Balsom), the model that the MCL86 version of biu88 (2026-10-21/22)
-// carried:
+// Daniel Balsom), the model that biu88's first version (for the MCL86 EU,
+// 2026-10-21/22) carried:
 //
 //   - T-states Ti T1 T2 T3 Tw T4; status pins active in T1/T2, passive from
 //     T3 (the transfer); a code fetch pushes its byte into the queue at T4;

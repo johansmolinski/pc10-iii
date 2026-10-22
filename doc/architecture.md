@@ -27,8 +27,7 @@ exact, 2205/22 MHz). Everything PC-side runs on `clk` with clock enables:
 - `ce_14m` falls on `cpu_step` and on `cpu_fall` (7 and 21 are multiples of 7).
 - The 8088 (`cpu8088`, `CPU = "z86"`, doc/z8086.md): biu88 steps at
   `cpu_step`; z8086's EU executes one microinstruction per 8088 clock, at
-  `cpu_step` + 3 `clk` (its clock enable). Both change state only there. (The old CPU, `CPU = "mcl86"`, ran
-  MCL86's EU on `clk`: 21 microinstructions per 8088 clock.)
+  `cpu_step` + 3 `clk` (its clock enable). Both change state only there.
 - Turbo (FE2010A 7.16/9.54 MHz) is not part of this contract yet.
 
 ## 2. Module tree
@@ -138,8 +137,7 @@ the CGA depend on it):
 module pc_system #(
     parameter int RAM_KB  = 640,
     parameter bit CGA_FIT = 1'b1,     // the CGA is in the machine
-    parameter int MDA_FIT = 0,        // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
-    parameter string CPU  = "z86"     // the 8088: "z86" or the old "mcl86"
+    parameter int MDA_FIT = 0         // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
 ) (
     input  logic        clk,          // 100.2273 MHz
     input  logic        reset,        // synchronous, active high, >= 1 CPU clock
