@@ -170,12 +170,12 @@ always_comb begin
         aen_next      = 1'b0;
         dma_wait_next = 1'b0;
     end else if (cpu_step) begin
-        // the DMA takes the bus only when the CPU is not inside a
-        // transfer: at its T4 or with an idle bus (the status pins
-        // go passive in T3 already). CAL: against MartyPC's HOLDA. AEN
-        // ends in the CPU clock where the 8237 drops HRQ (enters SI): five
-        // clocks for a transfer (S1 S2 S3 SW S4), as MartyPC's.
-        aen_next      = hold_ack && hold_request_next && (aen || cpu_bus_t == T4 || cpu_bus_t == TI);
+        // AEN one CPU clock after HOLDA (hrq_ff1: HRQ with passive status,
+        // i.e. the CPU in T3/Tw/T4/Ti, and no LOCK), also in the CPU's T4,
+        // and it ends in the clock where the 8237 drops HRQ (enters SI): five
+        // clocks for a transfer (S1 S2 S3 SW S4). CAL: MartyPC (HLDA, then S1
+        // with AEN on the next clock).
+        aen_next      = hold_ack && hold_request_next;
         dma_wait_next = aen;
     end
 end
@@ -623,7 +623,9 @@ always_ff @(posedge clk)
 logic rdy_sync;
 always_ff @(posedge clk)
     if (reset) rdy_sync <= 1'b1;
-    else if (cpu_fall) rdy_sync <= isa_ready & ~dma_wait;
+    // the DMA wait: from the CPU clock where AEN rises (S1) to one clock
+    // after it falls. CAL: MartyPC (DMA wait states from S1).
+    else if (cpu_fall) rdy_sync <= isa_ready & ~(aen | dma_wait);
 wire io_cycle = cpu_bus_type == ST_IOR || cpu_bus_type == ST_IOW;
 assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle);
 

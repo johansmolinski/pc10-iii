@@ -22,26 +22,34 @@ module pc_clocks #(
     output logic pit_clk
 );
 
-logic [6:0] cnt;
-logic [4:0] c21;                        // cnt mod 21
-logic [2:0] c7;                         // cnt mod 7
+logic [6:0] cnt, cnt_n;
+logic [4:0] c21, c21_n;                 // cnt mod 21
+logic [2:0] c7, c7_n;                   // cnt mod 7
 
-always_ff @(posedge clk) begin
+always_comb begin
     if (reset) begin
-        cnt <= 7'(PHASE);
-        c21 <= 5'(PHASE % 21);
-        c7  <= 3'(PHASE % 7);
+        cnt_n = 7'(PHASE);
+        c21_n = 5'(PHASE % 21);
+        c7_n  = 3'(PHASE % 7);
     end else begin
-        cnt <= cnt == 7'd83 ? 7'd0 : cnt + 7'd1;
-        c21 <= c21 == 5'd20 ? 5'd0 : c21 + 5'd1;
-        c7  <= c7  == 3'd6  ? 3'd0 : c7  + 3'd1;
+        cnt_n = cnt == 7'd83 ? 7'd0 : cnt + 7'd1;
+        c21_n = c21 == 5'd20 ? 5'd0 : c21 + 5'd1;
+        c7_n  = c7  == 3'd6  ? 3'd0 : c7  + 3'd1;
     end
 end
 
-assign ce_14m   = c7  == 3'd0;
-assign cpu_step = c21 == 5'd0;
-assign cpu_fall = c21 == 5'd7;
-assign ce_pclk  = cnt == 7'd0;
-assign pit_clk  = cnt < 7'd42;
+// the enables are registers, decoded from the counters' next values (timing:
+// they fan out to the whole PC; doc/cpu-timing.md measured the CPU with a
+// registered step)
+always_ff @(posedge clk) begin
+    cnt      <= cnt_n;
+    c21      <= c21_n;
+    c7       <= c7_n;
+    ce_14m   <= c7_n  == 3'd0;
+    cpu_step <= c21_n == 5'd0;
+    cpu_fall <= c21_n == 5'd7;
+    ce_pclk  <= cnt_n == 7'd0;
+    pit_clk  <= cnt_n < 7'd42;
+end
 
 endmodule
