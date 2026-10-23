@@ -22,7 +22,8 @@
 #include <string>
 #include <vector>
 
-static const double CLK_HZ = 100227272.7;        // 2205/22 MHz
+static const double CLK_HZ = 28636363.64;        // 315/11 MHz (6 clk per CPU clock)
+static const int C = 6;                           // clk per 4.77 MHz CPU clock
 static uint64_t us2clk(double us) { return (uint64_t)(us * CLK_HZ / 1e6 + 0.5); }
 static double clk2us(uint64_t c) { return c * 1e6 / CLK_HZ; }
 
@@ -183,12 +184,11 @@ struct Sim {
     }
 
     // ---------------------------------------------------- DMA model
-    // Single transfer mode. Per byte (in 4.77 MHz clocks of 21 clk): HRQ/HLDA
+    // Single transfer mode. Per byte (in 4.77 MHz clocks of C clk): HRQ/HLDA
     // 2 clocks, then DACK2 + AEN + the strobe pair for 2 clocks (S2/S3 with
     // the 5160's DMA wait state: 3), then release.
     void dma_model() {
         auto &m = dma;
-        const int C = 21;
         switch (m.phase) {
         case 0:
             if (m.armed && ((t->isa_drq >> 1) & 1) && !cpu_busy) { m.phase = 1; m.t0 = cyc; }
@@ -218,7 +218,7 @@ struct Sim {
             }
             break;
         case 4:
-            if (cyc - m.t0 >= 7) {              // DACK/TC go with the next half clock
+            if (cyc - m.t0 >= C / 3) {          // DACK/TC go with the next half clock
                 t->isa_dack_n = 0xF; t->isa_tc = 0;
                 m.addr++; m.done++;
                 if (m.count == 0) m.armed = false; else m.count--;
@@ -244,27 +244,27 @@ struct Sim {
         wait_bus();
         cpu_busy = true;
         t->isa_addr = port; t->isa_aen = 0;
-        for (int i = 0; i < 28; i++) tick();     // T1, T2 to the falling edge
+        for (int i = 0; i < C + C / 3; i++) tick();  // T1, T2 to the falling edge
         t->isa_dout = val;
         t->isa_iow_n = 0;
-        for (int i = 0; i < 56; i++) tick();
+        for (int i = 0; i < 8 * C / 3; i++) tick();
         t->isa_iow_n = 1;
-        for (int i = 0; i < 21; i++) tick();     // T4
+        for (int i = 0; i < C; i++) tick();     // T4
         cpu_busy = false;
-        for (int i = 0; i < 40; i++) tick();     // instruction overhead
+        for (int i = 0; i < 2 * C; i++) tick(); // instruction overhead
     }
     int io_read(int port) {
         wait_bus();
         cpu_busy = true;
         t->isa_addr = port; t->isa_aen = 0;
-        for (int i = 0; i < 14; i++) tick();
+        for (int i = 0; i < 2 * C / 3; i++) tick();
         t->isa_ior_n = 0;
-        for (int i = 0; i < 63; i++) tick();
+        for (int i = 0; i < 3 * C; i++) tick();
         int v = t->isa_dsel ? t->isa_din : 0xFF;
         t->isa_ior_n = 1;
-        for (int i = 0; i < 21; i++) tick();
+        for (int i = 0; i < C; i++) tick();
         cpu_busy = false;
-        for (int i = 0; i < 40; i++) tick();
+        for (int i = 0; i < 2 * C; i++) tick();
         return v;
     }
 

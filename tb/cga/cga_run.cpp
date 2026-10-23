@@ -1,11 +1,13 @@
 // cga_run.cpp - Verilator testbench for rtl/video/cga (doc/cga.md section 9).
 //
 // The card is driven by a model of the pc10-iii system board's bus timing
-// (rtl/system/xt_board.sv: the 8288 command edges, IOCHRDY sampled on rdy_ce,
-// 2 clk before the rising CLK edge that ends a state, one wait state on CPU
-// I/O cycles) and of biu88.v's READY rule (at the edge that starts T3/Tw the
-// CPU knows from READY whether that state is the last) with the clock enables
-// of pc_clocks.sv. Next to it runs cga_model.h, a C++ transliteration
+// (rtl/system/xt_board.sv: the 8288 command edges, the commands ending at the
+// CLK edge where T4 begins, IOCHRDY sampled on rdy_ce, 1 clk before the rising
+// CLK edge that ends a state, one wait state on CPU I/O cycles; the card bus's
+// next-clk values) and of biu88's READY rule (at the edge that starts T3/Tw
+// the CPU knows from READY whether that state is the last) with the clock
+// enables of pc_clocks.sv on the 28.63636 MHz clock (2 clk per OSC tick, 6 per
+// CPU clock). Next to it runs cga_model.h, a C++ transliteration
 // of MartyPC's CGA, ticked on the board's 14.318 MHz instants. Checked:
 //   waits   wait states of a CPU read/write at each of the 16 lchar phases
 //           against MartyPC's WAIT_TABLE (mmio.rs + the CPU's conversion);
@@ -65,7 +67,7 @@ struct Sim {
     Vcga_card *top;
     CgaModel g;
     uint64_t clk_n = 0, hdl_ticks = 0;
-    int c7 = 0, c21 = 0;
+    int c2 = 0, c6 = 0;
 
     // board
     enum TS { TI, T1, T2, T3, TW, T4 } ts = TI;
@@ -115,7 +117,7 @@ struct Sim {
     bool in_cycle() const { return ts == T1 || ts == T2 || ts == T3 || ts == TW; }
 
     void set_bus() {
-        bool rd = cmd_rd, wr = cmd_wr;       // registered: end one clk after T4 begins
+        bool rd = cmd_rd, wr = cmd_wr;       // registered: end at the edge where T4 begins
         top->isa_memr_n = !(rd && cur.t == Op::MEMR);
         top->isa_ior_n  = !(rd && cur.t == Op::IOR);
         top->isa_memw_n = !(wr && cur.t == Op::MEMW);
@@ -123,6 +125,18 @@ struct Sim {
         top->isa_aen = 0;
         top->lpen_trig = 0;
         top->lpen_sw = 0;
+    }
+
+    // the card bus of the next clk (xt_board.sv isa_*_next): the commands as
+    // they will be after the coming edge; the address only changes at a T1,
+    // when no strobe is low
+    void set_next(bool rd, bool wr) {
+        top->isa_addr_next   = top->isa_addr;
+        top->isa_aen_next    = 0;
+        top->isa_memr_n_next = !(rd && cur.t == Op::MEMR);
+        top->isa_ior_n_next  = !(rd && cur.t == Op::IOR);
+        top->isa_memw_n_next = !(wr && cur.t == Op::MEMW);
+        top->isa_iow_n_next  = !(wr && cur.t == Op::IOW);
     }
 
     void start_op() {
@@ -136,7 +150,7 @@ struct Sim {
 
     // one clk
     void step() {
-        bool ce = c7 == 0, cs = c21 == 0, cf = c21 == 7, cr = c21 == 19;
+        bool ce = c2 == 0, cs = c6 == 0, cf = c6 == 2, cr = c6 == 5;
         top->ce_14m = ce;
         top->clk = 0;
         top->eval();
@@ -202,6 +216,7 @@ struct Sim {
             case TW:
                 if (t3_last) {
                     ts = T4;
+                    ncmd_rd = ncmd_wr = false;   // the commands end at this edge
                     if (cur.t == Op::IOW) {
                         if (getenv("CGAIOLOG")) printf("    IOW %03X %02X at %llu (sel %d)\n", cur.a, cur.d, (unsigned long long)g.cycles, g.crtc.sel);
                         g.io_write(cur.a, cur.d);
@@ -236,8 +251,10 @@ struct Sim {
         }
         cmd_rd = ncmd_rd;
         cmd_wr = ncmd_wr;
-        c7 = c7 == 6 ? 0 : c7 + 1;
-        c21 = c21 == 20 ? 0 : c21 + 1;
+        set_next(ncmd_rd, ncmd_wr);
+        top->eval();
+        c2 = c2 == 1 ? 0 : c2 + 1;
+        c6 = c6 == 5 ? 0 : c6 + 1;
 
         top->clk = 1;
         top->eval();
@@ -293,7 +310,7 @@ struct Sim {
     }
 
     // recording: every dot is compared with the model while it runs
-    static constexpr int LAT = 3;        // card tick k shows model dot k - LAT
+    static constexpr int LAT = 6;        // card tick k shows model dot k - LAT (cga_card DLY 3 + 3)
     void rec_start(bool keep_dots = true) {
         rec.clear(); recording = true; keep = keep_dots; rec_base = hdl_ticks + 1;
         cmp_n = cmp_bad = cmp_lit = 0;

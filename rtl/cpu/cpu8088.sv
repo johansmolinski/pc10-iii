@@ -4,8 +4,8 @@
 // through ucl_*, doc/z8086.md) + biu88 (rtl/cpu/biu88.sv), one step per 8088
 // clock each.
 //
-// Runs on clk (100.2273 MHz); `step` is the rising edge of the 8088 CLK (one
-// clk wide, every 21 clk at 4.77 MHz). The pins follow the real chip:
+// Runs on clk (28.63636 MHz); `step` is the rising edge of the 8088 CLK (one
+// clk wide, every 6 clk at 4.77 MHz). The pins follow the real chip:
 // multiplexed AD bus, S2-S0, QS1-QS0, LOCK, READY, INTR, NMI, TEST. For the
 // system board's bus controller the BIU's own T-state and latched bus status
 // are exported too (bus_t, bus_type), so the 8288 function needs no

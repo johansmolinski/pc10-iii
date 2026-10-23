@@ -3,7 +3,7 @@
 --
 -- MEGA65 main file that contains the whole machine
 --
--- * clk.vhd: the PC's one clock, 100.2273 MHz (main_clk, also the video clock)
+-- * clk.vhd: the PC's one clock, 28.63636 MHz (main_clk, also the video clock)
 -- * main.vhd: pc_system + keyboard + video/audio glue
 -- * pc_ram.vhd: 640 KB system RAM in block RAM, no QNICE port (Megamiga hard rule 4)
 -- * pc_bios.vhd: 64 KB BIOS ROM, QNICE device C_DEV_PC_BIOS, filled by the Shell's ROM
@@ -137,7 +137,7 @@ port (
    clk_i                   : in  std_logic;              -- 100 MHz clock
 
    -- Share clock and reset with the framework
-   main_clk_o              : out std_logic;              -- CORE's 28.375 MHz clock
+   main_clk_o              : out std_logic;              -- the PC's 28.63636 MHz clock
    main_rst_o              : out std_logic;              -- CORE's reset, synchronized
 
    -- M2M's reset manager provides 2 signals:
@@ -560,9 +560,9 @@ begin
    clk_gen : entity work.clk
       port map (
          sys_clk_i         => clk_i,           -- expects 100 MHz
-         main_clk_o        => main_clk,        -- 100.2273 MHz
+         main_clk_o        => main_clk,        -- 28.63636 MHz
          main_rst_o        => main_rst,
-         video_clk_o       => video_clk,       -- 28.63636 MHz
+         video_clk_o       => video_clk,       -- the same clock
          video_rst_o       => video_rst
       ); -- clk_gen
 
@@ -605,7 +605,6 @@ begin
       port map (
          clk_main_i           => main_clk,
          reset_i              => main_pc_reset,
-         clk_video_i          => video_clk,
 
          video_ce_o           => video_ce_o,
          video_ce_ovl_o       => video_ce_ovl_o,

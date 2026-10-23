@@ -27,7 +27,7 @@ MUTANTS = [
     ('6845 without slot', "wire           req = mem_any || crtc_io;", "wire           req = mem_any;", 'waits', 0),
     ('3B8-3BF with slot', "wire        crtc_io = (io_rd || io_wr) && !isa_addr[3];",
      "wire        crtc_io = (io_rd || io_wr);", 'waits', 0),
-    ('dot clock rate', "parameter int DOT_INC   = HERC ? 704  : 59609,", "parameter int DOT_INC   = HERC ? 704  : 59610,",
+    ('dot clock rate', "parameter int DOT_INC   = HERC ? 352  : 59609,", "parameter int DOT_INC   = HERC ? 352  : 59610,",
      'text', 0),
     ('no hres stop', "parameter bit HRES_STOP = !HERC,", "parameter bit HRES_STOP = 1'b0,", 'hres', 0),
     ('DE one stage', "de1  <= de;    de2  <= de1;", "de1  <= de;    de2  <= de;", 'text', 0),

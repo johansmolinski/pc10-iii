@@ -8,13 +8,19 @@
 // behaviour and the Hercules extensions. The design, the schematic reading
 // and every difference to MartyPC are in doc/mda.md.
 //
-// Clocking: everything on clk (100.2273 MHz). The card has its own crystal
+// Clocking: everything on clk (28.63636 MHz). The card has its own crystal
 // (16.257 MHz; 16.000 MHz on the Hercules card), asynchronous to the PC. It
 // is made from clk with a fractional accumulator (DOT_INC/DOT_MOD): an
-// enable for the rising dot clock edge (6 or 7 clk apart, exact in the
-// average) and one for the falling edge half a dot later. The CPU side
-// samples the card's state on clk like the real bus samples an asynchronous
-// card.
+// enable for the rising dot clock edge (1 or 2 clk apart, exact in the
+// average) and one for the falling edge half a dot later. A dot is 1.76 clk,
+// so a clk can hold both edges. A falling edge before the rising one in the
+// same clk is taken there: its logic sees the state before the rising edge's
+// update, as it should. A falling edge after the rising one in the same clk
+// (the accumulator passes the end of a dot and the middle of the next) is
+// taken in the next clk (fall_pend), which is then before that clk's rising
+// edge: at most one falling edge per clk, each one at most 1 clk late. The
+// CPU side samples the card's state on clk like the real bus samples an
+// asynchronous card.
 //
 // Character timing (sheet 3): a 9-state counter (U1, 74LS174 + NOR feedback)
 // on the dot clock. In this file `ph` 0 is the state in which the character
@@ -45,10 +51,10 @@
 
 module mda_card #(
     parameter bit HERC      = 1'b0,          // 1 = Hercules Graphics Card
-    // dot clock = DOT_INC / DOT_MOD x clk (DOT_MOD even):
-    //   MDA 16.257 MHz: 59609 / 367500;  HGC 16.000 MHz: 704 / 4410
-    parameter int DOT_INC   = HERC ? 704  : 59609,
-    parameter int DOT_MOD   = HERC ? 4410 : 367500,
+    // dot clock = DOT_INC / DOT_MOD x clk (DOT_MOD even; clk = 315/11 MHz):
+    //   MDA 16.257 MHz: 59609 / 105000;  HGC 16.000 MHz: 352 / 630
+    parameter int DOT_INC   = HERC ? 352  : 59609,
+    parameter int DOT_MOD   = HERC ? 630  : 105000,
     parameter bit HRES_STOP = !HERC,         // no dot clock without 3B8 bit 0
     // vid_hblank/vid_vblank window, counted from the start of vid_hsync
     // (dots) and vid_vsync (lines): the 720x350 text and the 720x348 HGC
@@ -58,7 +64,7 @@ module mda_card #(
     parameter int AP_Y = 16,
     parameter int AP_H = 354
 ) (
-    input  logic        clk,            // 100.2273 MHz
+    input  logic        clk,            // 28.63636 MHz
     input  logic        reset,
 
     // card bus
@@ -101,10 +107,16 @@ localparam int AW = $clog2(DOT_MOD) + 1;
 logic [AW-1:0] acc;
 wire  [AW-1:0] acc_n    = acc + AW'(DOT_INC);
 wire           osc_rise = acc_n >= AW'(DOT_MOD);             // the crystal's rising edge
-wire           osc_fall = acc < AW'(HALF) && acc_n >= AW'(HALF); // its falling edge
+logic          fall_pend;                                    // a falling edge after the rise, last clk
+wire           osc_fall = (acc < AW'(HALF) && acc_n >= AW'(HALF)) || fall_pend;  // its falling edge
 always_ff @(posedge clk)
-    if (reset) acc <= '0;
-    else       acc <= osc_rise ? acc_n - AW'(DOT_MOD) : acc_n;
+    if (reset) begin
+        acc       <= '0;
+        fall_pend <= 1'b0;
+    end else begin
+        acc       <= osc_rise ? acc_n - AW'(DOT_MOD) : acc_n;
+        fall_pend <= acc_n >= AW'(DOT_MOD + HALF);
+    end
 
 // ============================================================ registers
 logic [7:0] mode;                       // 3B8 (bits 0, 3, 5; HGC also 1, 7)
@@ -217,7 +229,7 @@ wire           req = mem_any || crtc_io;
 assign isa_ready = !(req && !ack);
 // The write (-WE, U6) in the CPU's CCLK-high half; done at its end, before
 // IOCHRDY rises. The board keeps MEMW low until it has seen IOCHRDY high
-// (xt_board.sv samples it 12 clk after MEMW falls, doc/mda.md 4.2), so the
+// (xt_board.sv samples it 3 clk after MEMW falls, doc/mda.md 4.2), so the
 // strobe lasts to the slot; one that ended before it would lose the write,
 // as on the real card (checked in simulation). Exception: a DMA transfer
 // while the CPU waits takes MEMW away (AEN) and gives it back after the

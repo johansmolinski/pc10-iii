@@ -1,6 +1,7 @@
 // xt_board.sv - the IBM 5160 system board logic around the 8088.
 //
-// Everything on clk (100.2273 MHz) with the enables of pc_clocks.sv. Parts:
+// Everything on clk (28.63636 MHz, the PC10-III's master clock) with the
+// enables of pc_clocks.sv (6 clk per 8088 clock, 2 per OSC tick). Parts:
 //   - address latch (8282s) and the 8288 bus controller function, driven by
 //     the BIU's T-state and bus status instead of reconstructing them from the
 //     status pins;
@@ -25,13 +26,15 @@ module xt_board #(
     // schedule when its device loop sees the PIT write (here 7 clocks after
     // the 8253's reload); tb/sys sets this to compare traces past the first
     // refresh. 0 = the hardware.
-    parameter int DRQ0_SKEW = 0
+    parameter int DRQ0_SKEW = 0,
+    parameter int CLK_PER_CPU = 6       // clk per 8088 clock (DRQ0_SKEW only)
 ) (
     input  logic        clk,
     input  logic        reset,
     input  logic        cpu_step,
     input  logic        cpu_fall,
-    input  logic        rdy_ce,         // 2 clk before cpu_step (pc_clocks)
+    input  logic        rdy_ce,         // 1 clk before cpu_step (pc_clocks)
+    input  logic        cpu_prestep,    // the clk before cpu_step (the 8237's strobe end)
     input  logic        pit_clk,
 
     // the CPU
@@ -121,10 +124,25 @@ wire [7:0] cpu_dout = cpu_ad[7:0];      // write data from T2 on
 // in its T4, and the registers are cleared in any clk whose T-state is not
 // T1-Tw, so whenever a command register is set the status is the one it was
 // set for (checked in simulation against the original expressions below).
+//
+// The commands end at the CLK edge where T4 begins (cyc_end): the board knows
+// in the clk before that edge that the CPU enters T4, from READY at the edge
+// that started the running T3/Tw (biu88 decides there whether that state is
+// the last; t3_last mirrors its flag, checked in simulation). pc10-iii,
+// 28.63636 MHz: on the 100 MHz clock the commands ended one clk after T4
+// began, before anything on the card bus ticked again; at 28.63636 MHz one clk
+// is half an OSC tick, and a card's dot tick in that half (cga_card.sv) must
+// see the strobe end as it did then.
 logic cmd_memr, cmd_memw, cmd_ior, cmd_iow, cmd_inta;
 wire  in_cycle = cpu_bus_t == T1 || cpu_bus_t == T2 || cpu_bus_t == T3 || cpu_bus_t == TW;
+wire  in_t3tw  = cpu_bus_t == T3 || cpu_bus_t == TW;
+logic t3_last;                          // biu88's: the running T3/Tw is the last
+always_ff @(posedge clk)
+    if (reset) t3_last <= 1'b1;
+    else if (cpu_step && (cpu_bus_t == T2 || (in_t3tw && !t3_last))) t3_last <= cpu_ready;
+wire  cyc_end  = cpu_step && in_t3tw && t3_last;    // this CLK edge starts T4
 always_ff @(posedge clk) begin
-    if (reset || !in_cycle) begin
+    if (reset || !in_cycle || cyc_end) begin
         cmd_memr <= 1'b0;  cmd_memw <= 1'b0;
         cmd_ior  <= 1'b0;  cmd_iow  <= 1'b0;  cmd_inta <= 1'b0;
     end else if (cpu_fall) begin
@@ -140,17 +158,19 @@ always_ff @(posedge clk) begin
     end
 end
 logic aen;                              // DMA owns the bus
-// The CPU's commands come back one clk after AEN falls (cmd_en). AEN falls in
-// the clk in which the 8237 ends its commands (S4, aen_next below), so a CPU
-// command that the DMA held would otherwise continue the 8237's strobe of the
-// same kind without a high phase: a refresh's IOW running straight into the
-// CPU's OUT. A card that decodes at the strobe's start (fdc_card) then sees
-// one DMA strobe and drops the CPU's write (lost DOR reset write, 2026-10-22:
-// the floppy boot broken since 387e87e). On the 5160 the 8288 enables its
-// commands well after AEN (tAELCV); here one clk is the gap, so the CPU-clock
-// timing (READY, trace) is unchanged.
-logic aen_d;
-wire  cmd_en   = !aen && !aen_d;
+// The CPU's commands are enabled while AEN is low (the 8288's AEN). AEN falls
+// at the CLK edge that ends S4, and the 8237 ends its strobes one clk before
+// that edge (cpu_prestep, KF8237), so a CPU command that the DMA held starts
+// after a high phase of the line: without it the CPU's command would continue
+// the 8237's strobe of the same kind (a refresh's IOW running straight into
+// the CPU's OUT), and a card that decodes at the strobe's start (fdc_card)
+// would see one DMA strobe and drop the CPU's write (lost DOR reset write,
+// 2026-10-22). On the 5160 the 8288 enables its commands well after AEN
+// (tAELCV). pc10-iii, 28.63636 MHz: on the 100 MHz clock the gap was one clk
+// after AEN fell (aen_d); here that clk would be half an OSC tick, after the
+// cards' next dot tick, so the gap moved to the clk before the edge instead
+// (the CPU-clock and OSC-tick timing are unchanged).
+wire  cmd_en   = !aen;
 wire  cpu_memr = cmd_memr && cmd_en;
 wire  cpu_memw = cmd_memw && cmd_en;
 wire  cpu_ior  = cmd_ior  && cmd_en;
@@ -164,7 +184,7 @@ wire  is_read  = cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR ||
                  cpu_bus_type == ST_IOR  || cpu_bus_type == ST_INTA;
 wire  is_write = cpu_bus_type == ST_MEMW || cpu_bus_type == ST_IOW;
 always_ff @(posedge clk) begin
-    if (reset || !in_cycle) begin
+    if (reset || !in_cycle || cyc_end) begin
         cmd_rd <= 1'b0;
         cmd_wr <= 1'b0;
     end else if (cpu_fall) begin
@@ -174,12 +194,22 @@ always_ff @(posedge clk) begin
 end
 always_ff @(posedge clk)
     if (!reset && (
-        cpu_memr != (cmd_rd && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) && !aen && !aen_d) ||
-        cpu_memw != (cmd_wr && cpu_bus_type == ST_MEMW && !aen && !aen_d) ||
-        cpu_ior  != (cmd_rd && cpu_bus_type == ST_IOR && !aen && !aen_d) ||
-        cpu_iow  != (cmd_wr && cpu_bus_type == ST_IOW && !aen && !aen_d) ||
+        cpu_memr != (cmd_rd && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) && !aen) ||
+        cpu_memw != (cmd_wr && cpu_bus_type == ST_MEMW && !aen) ||
+        cpu_ior  != (cmd_rd && cpu_bus_type == ST_IOR && !aen) ||
+        cpu_iow  != (cmd_wr && cpu_bus_type == ST_IOW && !aen) ||
         inta     != (cmd_rd && cpu_bus_type == ST_INTA)))
         $fatal(1, "xt_board: command registers differ from the 8288 function");
+// t3_last is biu88's: a step that ends a T3/Tw starts T4 exactly when cyc_end
+// said so (in the clk after a step, bus_t is T4 only if that step started it)
+logic step_q, cyc_end_q;
+always_ff @(posedge clk) begin
+    step_q    <= cpu_step;
+    cyc_end_q <= cyc_end;
+end
+always_ff @(posedge clk)
+    if (!reset && step_q && cyc_end_q != (cpu_bus_t == T4))
+        $fatal(1, "xt_board: the start of T4 mispredicted (t3_last)");
 `endif
 
 // ------------------------------------------------------------ DMA: hold logic
@@ -204,7 +234,6 @@ always_comb begin
 end
 always_ff @(posedge clk) begin
     aen      <= aen_next;
-    aen_d    <= aen;                    // the CPU's command enable (cmd_en above)
     dma_wait <= dma_wait_next;
     if (reset) begin
         hrq_ff1 <= 1'b0;  hrq_ff2 <= 1'b0;
@@ -246,11 +275,12 @@ KF8237 u_dma (
     .clock                  (clk),
     .cpu_ce_posedge         (cpu_step),
     .cpu_ce_negedge         (cpu_fall),
+    .cpu_ce_preposedge      (cpu_prestep),          // pc10-iii: strobes end here in S4
     .reset                  (reset),
     .chip_select_n          (~cs_dma),
     .ready                  (isa_ready),            // CAL: XT DMA wait state
     .hold_acknowledge       (aen),           // the gated grant (see aen); CAL
-    .dma_request            ({isa_drq, drq0}),
+    .dma_request            ({isa_drq, drq0_next}), // pc10-iii: DRQ0's D input (below)
     .data_bus_in            (bus_wdata),
     .data_bus_out           (dma_dout),
     .io_read_n_in           (io_rd_n),
@@ -348,20 +378,30 @@ KF8253 #(.COUNTER_1_OUT_INIT(1'b1)) u_pit (
 
 assign speaker = out2 & pb_drv & pb[1];
 
-// DRQ0: a rising OUT1 sets the refresh request, DACK0 clears it (74LS74)
-logic out1_d, out1_s;
+// DRQ0: a rising OUT1 sets the refresh request, DACK0 clears it (74LS74).
+// The 8237 gets the flip-flop's D input (drq0_next): its own DREQ register
+// (KF8237, dma_request_ff) is then the flip-flop. pc10-iii, 28.63636 MHz: OUT1
+// changes at a rising CLK edge (the 8253 counts there) and the 8237 decides
+// at the falling edge 2 clk later; with both registers in the way it would
+// see the request one CPU clock later than on the 100 MHz clock.
+logic out1_d, out1_s, drq0_next;
 generate if (DRQ0_SKEW == 0) begin : g_drq0
     assign out1_s = out1;
 end else begin : g_drq0_skew
-    logic [DRQ0_SKEW*21-1:0] sh;
-    always_ff @(posedge clk) sh <= {sh[DRQ0_SKEW*21-2:0], out1};
-    assign out1_s = sh[DRQ0_SKEW*21-1];
+    localparam int SKEW_CLK = DRQ0_SKEW * CLK_PER_CPU;
+    logic [SKEW_CLK-1:0] sh;
+    always_ff @(posedge clk) sh <= {sh[SKEW_CLK-2:0], out1};
+    assign out1_s = sh[SKEW_CLK-1];
 end endgenerate
+always_comb begin
+    drq0_next = drq0;
+    if (reset) drq0_next = 1'b0;
+    else if (!dack_n[0]) drq0_next = 1'b0;
+    else if (out1_s && !out1_d) drq0_next = 1'b1;
+end
 always_ff @(posedge clk) begin
     out1_d <= out1_s;
-    if (reset) drq0 <= 1'b0;
-    else if (!dack_n[0]) drq0 <= 1'b0;
-    else if (out1_s && !out1_d) drq0 <= 1'b1;
+    drq0   <= drq0_next;
 end
 
 // ------------------------------------------------------------ 8259
@@ -504,11 +544,17 @@ wire  sel_rom = bus_addr[19:16] == 4'hF;
 wire  refresh = !dack_n[0];
 
 // the data a writing master drives: the CPU; in a DMA cycle the side being
-// read: the I/O card (I/O-to-memory) or the memory (memory-to-I/O)
+// read: the I/O card (I/O-to-memory) or the memory (memory-to-I/O). The
+// memory drives the bus until the CLK edge that ends S4, also in the clk
+// before it, where the 8237's MEMR has already gone high (KF8237
+// cpu_ce_preposedge): a strobe that was low in the clk before a cpu_step can
+// only have gone high there by that cut (strobes end in S4 only).
 logic [7:0] mem_rdata;
+logic       dma_rd_d;
+wire        dma_mem_src = !dma_memr_n || (dma_rd_d && cpu_step);
 always_comb begin
     if (!dma_owns)          bus_wdata = cpu_dout;
-    else if (!dma_memr_n)   bus_wdata = mem_rdata;
+    else if (dma_mem_src)   bus_wdata = mem_rdata;
     else                    bus_wdata = isa_din;
 end
 
@@ -517,7 +563,7 @@ end
 // when AEN falls, right after the 8237's (refresh: DACK0, no RAM access), so
 // the two strobes are one low level on the bus and only the owner tells them
 // apart
-logic       cpu_rd_d, cpu_wr_d, dma_rd_d, dma_wr_d;
+logic       cpu_rd_d, cpu_wr_d, dma_wr_d;
 logic [7:0] ram_q;
 always_ff @(posedge clk) begin
     cpu_rd_d <= cpu_memr;
@@ -563,7 +609,7 @@ always_comb begin
     cmd_iow_next  = cmd_iow;
     cmd_memr_next = cmd_memr;
     cmd_memw_next = cmd_memw;
-    if (reset || !in_cycle) begin
+    if (reset || !in_cycle || cyc_end) begin
         cmd_ior_next  = 1'b0;
         cmd_iow_next  = 1'b0;
         cmd_memr_next = 1'b0;
@@ -575,7 +621,7 @@ always_comb begin
         if (cpu_bus_t == T2 && cpu_bus_type == ST_MEMW) cmd_memw_next = 1'b1;
     end
 end
-wire  cmd_en_next = !aen_next && !aen;  // aen_d's D input is aen
+wire  cmd_en_next = !aen_next;
 assign isa_ior_n_next  = ~(cmd_ior_next  && cmd_en_next) & dma_ior_n_next;
 assign isa_iow_n_next  = ~(cmd_iow_next  && cmd_en_next) & dma_iow_n_next;
 assign isa_memr_n_next = ~(cmd_memr_next && cmd_en_next) & dma_memr_n_next;
@@ -670,21 +716,20 @@ always_ff @(posedge clk)
 // that ends T2, whether a Tw is the last by RDY at the edge that ends the
 // state before it. biu88 knows it already at that edge (it decides at the
 // step that starts T3/Tw whether that state is the last, as MartyPC fixes the
-// wait states at T2). It reads READY_IN on the step's clock (st_t3last; its
-// copy p1_ready for the step logic two clocks later), so READY is a register
-// loaded on rdy_ce, 2 clk before cpu_step (about the 8284's RDY setup time):
-// stable over the clock before the step and the step's own.
+// wait states at T2). It reads READY_IN on the step's clock, so READY is a
+// register loaded on rdy_ce, 1 clk (35 ns, about the 8284's RDY setup time)
+// before cpu_step: stable over the step's clock.
 //
-// A card sees MEMW/IOW (falling edge in T2, AMWC/AIOWC) 12 clk and MEMR/IOR
-// 33 clk before that sample, so a card that pulls IOCHRDY low on the strobe
+// A card sees MEMW/IOW (falling edge in T2, AMWC/AIOWC) 3 clk and MEMR/IOR
+// 9 clk before that sample, so a card that pulls IOCHRDY low on the strobe
 // stretches writes as well as reads (IBM: "drive it low immediately upon
 // detecting a valid address and a read or write command"). CAL: the CGA's
 // release (cga_card.sv) and MartyPC's WAIT_TABLE; doc/architecture.md
 // section 3.
 //
-// (Until 2026-10-22 IOCHRDY was synchronized at cpu_fall, the falling edge 7
-// clk into the state, with biu88 deciding at the next step: the same edge at
-// which MEMW/IOW start, so no write could wait.)
+// (Until 2026-10-22 IOCHRDY was synchronized at cpu_fall, the falling edge in
+// the state, with biu88 deciding at the next step: the same edge at which
+// MEMW/IOW start, so no write could wait.)
 //
 // The DMA wait (aen | dma_wait) changes only on cpu_step, so sampling it on
 // rdy_ce gives the value it had at cpu_fall: from the CPU clock where AEN
@@ -709,7 +754,6 @@ wire io_cycle = cpu_bus_type == ST_IOR || cpu_bus_type == ST_IOW;
 // wait states remain), first seen at reference clock 1,042,013 (an OUT with
 // the refresh in its T1).
 logic io_wait, dma_ok;
-wire  in_t3tw   = cpu_bus_t == T3 || cpu_bus_t == TW;
 wire  io_wait_n = io_wait && !dma_ok;
 always_ff @(posedge clk)
     if (reset) begin

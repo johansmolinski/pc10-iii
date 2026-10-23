@@ -2,7 +2,7 @@
 --   keyboard.vhd: make/break codes, the MEGA + digit Fn layer, the busy handshake
 --   pc_bios.vhd:  the window reads the RAM 1:1 (the firmware right-aligns the image), 0xFF
 --                 while the gate is closed
---   pc_ram.vhd:   6-clock read latency with ack, the size limit (0xFF above it)
+--   pc_ram.vhd:   2-clock read latency with ack, the size limit (0xFF above it)
 --   pc_font.vhd:  the default font copied into the font port after the reset, a 2 KB font
 --                 loaded by QNICE and copied to 0x1800 and 0x1000
 --   pc_ucode.vhd: a 6 KB bundle loaded by QNICE, read back, copied byte for byte into the
@@ -75,7 +75,7 @@ architecture sim of tb_glue is
    signal got       : t_codes(0 to 31);
    signal ngot      : natural := 0;
 begin
-   clk  <= not clk  after 5 ns  when not done;
+   clk  <= not clk  after 17.46 ns when not done;    -- 28.63636 MHz
    qclk <= not qclk after 10 ns when not done;
 
    -- the framework's scan: one key per 4 clocks
@@ -196,14 +196,14 @@ begin
             n := n + 1;
             exit when mack = '1';
          end loop;
-         assert n = 6 report "RAM ack after " & integer'image(n) & " TB waits (expected 6: ack 6 clocks after ram_en)" severity failure;
+         assert n = 2 report "RAM ack after " & integer'image(n) & " TB waits (expected 2: ack 2 clocks after ram_en)" severity failure;
          assert mrd = d report "RAM " & to_hstring(to_unsigned(a, 20)) & ": " & to_hstring(mrd)
                                 & " expected " & to_hstring(d) severity failure;
       end procedure;
       procedure key(k : natural; p : std_logic) is
       begin
          pressed(k) <= p;
-         wait for 2 us;
+         wait for 7 us;
       end procedure;
       constant exp : t_codes(0 to 7) := (x"1E", x"9E", x"3B", x"BB", x"02", x"82", x"2A", x"AA");
    begin
@@ -212,7 +212,7 @@ begin
       key(61, '1'); key(56, '1'); key(61, '0'); key(56, '0');     -- break of F1 although MEGA is up
       key(56, '1'); key(56, '0');
       key(15, '1'); key(15, '0');
-      wait for 2 us;
+      wait for 7 us;
       assert ngot = 8 report "got " & integer'image(ngot) & " codes" severity failure;
       for i in exp'range loop
          assert got(i) = exp(i) report "code " & integer'image(i) & ": " & to_hstring(got(i)) severity failure;
@@ -227,7 +227,7 @@ begin
       qwrite(13, 4095, 16#FF#);
       romchk(16#E000#, x"FF");                -- gate closed
       qwrite(16#0100#, 2, 1);
-      wait for 1 us;
+      wait for 4 us;
       assert bvalid = '1' report "BIOS not valid" severity failure;
       romchk(16#0000#, x"FF");
       romchk(16#DFFF#, x"FF");
@@ -252,7 +252,7 @@ begin
 
       -- font: the default after the reset ('A' row 1 = 0x78, thin = 0x78 and not 0x3C = 0x40)
       mrst <= '0';
-      wait for 100 us;
+      wait for 400 us;
       assert font_wr = 8192 report "default font: " & integer'image(font_wr) & " writes" severity failure;
       assert font(16#1800# + 16#41# * 8 + 1) = x"78" and font(16#1000# + 16#41# * 8 + 1) = x"40" and
              font(16#1800# + 16#C1# * 8 + 1) = x"00" and font(0) = x"00"
@@ -273,7 +273,7 @@ begin
       fqaddr <= x"0100" & x"002"; fqwe <= '1';
       wait until rising_edge(qclk);
       fqce <= '0'; fqwe <= '0';
-      wait for 100 us;
+      wait for 400 us;
       assert font_wr = 8192 + 4096 report "2 KB font: " & integer'image(font_wr - 8192) & " writes" severity failure;
       for i in 0 to 2047 loop
          assert font(16#1800# + i) = (std_logic_vector(to_unsigned(i mod 256, 8)) xor x"3C") and
@@ -298,13 +298,13 @@ begin
       wait until rising_edge(qclk);
       assert uqdout = x"1800" report "bundle size " & to_hstring(uqdout) severity failure;
       uqce <= '0';
-      wait for 2 us;
+      wait for 7 us;
       assert uvalid = '0' and ucl_n = 0 report "bundle valid or copied before GO" severity failure;
       wait until rising_edge(qclk);
       uqaddr <= x"0100" & x"002"; uqce <= '1'; uqwe <= '1';
       wait until rising_edge(qclk);
       uqce <= '0'; uqwe <= '0';
-      wait for 100 us;
+      wait for 400 us;
       assert ucl_n = 6144 and ucl_bad = 0 and ucl_wr_valid = 0
          report "bundle copy: " & integer'image(ucl_n) & " writes, " & integer'image(ucl_bad) & " wrong, " &
                 integer'image(ucl_wr_valid) & " while valid" severity failure;
@@ -313,7 +313,7 @@ begin
       uqaddr <= x"0100" & x"004"; uqce <= '1'; uqwe <= '1';
       wait until rising_edge(qclk);
       uqce <= '0'; uqwe <= '0';
-      wait for 2 us;
+      wait for 7 us;
       assert uvalid = '0' report "bundle still valid after forget" severity failure;
 
       report "PASS: keyboard, BIOS alignment, RAM latency and size, CGA font, microcode bundle";

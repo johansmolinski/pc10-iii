@@ -29,7 +29,7 @@
 // (MartyPC: the EU acts between two cycles). What the EU sees (the queue
 // head, its IP, the T-state, done and the read data) are registers set at the
 // step. There is nothing per core clock any more: the whole state changes at
-// `step` only (rtl/cpu/cpu8088.xdc: multicycle paths), except the test-only
+// `step` only, except the test-only
 // queue preload.
 //
 // Done (`done`, for the clock after the step): a read when its last byte's T4

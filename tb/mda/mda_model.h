@@ -2,7 +2,7 @@
 // tb/mda.
 //
 // Written from the reading of IBM's MDA logic diagrams in doc/mda.md (not
-// from the HDL), stepped once per clk (100.2273 MHz) like the card:
+// from the HDL), stepped once per clk (28.63636 MHz) like the card:
 //   - the crystal as a fractional accumulator (rising and falling edge);
 //   - the 9-state character counter, CCLK, the 6845 stepping when CCLK rises;
 //   - the CPU slot: request sampled at 4Q, IOCHRDY at the CCLK falling edge;
@@ -20,7 +20,8 @@
 
 struct MdaModel {
     bool herc = false;
-    uint32_t inc = 59609, mod = 367500, acc = 0;
+    uint32_t inc = 59609, mod = 105000, acc = 0;
+    bool fall_pend = false;
     bool hres_stop = true;
     bool cga_fitted = false;
 
@@ -54,7 +55,7 @@ struct MdaModel {
     int ap_x = 144, ap_w = 738, ap_y = 16, ap_h = 354;
 
     explicit MdaModel(bool h) : herc(h), mem(h ? 65536 : 4096, 0) {
-        if (h) { inc = 704; mod = 4410; hres_stop = false; }
+        if (h) { inc = 352; mod = 630; hres_stop = false; }
     }
 
     bool m_hres() const { return mode & 0x01; }
@@ -172,7 +173,10 @@ struct MdaModel {
     Out step(bool memr, bool memw, bool ior, bool iow, uint32_t a, uint8_t d) {
         Out o{false, false, false, false, false, false, false};
         uint32_t n = acc + inc;
-        bool rise = n >= mod, fall = acc < mod / 2 && n >= mod / 2;
+        // a falling edge after the rising one in the same clk counts in the
+        // next clk (at 28.63636 MHz a dot is 1.76 clk)
+        bool rise = n >= mod, fall = (acc < mod / 2 && n >= mod / 2) || fall_pend;
+        fall_pend = n >= mod + mod / 2;
         acc = rise ? n - mod : n;
         bool run = !hres_stop || m_hres();
         rise = rise && run;

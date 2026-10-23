@@ -70,19 +70,10 @@ if not stub:
 tail = tail.replace("      <Config>", "      <Config>" + opts, 1)
 x = x[:m.start()] + head + "".join(keep) + tail + x[m.end():]
 
-# the 8088's timing exceptions, scoped to its module (doc/cpu-timing.md)
-CPU_XDC = ('      <File Path="$PPRDIR/../rtl/cpu/cpu8088.xdc">\n        <FileInfo>\n'
-           '          <Attr Name="ScopedToRef" Val="cpu8088"/>\n'
-           '          <Attr Name="UsedIn" Val="synthesis"/>\n'
-           '          <Attr Name="UsedIn" Val="implementation"/>\n'
-           '        </FileInfo>\n      </File>\n')
-def add_cpu_xdc(x):
-    if 'cpu8088.xdc' in x:
-        return x
-    m = re.search(r'(<FileSet Name="constrs_1".*?)(      <Config>)', x, re.S)
-    return x[:m.end(1)] + CPU_XDC + x[m.end(1):]
-if not stub:
-    x = add_cpu_xdc(x)
+# no constraints of the 8088's own any more (rtl/cpu/cpu8088.xdc held multicycle paths for the
+# 100.2273 MHz clock; at 28.63636 MHz every path is a single-clock one, doc/clock-plan.md): drop
+# the entry from a project generated before
+x = re.sub(r'      <File Path="\$PPRDIR/../rtl/cpu/cpu8088.xdc">.*?</File>\n', '', x, flags=re.S)
 
 # the project's own path and id are rewritten by Vivado on open; give it a neutral path
 x = re.sub(r'<Project Version="7" Minor="61" Path="[^"]*"',

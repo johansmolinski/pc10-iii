@@ -105,19 +105,19 @@ static bool read_test(std::istream &in, Test &t) {
 
 struct Sim {
     std::unique_ptr<Vtb_z86> top;
-    double phase = 0.0;               // 8088 CLK phase in periods
-    static constexpr double STEP = 4.7727272 / 100.0;  // per 100 MHz core clock
+    // the PC's clock: 28.63636 MHz, an 8088 clock (4.77 MHz) every CPU_CLK
+    // core clocks, CLK high for the first 2 (the 8284's 1/3 duty)
+    static constexpr int CPU_CLK = 6;
+    int sub = 0;                      // core clock in the 8088 clock (0: CLK rose)
     uint64_t core_clocks = 0;
 
     Sim() : top(new Vtb_z86) {}
 
     // One core clock. Returns true when CLK rose (an 8088 cycle boundary).
     bool step() {
-        double next = phase + STEP;
-        bool rose = (int)next != (int)phase;
-        phase = next;
-        double frac = phase - (int)phase;
-        top->clk = frac < (1.0 / 3.0);
+        sub = sub == CPU_CLK - 1 ? 0 : sub + 1;
+        bool rose = sub == 0;
+        top->clk = sub < CPU_CLK / 3;
         top->step = rose;           // biu88 advances at the CLK rising edge
         top->core_clk = 0; top->eval();
         top->core_clk = 1; top->eval();
@@ -169,14 +169,13 @@ static bool g_dump = false;   // -d: print every bus cycle of the test
 static bool g_prefix = false; // -p: compare only up to the first EU bus cycle's T1
 static long g_cyc = 0;        // 8088 cycle number (for -d)
 
-static double g_phase = -1.0;   // -P: the CLK phase at each test's start (0 <= p < Sim::STEP
-                                // places the 20-core-clock periods, one in ~21)
-static int g_sweep = 0;         // -S n: run each test at n phases
+static int g_phase = -1;        // -P: the core clock in the 8088 clock at each test's start (0..5)
+static int g_sweep = 0;         // -S n: run each test at n such phases
 static bool g_lag = false;      // -L: dispatch lag (see Result::lag) in -l lines, and per file
 
 static Result run_test(Sim &sim, const Test &t) {
     Result r;
-    if (g_phase >= 0.0) sim.phase = (double)(long)sim.phase + g_phase;
+    if (g_phase >= 0) sim.sub = g_phase % Sim::CPU_CLK;
     r.prefetched = !t.queue.empty();
     if (g_dump) printf("=== test %d\n", t.idx);
     auto &top = sim.top;
@@ -520,7 +519,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-r")) only_reg = true;
         else if (!strcmp(argv[i], "-p")) g_prefix = true;
         else if (!strcmp(argv[i], "-m")) only_mem = true;
-        else if (!strcmp(argv[i], "-P") && i + 1 < argc) g_phase = atof(argv[++i]);
+        else if (!strcmp(argv[i], "-P") && i + 1 < argc) g_phase = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-S") && i + 1 < argc) g_sweep = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-L")) g_lag = true;
         else if (argv[i][0] != '+') files.push_back(argv[i]);
@@ -558,7 +557,7 @@ int main(int argc, char **argv) {
                 // the test at g_sweep CLK phases: it passes only if it passes at all
                 bool all_st = true, all_tr = true;
                 for (int k = 0; k < g_sweep; k++) {
-                    g_phase = Sim::STEP * k / g_sweep;   // the 20-clock periods move
+                    g_phase = Sim::CPU_CLK * k / g_sweep;
                     r = run_test(sim, t);
                     all_st = all_st && r.state_ok;
                     all_tr = all_tr && r.trace_ok;
@@ -570,8 +569,8 @@ int main(int argc, char **argv) {
             n++;
             if (!r.ran) tmo++;
             if (r.lag > lag_max) lag_max = r.lag;
-            if (r.lag > 21) lag1++;
-            if (r.lag > 42) lag2++;
+            if (r.lag > Sim::CPU_CLK) lag1++;
+            if (r.lag > 2 * Sim::CPU_CLK) lag2++;
             if (r.state_ok) st++;
             if (true) {
                 plain++;

@@ -1,10 +1,12 @@
 // mda_run.cpp - Verilator testbench for rtl/video/mda (doc/mda.md section 8).
 //
 // The card is driven by a model of the pc10-iii system board's bus timing
-// (rtl/system/xt_board.sv: 8288 command edges, IOCHRDY sampled on rdy_ce, 2
-// clk before the rising CLK edge that ends a state, one wait state on CPU I/O
-// cycles; biu88.v: at the edge that starts T3/Tw the CPU knows from READY
-// whether that state is the last) with the clock enables of pc_clocks.sv. Next to it runs mda_model.h, a C++ model written from the
+// (rtl/system/xt_board.sv: 8288 command edges, the commands ending at the CLK
+// edge where T4 begins, IOCHRDY sampled on rdy_ce, 1 clk before the rising CLK
+// edge that ends a state, one wait state on CPU I/O cycles; biu88: at the edge
+// that starts T3/Tw the CPU knows from READY whether that state is the last)
+// with the clock enables of pc_clocks.sv on the 28.63636 MHz clock (2 clk per
+// OSC tick, 6 per CPU clock). Next to it runs mda_model.h, a C++ model written from the
 // IBM logic diagrams, stepped on the same clk. Every clk, the card's IOCHRDY
 // is compared with the model; every dot (video, intensity, syncs, window)
 // and every read are compared too. Tests (MDA build):
@@ -67,7 +69,7 @@ struct Sim {
     Vmda_card *top;
     MdaModel g;
     uint64_t clk_n = 0;
-    int c7 = 0, c21 = 0;
+    int c2 = 0, c6 = 0;
 
     enum TS { TI, T1, T2, T3, TW, T4 } ts = TI;
     std::deque<Op> q;
@@ -139,7 +141,7 @@ struct Sim {
     }
 
     void step() {
-        bool ce = c7 == 0, cs = c21 == 0, cf = c21 == 7, cr = c21 == 19;
+        bool ce = c2 == 0, cs = c6 == 0, cf = c6 == 2, cr = c6 == 5;
         (void)ce;
         top->clk = 0;
         top->eval();
@@ -217,6 +219,7 @@ struct Sim {
             case TW:
                 if (t3_last) {
                     ts = T4;
+                    ncmd_rd = ncmd_wr = false;   // the commands end at this edge
                     tw_hist[kind()][tw]++;
                     if (cur.t == Op::MEMR || cur.t == Op::MEMW) {
                         // MartyPC: phase = (MDA clock + 1) & 15 at the end of T2
@@ -249,8 +252,8 @@ struct Sim {
         }
         cmd_rd = ncmd_rd;
         cmd_wr = ncmd_wr;
-        c7 = c7 == 6 ? 0 : c7 + 1;
-        c21 = c21 == 20 ? 0 : c21 + 1;
+        c2 = c2 == 1 ? 0 : c2 + 1;
+        c6 = c6 == 5 ? 0 : c6 + 1;
 
         top->clk = 1;
         top->eval();
@@ -429,16 +432,17 @@ static void test_waits(const std::vector<uint8_t> &font) {
             lo = std::min(lo, e.first); hi = std::max(hi, e.first);
         }
         printf("   (mean %.2f)\n", (double)sum / n);
-        // the slot: IOCHRDY 5.5 to 14.5 dots (34-89 clk) after the strobe.
-        // The board samples IOCHRDY 2 clk before the edge that ends T2, T3,
-        // Tw...: 32 + 21k clk after the card sees MEMR/IOR (falling edge in
-        // T1), 11 + 21k after MEMW/IOW (falling edge in T2), so reads get 1-3
+        // the slot: IOCHRDY 5.5 to 14.5 dots (9.7-25.6 clk) after the strobe.
+        // The board samples IOCHRDY 1 clk before the edge that ends T2, T3,
+        // Tw...: 9 + 6k clk after the card sees MEMR/IOR (falling edge in
+        // T1), 3 + 6k after MEMW/IOW (falling edge in T2), so reads get 1-3
         // wait states, writes 2-4 (doc/mda.md 4.2). The 6845 read here
-        // follows the 6845 write to 3B4 at a nearly fixed slot phase: 1-2.
+        // follows the 6845 write to 3B4 at a nearly fixed slot phase: 1-2,
+        // rarely 3 (the dot edges are on a 35 ns grid at 28.63636 MHz).
         if (h.first == "MEMR") CHECK(lo == 1 && hi == 3, "MEMR waits %d-%d, expected 1-3", lo, hi);
         if (h.first == "MEMW") CHECK(lo == 2 && hi == 4, "MEMW waits %d-%d, expected 2-4", lo, hi);
         if (h.first == "IOR 3B8-F") CHECK(lo == 1 && hi == 1, "3BA waits %d-%d, expected 1 (the board's)", lo, hi);
-        if (h.first == "IOR 6845") CHECK(lo == 1 && hi == 2, "6845 IOR waits %d-%d, expected 1-2", lo, hi);
+        if (h.first == "IOR 6845") CHECK(lo == 1 && hi >= 2 && hi <= 3, "6845 IOR waits %d-%d, expected 1-2 (3)", lo, hi);
         if (h.first == "IOW 6845") CHECK(lo == 2 && hi == 4, "6845 IOW waits %d-%d, expected 2-4", lo, hi);
     }
     int n = 0, sum = 0;

@@ -4,7 +4,7 @@
 // and floppy ports are ignored / tied off.
 //
 // What it does, so that every path of the shell can be checked on the screen:
-//   * video: a CGA-like raster on the 14.31818 MHz enable (clk / 7): 912 dots x 262 lines
+//   * video: a CGA-like raster on the 14.31818 MHz enable (clk / 2): 912 dots x 262 lines
 //     (15.70 kHz, 59.92 Hz), 640 x 200 active, hsync dots 720-799, vsync lines 224-226,
 //     blanks covering the syncs. Text (8 x 8 font) shows the values below, then 16 colour
 //     bars of the RGBI palette, inside a white one-pixel frame.
@@ -25,7 +25,7 @@
 module pc_system #(
     parameter int RAM_KB = 640
 ) (
-    input  logic        clk,          // 100.2273 MHz
+    input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high
 
     output logic [19:0] ram_addr,
@@ -202,9 +202,9 @@ module pc_system #(
     // 14.31818 MHz enable
     // ------------------------------------------------------------------------------------
 
-    logic [2:0] div7 = '0;
-    always_ff @(posedge clk) div7 <= (div7 == 3'd6) ? 3'd0 : div7 + 3'd1;
-    wire ce_14m = (div7 == 3'd0);
+    logic div2 = 1'b0;
+    always_ff @(posedge clk) div2 <= !div2;
+    wire ce_14m = !div2;
     assign vid_ce = ce_14m;
 
     // ------------------------------------------------------------------------------------
@@ -238,7 +238,7 @@ module pc_system #(
         if (busy_cnt != 0) busy_cnt <= busy_cnt - 14'd1;
         if (beep != 0) begin
             beep <= beep - 24'd1;
-            if (tone == 16'd50112) begin
+            if (tone == 16'd14317) begin           // ~1 kHz
                 tone <= '0;
                 spk  <= ~spk;
             end else
@@ -248,8 +248,8 @@ module pc_system #(
         if (kbd_valid && busy_cnt == 0) begin
             last_code  <= kbd_code;
             code_count <= code_count + 16'd1;
-            busy_cnt   <= 14'd10023;                  // 100 us
-            if (!kbd_code[7]) beep <= 24'd10_022_727; // 100 ms
+            busy_cnt   <= 14'd2864;                   // 100 us
+            if (!kbd_code[7]) beep <= 24'd2_863_636;  // 100 ms
         end
         if (reset) begin
             last_code  <= '0;

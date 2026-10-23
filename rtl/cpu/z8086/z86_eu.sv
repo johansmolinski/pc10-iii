@@ -8,8 +8,7 @@
 // NOTICE). pc10-iii changes (z8086-eval and z86, 2026-10-22), marked
 // "pc10-iii":
 //   - clock enable `ce`: one microinstruction per 8088 clock. Every register
-//     of this module changes only at ce (rtl/cpu/cpu8088.xdc: multicycle
-//     paths);
+//     of this module changes only at ce;
 //   - the Intel tables are not logic here: the microcode, its address decoder,
 //     the translation ROM and the group decode ROM are RAMs in z86_tables.sv,
 //     loaded from the microcode bundle (AGENTS.md rule 4);

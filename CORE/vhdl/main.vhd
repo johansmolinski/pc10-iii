@@ -6,15 +6,13 @@
 -- the MEGA65: keyboard, video into M2M, audio. RAM, BIOS ROM, CGA font loader and the floppy
 -- backend are owned by mega65.vhd.
 --
--- Video: pc_system gives RGBI on the 14.31818 MHz enable (every 7th main clock); M2M's video
--- pipeline runs on video_clk = 28.63636 MHz = 2 x OSC from the same MMCM (clk.vhd), so it is not
--- timed at 100 MHz. A pixel lasts 7 main clocks = exactly 2 video clocks: every video clock
--- takes the pixel registers of pc_system (a synchronous crossing, the clocks are related), so
--- each pixel is seen in two consecutive video clocks, and a free-running video_ce at every
--- second video clock picks each pixel once. RGBI becomes 8-bit RGB with the IBM 5153's brown
--- (colour 6 = dark yellow with half green). The syncs are active high and the blanks cover
--- them already (contract, architecture.md section 4), as M2M wants (Megamiga hard rule 6).
--- video_ce_ovl_o, the doubled enable for the analog OSM, is every video clock.
+-- Video: pc_system gives RGBI on the 14.31818 MHz enable (vid_ce = ce_14m, every second clock).
+-- The PC and M2M's video pipeline run on the one 28.63636 MHz clock (clk.vhd, video_clk =
+-- main_clk), so the pixel, the syncs, the blanks and the enable are registered together and
+-- handed over as they are: one pixel per video_ce. RGBI becomes 8-bit RGB with the IBM 5153's
+-- brown (colour 6 = dark yellow with half green). The syncs are active high and the blanks
+-- cover them already (contract, architecture.md section 4), as M2M wants (Megamiga hard rule
+-- 6). video_ce_ovl_o, the doubled enable for the analog OSM, is every clock.
 --
 -- done by Johan Smolinski in 2026, based on the MiSTer2MEGA65 template (sy2002 and
 -- MJoergen), licensed under GPL v3
@@ -29,11 +27,10 @@ entity main is
       G_RAM_KB                : natural := 640
    );
    port (
-      clk_main_i              : in  std_logic;
+      clk_main_i              : in  std_logic;     -- 28.63636 MHz, also M2M's video clock
       reset_i                 : in  std_logic;     -- synchronous, high active (all reset sources)
-      clk_video_i             : in  std_logic;     -- 28.63636 MHz, related to clk_main_i
 
-      -- Video output (on clk_video_i with video_ce_o)
+      -- Video output (on clk_main_i with video_ce_o)
       video_ce_o              : out std_logic;
       video_ce_ovl_o          : out std_logic;
       video_red_o             : out std_logic_vector(7 downto 0);
@@ -266,15 +263,15 @@ begin
    -- Video
    ---------------------------------------------------------------------------------------------
 
-   p_video : process (clk_video_i)
+   p_video : process (clk_main_i)
    begin
-      if rising_edge(clk_video_i) then
+      if rising_edge(clk_main_i) then
          v_rgbi <= vid_rgbi;
          v_hs   <= vid_hsync;
          v_vs   <= vid_vsync;
          v_hb   <= vid_hblank;
          v_vb   <= vid_vblank;
-         v_ce   <= not v_ce;
+         v_ce   <= vid_ce;
       end if;
    end process p_video;
 
