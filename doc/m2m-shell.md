@@ -307,8 +307,9 @@ $R fetch <name> R6                                   # -> ~/pcxt-work/builds/<na
 
 `build_bitstream.tcl` writes the bitstream in any case and prints one
 `RESULT` line: `SIGNOFF-FAILED` (a gate), `TIMING-FAILED` (WNS or WHS < 0)
-or `OK`. Gates: `main_clk` 9.977 ns and `video_clk` 34.921 ns, the multicycle target of
-the floppy geometry exists, `pc_ram` has its 160 block RAMs. It also writes
+or `OK`. Gates: `main_clk` 34.921 ns (the one PC clock since clk28; the old
+`video_clk` and the floppy geometry's multicycle target are gone), `pc_ram` has its
+160 block RAMs. It also writes
 `utilization_hierarchical.rpt` and `worst_paths.rpt` (50 paths, one per
 group) next to the bitstream; `rbuild.sh fetch` copies them.
 
