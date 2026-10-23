@@ -9,6 +9,7 @@ module KF8237 (
     input   logic           clock,
     input   logic           cpu_ce_posedge,
     input   logic           cpu_ce_negedge,
+    input   logic           cpu_ce_preposedge,      // pc10-iii: the clk before cpu_ce_posedge
     input   logic           reset,
     input   logic           chip_select_n,
     input   logic           ready,
@@ -197,6 +198,7 @@ module KF8237 (
         .clock                              (clock),
         .cpu_clock_posedge                  (cpu_ce_posedge),
         .cpu_clock_negedge                  (cpu_ce_negedge),
+        .cpu_clock_preposedge               (cpu_ce_preposedge),
         .reset                              (reset),
 
         // Internal Bus

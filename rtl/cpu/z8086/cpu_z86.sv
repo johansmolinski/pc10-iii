@@ -2,20 +2,22 @@
 // per 8088 clock) and biu88, the cycle-stepped 8088 BIU, with the real chip's
 // EU/BIU split (doc/z8086.md).
 //
-// Clocking: everything runs on `clk`. biu88 steps at `step` (one clk per 8088
-// clock, at the CLK rising edge): it takes the EU's events of the last 8088
-// clock and runs this clock's cycle. The EU's clock enable is `step` delayed
-// by EU_DELAY clk, so that the EU sees the BIU after the step (the queue after
-// a T4 push, a transfer done); the EU's outputs are registers it sets there,
-// which biu88 takes at the next step. Nothing else happens per clk: both
-// change state once per 8088 clock (rtl/cpu/cpu8088.xdc). INTR, NMI and TEST
-// are sampled at the 8088 clock edge.
+// Clocking: everything runs on `clk` (28.63636 MHz in the PC, 6 clk per 8088
+// clock). biu88 steps at `step` (one clk per 8088 clock, at the CLK rising
+// edge): it takes the EU's events of the last 8088 clock and runs this clock's
+// cycle. The EU's clock enable is `step` delayed by EU_DELAY clk (pc10-iii: 1,
+// the clk after the step), so that the EU sees the BIU after the step (the
+// queue after a T4 push, a transfer done); the EU's outputs are registers it
+// sets there, which biu88 takes at the next step. Nothing else happens per
+// clk: both change state once per 8088 clock, and every path between them is
+// an ordinary single-clock path (biu88 -> EU: EU_DELAY = 1 clk). INTR, NMI and
+// TEST are sampled at the 8088 clock edge.
 //
 // The microcode tables (z86_tables.sv) are loaded through ucl_* (the bundle
 // file, one byte per clk) while the CPU is held in reset.
 
 module cpu_z86 #(
-    parameter int EU_DELAY = 3,
+    parameter int EU_DELAY = 1,         // >= 1, < the 8088 clock in clk
     parameter bit OVERLAY  = 1'b0
 ) (
     input             clk,
@@ -58,7 +60,11 @@ module cpu_z86 #(
 
 // ------------------------------------------------------------------ EU clock enable
 reg [EU_DELAY-1:0] ce_sr = '0;
-always @(posedge clk) ce_sr <= {ce_sr[EU_DELAY-2:0], step};
+generate if (EU_DELAY == 1) begin : g_ce1
+    always @(posedge clk) ce_sr <= step;
+end else begin : g_cen
+    always @(posedge clk) ce_sr <= {ce_sr[EU_DELAY-2:0], step};
+end endgenerate
 wire ce_step = ce_sr[EU_DELAY-1];
 // in reset the EU is clocked every clk, so that its reset takes at any length
 wire ce = ce_step | reset;

@@ -27,14 +27,15 @@ CGA uses (no IRQ, no DRQ), plus `isa_dsel` (the card drives `isa_din`, as
 | `vid_rgbi[3:0]`, `vid_hsync`, `vid_vsync`, `vid_hblank`, `vid_vblank` | video, one dot per `ce_14m` (section 6.6) |
 | `comp_*` | raw signals for a composite model (section 7) |
 
-Parameters: `CE_DELAY` (6), `DC_RESET` (0), `RD_LEAD` (6), `WR_LEAD` (3),
+Parameters: `CE_DELAY` (1), `DC_RESET` (0), `RD_LEAD` (6), `WR_LEAD` (3),
 `SNOW` (1), and the display window `AP_X/AP_W/AP_Y/AP_H` (128/768/17/245).
 
 Size (Vivado 2022.2, xc7a200t-2, out of context, `tools/ooc/cga_ooc.tcl`):
 480 LUTs, 415 flip-flops, 6 BRAM tiles (16 KB video RAM, 8 KB character
 ROM). Timing at 100.2273 MHz met with +2.15 ns; the worst path is the
 6845's character-clock update (the light pen copy of MA). Reports:
-`~/pcxt-work/ooc/cga-ooc-a/`.
+`~/pcxt-work/ooc/cga-ooc-a/`. (Measured before the move to 28.63636 MHz,
+which added the display delay line of section 2: about 90 flip-flops more.)
 
 ## 2. Clocking: when things happen
 
@@ -47,19 +48,39 @@ first "caught up" to t, then the access acts. So:
 - the wait states of a memory access depend on the CGA's phase at the end of
   T2.
 
-In the card, the dot clock is `ce_14m` delayed by `CE_DELAY` = 6 clk, one
-clk before the next `ce_14m`. In `pc_clocks`, `cpu_step` and `cpu_fall`
-always fall on a `ce_14m` clk, and the board's registers change at the end
-of those clks. The card has therefore finished its update for an instant one
-clk before the board's edge of the same instant:
+In the card, the dot clock is `ce_14m` delayed by `CE_DELAY` = 1 clk, one
+clk before the next `ce_14m` (`clk` = 28.63636 MHz, 2 per tick). In
+`pc_clocks`, `cpu_step` and `cpu_fall` always fall on a `ce_14m` clk, and the
+board's registers change at the end of those clks. The card has therefore
+finished its update for an instant one clk before the board's edge of the
+same instant:
 - what the board samples at that edge (READY, read data) is the state after
-  the update;
+  the update (`rdy_ce` is in the clk of the card's tick and samples the state
+  before it, the one for the instant before);
 - a strobe the board changes at that edge reaches the card after the update.
 
-`CE_DELAY` may be 3 to 6: the board's command strobes end one clk after its
-edge (`xt_board.sv`), the card sees that a clk later and acts at the end of
-that clk, which must come before its next dot update. 7 or more would update
-the card after the board's edge.
+Between the board's edge and the card's next tick there is one clk, so
+everything the card does on a bus event must be done at the end of that clk
+(on the 100 MHz clock, `CE_DELAY` 6, there were 5 clk; doc/clock-plan.md):
+- the board ends its commands at the edge where T4 begins (it knows the
+  T4 a clk before, `xt_board.sv` `cyc_end`), and an I/O access acts in the
+  strobe's last clk, which the card knows from the card bus's next-clk values
+  (`isa_aen_next`, `isa_addr_next`, `isa_ior_n_next`, `isa_iow_n_next`): a
+  CRTC, mode, colour or light pen access is done at the edge where T4
+  begins, before the next tick, as MartyPC applies it;
+- a memory access starts in the clk after the strobe falls, which is the
+  tick's clk: it counts that tick (`el` starts at 1);
+- the 80-column clock switch at lchar phase 0 takes a mode that a pending
+  text/graphics change gives in the same clk (`post`, the only non-tick clk
+  of phase 0);
+- the display fetch after a character clock (5 clk) ends after the next two
+  ticks, so the dots are computed `DLY` = 3 ticks late, from a delay line of
+  the dot logic's inputs and a copy of the fetched character made when the
+  character clock's record leaves the delay line. The picture is the same,
+  3 ticks later (`tb/cga` compares with the model at `LAT` 6 instead of 3).
+
+`CE_DELAY` must stay 1 at 28.63636 MHz (0 would update the card at the
+board's own edge, after the board has sampled it).
 
 The card's lchar phase `dc` (MartyPC: `cycles & 15`) runs from reset with
 `DC_RESET`. Together with `pc_clocks`' `PHASE` it fixes the CPU-CGA phase
@@ -127,7 +148,7 @@ and at most 1 tick before it, i.e. the slot falls between 1 tick before that
 state and 1 tick into it.
 
 **The board side** (doc/architecture.md section 3): `xt_board.sv` samples
-IOCHRDY on `rdy_ce`, 2 clk before the rising CLK edge that ends a state, and
+IOCHRDY on `rdy_ce`, 1 clk before the rising CLK edge that ends a state, and
 biu88 decides at that edge whether the next T3/Tw is the last. In the card's
 time that sample sees the state after the dot update 1 tick before the edge,
 so a state is the last one when IOCHRDY was high 1 tick before it began. For
@@ -375,8 +396,9 @@ and writes images to `~/pcxt-work/cga/`. `python3 tb/cga/mut.py` runs the
 mutant set.
 
 The testbench drives the card bus with a model of `xt_board.sv`'s bus
-timing and biu88's READY rule: `pc_clocks` enables, 8288 command edges,
-IOCHRDY sampled on `rdy_ce` (2 clk before the step), the next T3/Tw's
+timing and biu88's READY rule: `pc_clocks` enables (2 clk per tick, 6 per
+CPU clock), 8288 command edges (ending at the edge where T4 begins), the card
+bus's next-clk values, IOCHRDY sampled on `rdy_ce` (1 clk before the step), the next T3/Tw's
 lastness decided at the step from it, one wait state on every I/O cycle. Next to the card runs
 `cga_model.h`, a C++ transliteration of MartyPC's CGA and 6845 written from
 the Rust sources (not from the HDL), ticked at the board's 14.318 MHz

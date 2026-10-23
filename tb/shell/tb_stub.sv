@@ -50,11 +50,11 @@ module tb_stub;
                 if (!kbd_busy) begin kbd_code = (n == 1000) ? 8'h1E : 8'h9E; kbd_valid = 1; sent++; end
             end
         end
-        $display("hsync period %0d clocks (expect %0d), vsync period %0d (expect %0d)", hper, 912*7, vper, 912*7*262);
+        $display("hsync period %0d clocks (expect %0d), vsync period %0d (expect %0d)", hper, 912*2, vper, 912*2*262);
         $display("RAM passes %0d errors %0d", dut.passes, dut.errors);
         $display("ROM F0000 %02x FFFF0 %02x FFFFF %02x", dut.rom_bytes[0], dut.rom_bytes[16], dut.rom_bytes[31]);
         $display("keyboard: last code %02x, count %0d", dut.last_code, dut.code_count);
-        if (hper == 912*7 && vper == 912*7*262 && dut.passes >= 2 && dut.errors == 0 &&
+        if (hper == 912*2 && vper == 912*2*262 && dut.passes >= 2 && dut.errors == 0 &&
             dut.rom_bytes[0] == 8'h5A && dut.rom_bytes[16] == (8'hF0 ^ 8'h5A) && dut.rom_bytes[31] == (8'hFF ^ 8'h5A) &&
             dut.last_code == 8'h9E && dut.code_count == 2)
             $display("PASS: stub pc_system");

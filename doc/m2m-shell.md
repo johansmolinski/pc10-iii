@@ -12,9 +12,9 @@ experiments without the PC (`tools/gen_xpr.py --stub`).
 |---|---|
 | `M2M/` | the framework, vendored from Megamiga (`doc/m2m-provenance.md`), unchanged |
 | `M2M/QNICE` | submodule johansmolinski/QNICE-FPGA `fat32-fastseek` @ `78aeaac` |
-| `CORE/vhdl/clk.vhd` | MMCM: 100.2273 MHz PC clock (architecture.md section 1) and 28.63636 MHz video clock |
+| `CORE/vhdl/clk.vhd` | MMCM: the 28.63636 MHz PC clock (architecture.md section 1), also the video clock |
 | `CORE/vhdl/mega65.vhd` | `MEGA65_Core` (Megamiga's entity), tie-offs, resets, menu decoding, RAM/ROM instances, QNICE device mux |
-| `CORE/vhdl/main.vhd` | `pc_system` (via `CORE/sv/pc_system_flat.sv`) + keyboard, video into the video clock, RGBI to RGB, speaker to PCM |
+| `CORE/vhdl/main.vhd` | `pc_system` (via `CORE/sv/pc_system_flat.sv`) + keyboard, video to M2M, RGBI to RGB, speaker to PCM |
 | `CORE/sv/pc_system_flat.sv` | `pc_system` with the per-drive packed arrays flattened (VHDL boundary) |
 | `CORE/vhdl/pc_ram.vhd` | 640 KB system RAM in block RAM, no QNICE port |
 | `CORE/vhdl/pc_bios.vhd` | 64 KB BIOS ROM, QNICE device `0x0100`, the BIOS gate |
@@ -36,12 +36,17 @@ experiments without the PC (`tools/gen_xpr.py --stub`).
 
 ## 2. Clocks and resets
 
-One MMCM (VCO 1102.5 MHz, PFD 20 MHz):
-- `main_clk` = VCO / 11 = 100.2273 MHz (2205/22 MHz exactly, 7 x OSC): the PC;
-- `video_clk` = VCO / 38.5 = 28.63636 MHz (2 x OSC): M2M's video pipeline
-  (`video_clk_o`: scandoubler, analog OSM, ascal's input). A first build with
-  the video pipeline on `main_clk` closed with the stand-in but failed in
-  M2M's `vga_osm` (-1.16 ns) with the real PC around it.
+One MMCM (VCO 1102.5 MHz, PFD 20 MHz), one clock since 2026-10-23
+(doc/clock-plan.md):
+- `main_clk` = VCO / 38.5 = 28.63636 MHz (315/11 MHz exactly, 2 x OSC): the
+  PC, the PC10-III's master clock; also `video_clk`, M2M's video pipeline
+  (`video_clk_o`: scandoubler, analog OSM, ascal's input). `main.vhd`
+  registers RGBI, syncs, blanks and `vid_ce` (= `ce_14m`) together and hands
+  them over as they are.
+- Until 2026-10-22: `main_clk` = VCO / 11 = 100.2273 MHz (7 x OSC) for the
+  PC and the video pipeline on its own 28.63636 MHz output (a first build
+  with the video pipeline on the 100 MHz `main_clk` had failed in M2M's
+  `vga_osm`, -1.16 ns).
 
 M2M's own clocks (QNICE 50 MHz, HyperRAM, HDMI, audio) are untouched.
 
@@ -54,14 +59,15 @@ copied into the CPU yet (`pc_ucode.vhd`, section 3).
 ## 3. Memory
 
 **System RAM** (`pc_ram.vhd`): 20 banks of 32 KB (8 RAMB36 each, 160 in
-all). No QNICE port (Megamiga hard rule 4). The request is registered, then
-copied and decoded into one register set per group of 5 banks and one per
-bank (address, data, write enable), and the banks' outputs go through the
-block RAMs' output registers into a registered multiplexer: read data and
-`ram_ack` come **6 clocks** after `ram_en` (the board waits for `ram_ack`;
-doc/timing.md section 2.10 shows why the board does not see it). With the
-request fanning out to 160 tiles from one register (2 clocks), the first
-real-PC build missed by up to 3.3 ns; 4 clocks still missed by 0.75 ns. The menu's memory size
+all). No QNICE port (Megamiga hard rule 4). The request is registered, the
+banks read it into their block RAM registers and a multiplexer picks the
+bank: read data and `ram_ack` come **2 clocks** after `ram_en` (the board
+waits for `ram_ack`; doc/timing.md section 2.10 shows why the board does not
+see it). On the 100.2273 MHz clock the request needed a register set per
+group of banks and per bank and the outputs two more stages (6 clocks): with
+the request fanning out to 160 tiles from one register the first real-PC
+build missed by up to 3.3 ns. At 28.63636 MHz (34.9 ns) one register each
+way is plenty. The menu's memory size
 (640/512/256/128 KB) limits it at run time: above the limit reads return 0xFF
 and writes are dropped, both acknowledged. `tb/sys` boots GLaBIOS with a
 3-clock RAM model (section 9).
@@ -323,7 +329,7 @@ directories (`rtl/system/kf/KF82xx`).
 
 Tests (`tb/shell/run.sh`, about a minute):
 - `tb_glue.vhd` (ghdl): keyboard codes and the Fn layer; the BIOS window
-  (1:1, 0xFF while the gate is closed); RAM ack after 6 clocks and the size
+  (1:1, 0xFF while the gate is closed); RAM ack after 2 clocks and the size
   limit; the CGA font: the default copied after the reset (8192 writes, a
   glyph and its thin copy), a 2 KB font from QNICE copied to 0x1800 and 0x1000;
 - `tb_fdd.vhd` (ghdl): `pc_fdd_sd` against a model of the engine port (READY,

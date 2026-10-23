@@ -13,6 +13,7 @@
 #include "Vxtide_card.h"
 #include "verilated.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -22,7 +23,8 @@
 #include <string>
 #include <vector>
 
-static const double CLK_HZ = 100227272.7;        // 2205/22 MHz
+static const double CLK_HZ = 28636363.64;        // 315/11 MHz (6 clk per CPU clock)
+static const int C = 6;                           // clk per 4.77 MHz CPU clock
 static uint64_t us2clk(double us) { return (uint64_t)(us * CLK_HZ / 1e6 + 0.5); }
 static double clk2us(uint64_t c) { return c * 1e6 / CLK_HZ; }
 
@@ -185,34 +187,34 @@ struct Sim {
     // ---------------------------------------------------- bus cycles
     // An 8088 I/O cycle with the 5160's wait state (IOR from the falling edge
     // in T1, IOW from T2, both to T4), then some instruction time.
-    void io_write(int port, int val, int gap = 40) {
+    void io_write(int port, int val, int gap = 2 * C) {
         t->isa_addr = port; t->isa_aen = 0;
-        for (int i = 0; i < 28; i++) tick();
+        for (int i = 0; i < C + C / 3; i++) tick();
         t->isa_dout = val;
         t->isa_iow_n = 0;
-        for (int i = 0; i < 56; i++) tick();
+        for (int i = 0; i < 8 * C / 3; i++) tick();
         t->isa_iow_n = 1;
-        for (int i = 0; i < 21 + gap; i++) tick();
+        for (int i = 0; i < C + gap; i++) tick();
     }
-    int io_read(int port, int gap = 40) {
+    int io_read(int port, int gap = 2 * C) {
         t->isa_addr = port; t->isa_aen = 0;
-        for (int i = 0; i < 14; i++) tick();
+        for (int i = 0; i < 2 * C / 3; i++) tick();
         t->isa_ior_n = 0;
         if (port == BASE) last_lo = cyc;
-        for (int i = 0; i < 63; i++) tick();
+        for (int i = 0; i < 3 * C; i++) tick();
         int v = t->isa_dsel ? t->isa_din : 0xFF;
         t->isa_ior_n = 1;
-        for (int i = 0; i < 21 + gap; i++) tick();
+        for (int i = 0; i < C + gap; i++) tick();
         return v;
     }
     int mem_read(uint32_t addr) {
         t->isa_addr = addr;
-        for (int i = 0; i < 14; i++) tick();
+        for (int i = 0; i < 2 * C / 3; i++) tick();
         t->isa_memr_n = 0;
         // the data must be there 2 clk after the strobe and stay
         int first = -1;
         bool stable = true;
-        for (int i = 0; i < 42; i++) {
+        for (int i = 0; i < 2 * C; i++) {
             tick();
             if (i >= 1) {
                 int v = t->isa_dsel ? t->isa_din : 0xFF;
@@ -222,7 +224,7 @@ struct Sim {
         CHECK(stable, "memory read %05X: data not stable during MEMR", addr);
         int v = t->isa_dsel ? t->isa_din : 0xFF;
         t->isa_memr_n = 1;
-        for (int i = 0; i < 21; i++) tick();
+        for (int i = 0; i < C; i++) tick();
         return v;
     }
 
@@ -245,14 +247,14 @@ struct Sim {
     int alt() { return io_read(ctl()); }
     // IN AX,DX / the XTIDE rev 1 pair / 8-bit mode
     int read_word() {
-        int lo = io_read(BASE, 4);
-        int hi = io_read(mode8 ? (variant == 0 ? BASE + 1 : BASE) : data_hi(), 20);
+        int lo = io_read(BASE, 1);
+        int hi = io_read(mode8 ? (variant == 0 ? BASE + 1 : BASE) : data_hi(), C);
         return lo | (hi << 8);
     }
     void write_word(int w) {
-        if (mode8) { io_write(variant == 0 ? BASE + 1 : BASE, w & 0xFF, 4); io_write(BASE, w >> 8, 20); return; }
-        if (variant == 0) { io_write(BASE, w & 0xFF, 4); io_write(BASE + 1, w >> 8, 20); }
-        else { io_write(data_hi(), w >> 8, 4); io_write(BASE, w & 0xFF, 20); }
+        if (mode8) { io_write(variant == 0 ? BASE + 1 : BASE, w & 0xFF, 1); io_write(BASE, w >> 8, C); return; }
+        if (variant == 0) { io_write(BASE, w & 0xFF, 1); io_write(BASE + 1, w >> 8, C); }
+        else { io_write(data_hi(), w >> 8, 1); io_write(BASE, w & 0xFF, C); }
     }
 
     // poll status until !BSY (returns the status), with a time limit
@@ -507,7 +509,10 @@ static void t_timing_irq(Sim &s) {
     while (!(s.irq()) && s.cyc - t0 < us2clk(200)) s.tick();
     double us = clk2us(s.cyc - t0);
     CHECK(s.irq(), "IDENTIFY: INTRQ");
-    CHECK(us > CMD_US + 3 && us < CMD_US + 12, "IDENTIFY: DRQ %.1f us after the command", us);
+    // BSY for CMD_US from the command, or while the card writes the 512 bytes
+    // of the IDENTIFY sector into its buffer (one per clk), whichever is longer
+    const double id_us = std::max<double>(CMD_US, clk2us(512));
+    CHECK(us > id_us && us < id_us + 3, "IDENTIFY: DRQ %.1f us after the command", us);
     CHECK(s.alt() == (DRDY | DSC | DRQ) && s.irq(), "alternate status does not clear INTRQ");
     CHECK(s.status() == (DRDY | DSC | DRQ) && !s.irq(), "status clears INTRQ");
     std::vector<uint8_t> b;

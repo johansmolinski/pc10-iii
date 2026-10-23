@@ -23,9 +23,9 @@
 
 module fdc_card #(
     parameter int NDRIVES   = 2,
-    // 1 us enable = clk * US_NUM / US_DEN (100.2273 MHz = 2205/22 MHz)
-    parameter int US_NUM    = 22,
-    parameter int US_DEN    = 2205,
+    // 1 us enable = clk * US_NUM / US_DEN (28.63636 MHz = 315/11 MHz)
+    parameter int US_NUM    = 11,
+    parameter int US_DEN    = 315,
     parameter int TIME_SCALE   = 2,
     parameter int RQM_DELAY_US = 12,
     parameter int RESET_US     = 1000,

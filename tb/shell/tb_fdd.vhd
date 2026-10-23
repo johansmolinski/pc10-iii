@@ -67,7 +67,7 @@ architecture sim of tb_fdd is
    end function;
 begin
    qclk <= not qclk after 10 ns when not done;
-   mclk <= not mclk after 5 ns when not done;
+   mclk <= not mclk after 17.46 ns when not done;   -- 28.63636 MHz
 
    dut : entity work.pc_fdd_sd
       generic map (G_MS => 50, G_READY_WAIT => 20)
@@ -206,7 +206,7 @@ begin
       qw('0', 0, 3, 100); qw('0', 0, 4, 0);
       qw('0', 0, 5, 2);
       qw('0', 0, 0, 1);
-      wait for 1 us;
+      wait for 4 us;
       assert present = "01" and tracks(7 downto 0) = x"28" and heads(1 downto 0) = "10" and
              spt(5 downto 0) = "001001" and wp80 = "00"
          report "geometry of a 360K image" severity failure;
@@ -223,7 +223,7 @@ begin
       req('0', 5, '1', 16#A5#, '0');           -- write, then read it back
       req('0', 5, '0', 16#A5#, '0');
       qwp <= "01";
-      wait for 200 ns;
+      wait for 700 ns;
       req('0', 6, '1', 16#5A#, '1');           -- write protected
       qwp <= "00";
 
@@ -238,10 +238,10 @@ begin
       req('0', 9, '0', 0, '1');
 
       qw('0', 0, 1, 1440);                     -- 720K: an 80-track drive
-      wait for 1 us;
+      wait for 4 us;
       assert tracks(7 downto 0) = x"50" and wp80 = "01" report "geometry of a 720K image" severity failure;
       qw('0', 0, 1, 1000);                     -- no known format: no disk
-      wait for 1 us;
+      wait for 4 us;
       assert present = "00" report "odd size must mean no disk" severity failure;
 
       report "PASS: pc_fdd_sd (" & integer'image(starts) & " engine transfers)";

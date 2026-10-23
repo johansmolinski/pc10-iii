@@ -1,8 +1,6 @@
 // cpu_ooc_top.v - the 8088 (rtl/cpu/cpu8088.sv: z8086 EU + its tables +
 // biu88) with registered I/O, for an out-of-context Vivado run that measures the
-// CPU alone at 100.2273 MHz (tools/ooc/cpu_ooc.tcl). The CPU's own timing
-// constraints (rtl/cpu/cpu8088.xdc) are read scoped to cpu8088, as in the
-// system.
+// CPU alone at 28.63636 MHz (tools/ooc/cpu_ooc.tcl).
 module cpu_ooc_top (
     input             clk,
     input             ucl_we_i,

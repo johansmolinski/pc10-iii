@@ -15,7 +15,7 @@ drives are disk images that the MEGA65 glue serves sector by sector. The same
 | `rtl/fdc/fdc_secbuf.sv` | the sector buffer (2 x 512 bytes, one RAMB18) and the sector-port engine |
 | `tb/fdc/fdc_run.cpp`, `tb/fdc/Makefile` | Verilator testbench: `make run` |
 
-All on `clk` (100.2273 MHz) with enables; no other clock. About one RAMB18;
+All on `clk` (28.63636 MHz) with enables; no other clock. About one RAMB18;
 the rest is a few hundred flip-flops and the step/command logic.
 
 ## 2. The adapter (`fdc_card`)
@@ -117,7 +117,7 @@ What software can observe, and where it comes from:
 | Reset | interrupt and RQM 1 ms after the DOR releases reset | MartyPC |
 | Overrun | a read byte not taken when the next is assembled (32 us), a write byte not delivered when it is due | data sheet |
 
-The time base is a 1 us enable from a phase accumulator (clk x 22/2205, exact
+The time base is a 1 us enable from a phase accumulator (clk x 11/315, exact
 on average, +-1 clk jitter). The real adapter has its own 16 MHz crystal, so
 the FDC is asynchronous to the CPU clock anyway.
 

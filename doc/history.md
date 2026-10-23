@@ -1327,3 +1327,85 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   `pc_ram` (6-clk latency must shrink for 9.54 MHz), the video crossing in
   `main.vhd` (gone), the duty cycles (1/3 at /6; /4 undocumented; /3 at 50%
   is off the clock grid) and the turbo switch. Not implemented.
+
+## 2026-10-23 - The PC on the PC10-III's 28.63636 MHz master clock (branch `clk28`)
+
+- **What:** the whole PC side runs on one 28.63636 MHz clock (2 x OSC, the
+  FE2010A's crystal; MMCM VCO 1102.5 MHz / 38.5 as before), also M2M's video
+  clock; no 100 MHz clock any more. Plan and what was done beyond it:
+  doc/clock-plan.md (section 6, marked done); doc/architecture.md section 1,
+  doc/timing.md section 5.
+- **Enables** (`pc_clocks.sv`): a modulo-24 counter and the CPU clock's own
+  modulo-6 counter: `ce_14m` /2, `cpu_step` /6 (CLK high 2, low 4: the 8284's
+  1/3), `cpu_fall` step + 2, `rdy_ce` step - 1, new `cpu_prestep` (the clk
+  before the step), PCLK /24. The FE2010A's /4 and /3 only need another
+  period of the CPU counter (not done).
+- **CPU:** `EU_DELAY` 1; `rtl/cpu/cpu8088.xdc` deleted (and from the R6
+  project, `tools/gen_xpr.py`). No other change in `rtl/cpu` (comments).
+- **The order within an OSC tick.** At 100 MHz a tick had 7 clk and some
+  registered follow-ups of a CPU edge happened 1-2 clk later, still before
+  the next tick; at 2 clk per tick they would come a tick (or, DRQ0, a CPU
+  clock) late. Moved to the edge itself:
+  - the 8288 commands end at the edge where T4 begins (`cyc_end`, from a
+    mirror of biu88's "this T3/Tw is the last" flag; `$fatal` check);
+  - the 8237 ends its strobes one clk before the edge that ends S4
+    (`cpu_prestep` into KF8237) and the CPU's commands return with AEN
+    (`aen_d` gone); the memory keeps driving a DMA read's data in that clk
+    (`dma_mem_src`: without it the trace's data column in 5,456 DMA-held
+    write cycles showed 00 instead of the RAM byte);
+  - the 8237's DREQ register takes DRQ0's D input;
+  - CGA: `CE_DELAY` 1; I/O acts in the strobe's last clk (three new
+    next-clk inputs; `$fatal` check against the old end); an access counts the
+    tick it starts in; the 80-column clock switch takes a pending text/graphics
+    mode in the post clk (tb/cga torture found it: the CRTC timeline drifted,
+    3DA and light pen reads differed); the composite VSYNC shift one clk
+    earlier; the dots are computed 3 ticks late from a delay line of the dot
+    logic's inputs and a copy of the fetched character (the fetch takes 5 clk).
+- **Real time:** FDC and XTIDE 1 us = 11/315 clk; the XTIDE's IDENTIFY keeps
+  CMD_US from the command (it was reloaded after the 512-clk sector write:
+  23 us at 28.6 MHz). MDA 59609/105000 (16.257 MHz), Hercules 352/630: a dot
+  is 1.76 clk, and a falling dot edge after the rising one in the same clk
+  was lost (tb/mda: 741 of 742 lines short, waits wrong); now taken in the
+  next clk (`fall_pend`, card and model).
+- **CORE:** `clk.vhd` one output (`main_clk` = `video_clk`); `main.vhd`
+  registers RGBI, syncs, blanks and `vid_ce` together (no crossing);
+  `pc_ram.vhd` latency 2 (request register, the banks, a multiplexer);
+  CORE.xdc: one clock, QNICE <-> main 20 ns as before, no geometry
+  multicycle, no `FORCE_MAX_FANOUT`; the stand-in pc_system's constants.
+- **Testbenches:** tb/sys `CLK_HZ`; tb/sst 6 clk per CPU clock (integer, `-P`
+  in clk); tb/cga and tb/mda board models at 2/6 clk with the T4 end (tb/cga
+  also the next-clk values, `LAT` 6); tb/fdc and tb/hdc bus cycles in units of
+  `C` = 6; tb/shell clock period, RAM latency 2, copy waits. Mutant lists
+  updated (CGA: `CE_DELAY` 2, I/O end late, access tick lost, display delay 2).
+- **Gates** (fedora, gates `c4`; main = c49a1fc exported, gates `base0`):
+  - MartyPC trace (`DRQ0_SKEW=7`, `-s 1.27 -C 40`): **byte-identical to
+    main's** (SHA-256 a72753ca...; both `-t` traces compared whole, not just
+    their first difference); against MartyPC therefore the same first
+    differences, 2,227,925 (`cycles.txt`) and 2,439,294 (`-loopfix`). The
+    `-d EE` trace is byte-identical too (bd612823..., 2,227,925 / 2,439,417),
+    and so is the trace with the shell's RAM latency (`-L 2`). The `-C` oracle
+    13,305 writes, 0 differ.
+  - Floppy boot (`-a hello360.img -s 10 -C 40`): C0 H0 S1/S2 at 9,005.376 ms,
+    "Booted from floppy A: (pc10-iii FDC+DMA)"; the oracle 134 reads, 14,147
+    writes, 0 differ. The whole log equals main's but for one line: the
+    second sector request at 9,005.394 ms instead of 9,005.381 (tb/sys's
+    image backend sends a byte per clk, so 512 bytes take 18 us instead of
+    5 us; the CS:IP samples every 50 ms, the boot and the oracle are the
+    same).
+  - SST full (`clk28-a`): state 3,007,000, trace 3,006,693, every file's line
+    identical to `z86f-88` (main).
+  - tb/cga PASS; tb/mda PASS (MDA and Hercules; the 6845 read right after a
+    3B4 write now 1-3 wait states, 3 in 1%: the dot edges are on a 35 ns
+    grid and RDY is sampled 35 ns before the edge; doc/mda.md 4.2); tb/fdc
+    PASS (208 checks); tb/hdc PASS (3,182 checks: the random traffic draws
+    per clk, so its count moves); tb/shell PASS. Mutants: tb/cga 29 of 29
+    killed, tb/mda 34 of 34, tb/hdc 20 of 20.
+- **Simulation speed** (the 1.27 s trace run alone on fedora): 322.0 s before,
+  95.3-97.9 s after (3.3x); the full SST run took about 3 minutes; the floppy
+  boot run (10 s, in parallel with the other gates) 2,494 s before, 741 s
+  after.
+- **Out of context** (`tools/ooc/rooc.sh --pc clk28-pc`, `pc_ooc.tcl`:
+  pc_system with CGA, Hercules, FDC and XTIDE, pc_ram, the ROMs as block RAM;
+  R6 part, 34.921 ns, no exceptions): **WNS +15.498 ns**, WHS +0.070 ns, 0
+  failing endpoints; 8,690 LUTs, 4,284 FFs, 206 BRAM tiles. Worst path:
+  biu88 `qlen` -> `address_latch` CE, 19 levels, 19.0 ns.

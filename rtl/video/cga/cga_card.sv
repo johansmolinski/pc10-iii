@@ -4,14 +4,22 @@
 // devices/cga/{mod,mmio,io,draw}.rs and devices/mc6845.rs at commit 05c0d08.
 // The design and every deviation from MartyPC are in doc/cga.md.
 //
-// Clocking (doc/architecture.md section 1): everything on clk with the
-// 14.31818 MHz enable ce_14m. The card advances its dot clock CE_DELAY clk
-// after ce_14m (default 6 = one clk before the next ce_14m). The card's state
-// for dot instant t is therefore complete one clk before the CPU-side edge
-// of the same instant: what the board samples at a CPU clock edge (READY,
-// read data) is the CGA as MartyPC sees it after "catching up" to that
-// instant, and a strobe the board changes at that edge reaches the card after
-// the update, as MartyPC applies an I/O access after catching up.
+// Clocking (doc/architecture.md section 1): everything on clk (28.63636 MHz,
+// 2 clk per OSC tick) with the 14.31818 MHz enable ce_14m. The card advances
+// its dot clock CE_DELAY clk after ce_14m (1 = one clk before the next
+// ce_14m, half an OSC period after the board's edges). The card's state for
+// dot instant t is therefore complete one clk before the CPU-side edge of the
+// same instant: what the board samples at a CPU clock edge (READY, read data)
+// is the CGA as MartyPC sees it after "catching up" to that instant, and a
+// strobe the board changes at that edge reaches the card after the update, as
+// MartyPC applies an I/O access after catching up.
+//
+// pc10-iii, 28.63636 MHz (doc/clock-plan.md): with only one clk between the
+// board's edge and the card's tick, everything the card does on a bus event
+// must be done by that tick, as it was on the 100 MHz clock (7 clk per tick):
+// an I/O access acts in the strobe's last clk (from the bus's next-clk
+// values), an access that starts in a tick's clk counts that tick, and the
+// display computes its dots DLY ticks late (the character fetch takes 5 clk).
 //
 // Card bus (section 3): B8000-BFFFF (16 KB, mirrored at BC000), I/O A9-A4 =
 // 3Dx with AEN low: 3D0-3D7 6845 (A0 = data), 3D8 mode, 3D9 colour, 3DA
@@ -24,7 +32,7 @@
 // card seeing MEMR/MEMW fall to that reference; the defaults fit xt_board.sv
 // (MEMR from the CLK falling edge in T1, MEMW from the falling edge in T2).
 // IOCHRDY goes high 2 ticks before the slot (lchar phase 12): xt_board.sv
-// samples it 2 clk before the rising CLK edge that ends the state BEFORE a
+// samples it 1 clk before the rising CLK edge that ends the state BEFORE a
 // T3/Tw (the 8284's RDY), i.e. 1 tick before that state begins, and MartyPC's
 // last T3/Tw is the one that the slot falls into or 1 tick before. The VRAM
 // access (write, snow capture) is done at the slot, inside the strobe.
@@ -32,7 +40,7 @@
 // GPL-3.0-or-later, pc10-iii.
 
 module cga_card #(
-    parameter int CE_DELAY = 6,        // card dot tick = ce_14m delayed (clk)
+    parameter int CE_DELAY = 1,        // card dot tick = ce_14m delayed (clk)
     parameter int DC_RESET = 0,        // lchar phase after reset
     parameter int RD_LEAD  = 6,        // MEMR seen -> MartyPC phase reference (ticks)
     parameter int WR_LEAD  = 3,        // MEMW seen -> MartyPC phase reference (ticks)
@@ -48,7 +56,7 @@ module cga_card #(
     // next clk); 0 = from the card bus alone
     parameter bit REG_READY = 1'b0
 ) (
-    input  logic        clk,           // 100.2273 MHz
+    input  logic        clk,           // 28.63636 MHz
     input  logic        reset,
     input  logic        ce_14m,
 
@@ -57,6 +65,9 @@ module cga_card #(
     input  logic [19:0] isa_addr_next,     // REG_READY: isa_addr of the next clk
     input  logic        isa_memr_n_next,   // REG_READY: isa_memr_n of the next clk
     input  logic        isa_memw_n_next,   // REG_READY: isa_memw_n of the next clk
+    input  logic        isa_aen_next,      // isa_aen of the next clk (I/O end)
+    input  logic        isa_ior_n_next,    // isa_ior_n of the next clk (I/O end)
+    input  logic        isa_iow_n_next,    // isa_iow_n of the next clk (I/O end)
     input  logic [7:0]  isa_dout,      // data from the CPU/DMA
     output logic [7:0]  isa_din,       // data to the CPU (0 when not selected)
     output logic        isa_dsel,      // the card drives isa_din
@@ -78,7 +89,8 @@ module cga_card #(
     input  logic        lpen_trig,     // rising edge latches the address
     input  logic        lpen_sw,       // 1 = switch pressed
 
-    // video, one dot per ce_14m (outputs change 1 clk before ce_14m)
+    // video, one dot per ce_14m (outputs change 1 clk before ce_14m; DLY + 2
+    // ticks after the dot instant they show)
     output logic [3:0]  vid_rgbi,      // {I, R, G, B}
     output logic        vid_hsync,     // active high
     output logic        vid_vsync,     // active high
@@ -96,8 +108,11 @@ module cga_card #(
 
 // ============================================================ dot clock
 logic [CE_DELAY-1:0] ce_sh;
-always_ff @(posedge clk)
-    ce_sh <= reset ? '0 : {ce_sh[CE_DELAY-2:0], ce_14m};
+generate if (CE_DELAY == 1) begin : g_ce1
+    always_ff @(posedge clk) ce_sh <= reset ? '0 : ce_14m;
+end else begin : g_cen
+    always_ff @(posedge clk) ce_sh <= reset ? '0 : {ce_sh[CE_DELAY-2:0], ce_14m};
+end endgenerate
 wire tick = ce_sh[CE_DELAY-1];
 
 logic [3:0] dc;                         // lchar phase (MartyPC: cycles & 15)
@@ -180,12 +195,16 @@ wire        io_rd   = sel_io && !isa_ior_n;
 wire        io_wr   = sel_io && !isa_iow_n;
 
 // I/O: address and data are held while the strobe is low, the access acts
-// when it ends (MartyPC: at the end of the last T3/Tw).
-logic       io_rd_q, io_wr_q;
-logic [3:0] io_a;
-logic [7:0] io_d;
-wire        io_rd_end = io_rd_q && !io_rd;
-wire        io_wr_end = io_wr_q && !io_wr;
+// when it ends (MartyPC: at the end of the last T3/Tw). pc10-iii: it acts in
+// the strobe's last clk, known from the card bus's next-clk values (the
+// strobe, AEN and the address of the next clk), with the address and data of
+// that clk: at the CLK edge where T4 begins, before the card's next tick (on
+// the 100 MHz clock: in the clk after the strobe, 2 clk after that edge).
+wire        io_sel_nx = !isa_aen_next && isa_addr_next[9:4] == 6'b111101;
+wire        io_rd_end = io_rd && !(io_sel_nx && !isa_ior_n_next);
+wire        io_wr_end = io_wr && !(io_sel_nx && !isa_iow_n_next);
+wire [3:0]  io_a = isa_addr[3:0];
+wire [7:0]  io_d = isa_dout;
 
 // light pen
 logic lp_latch, lp_trig_q;
@@ -294,50 +313,83 @@ logic card_hb, card_vb;
 logic [3:0] blink_cnt;
 logic cur_blink_on, txt_blink_on;
 
-// ============================================================ dot logic
-wire [3:0] fg   = att[3:0];
-wire [3:0] bg   = blink_snap ? {1'b0, att[6:4]} : att[7:4];
-wire       cbl  = blink_snap && att[7];
-wire       curs = c_cur && cur_blink_on;
-wire       boff = cbl && !txt_blink_on && !c_cur && m_blink;
-wire [3:0] overscan = m_640 ? 4'h0 : cc[3:0];
-wire [2:0] col  = hclk ? dc[2:0] : dc[3:1];          // dot / pair in the char
-wire [15:0] word = {g0, g1};
+// ============================================================ display delay
+// pc10-iii (28.63636 MHz): a tick is 2 clk, and the fetch after a character
+// clock (post, fs 1-4) takes 5 clk, so the dots are computed DLY ticks late:
+// every tick pushes the inputs the dot logic had then (dly_t, the CRTC's
+// outputs, the mode and colour registers, the card syncs, the blink states,
+// the lchar phase) into a delay line, and the dot logic works on the record
+// that comes out of it (r) and on a copy of the fetched character (att_d,
+// glyph_d, g0_d, g1_d, blink_d), taken from the fetch registers when the
+// record of the character clock's tick comes out: a dot after a character
+// clock uses that character's fetch, as on the 100 MHz clock, where the fetch
+// was done 2 clk before the next tick. The picture is the same, DLY ticks
+// later.
+localparam int DLY = 3;
+typedef struct packed {
+    logic       de, cur;                // CRTC DISPEN, CURSOR
+    logic [5:0] mode, cc;               // 3D8 in effect, 3D9
+    logic       hb, vb;                 // card_hb, card_vb
+    logic       cbo, tbo;               // cur_blink_on, txt_blink_on
+    logic       ch, cv, cb;             // composite HSYNC, VSYNC, burst
+    logic [3:0] dc;                     // lchar phase
+    logic       hclk, drw, bnd;         // 80 columns, the tick draws, a character clock
+} dly_t;
+dly_t dl [DLY];                         // dl[0]: the last tick's
+dly_t r;                                // the record of DLY ticks ago
+assign r = dl[DLY-1];
+logic [7:0] att_d, glyph_d, g0_d, g1_d;
+logic       blink_d;
 
-function automatic logic [3:0] pal(logic [1:0] idx);
+// ============================================================ dot logic
+wire       r_en   = r.mode[3];
+wire       r_gfx  = r.mode[1];
+wire       r_bw   = r.mode[2];
+wire       r_640  = r.mode[4];
+wire       r_blk  = r.mode[5];
+wire [3:0] fg   = att_d[3:0];
+wire [3:0] bg   = blink_d ? {1'b0, att_d[6:4]} : att_d[7:4];
+wire       cbl  = blink_d && att_d[7];
+wire       curs = r.cur && r.cbo;
+wire       boff = cbl && !r.tbo && !r.cur && r_blk;
+wire [3:0] overscan = r_640 ? 4'h0 : r.cc[3:0];
+wire [2:0] col  = r.hclk ? r.dc[2:0] : r.dc[3:1];      // dot / pair in the char
+wire [15:0] word = {g0_d, g1_d};
+
+function automatic logic [3:0] pal(logic [1:0] idx, logic [5:0] cr, logic bw, logic gfx, logic m640);
     logic [2:0] c;
-    if (idx == 2'd0) return cc[3:0];
-    if (m_bw && m_gfx && !m_640)
+    if (idx == 2'd0) return cr[3:0];
+    if (bw && gfx && !m640)
         c = idx == 2'd1 ? 3'd3 : idx == 2'd2 ? 3'd4 : 3'd7;   // red/cyan/white
-    else if (cc[5])
+    else if (cr[5])
         c = {idx, 1'b1};                                     // cyan/magenta/white
     else
         c = {idx, 1'b0};                                     // green/red/brown
-    return {cc[4], c};
+    return {cr[4], c};
 endfunction
 
 logic [3:0] pa, pb;                     // dot dc-1 (lores only), dot dc
 always_comb begin
     logic [3:0] t;
-    t  = curs ? fg : !m_en ? 4'h0 : boff ? bg : glyph[3'd7 - col] ? fg : bg;
+    t  = curs ? fg : !r_en ? 4'h0 : boff ? bg : glyph_d[3'd7 - col] ? fg : bg;
     pa = 4'h0;
     pb = 4'h0;
-    if (de) begin
-        if (!m_gfx) begin
+    if (r.de) begin
+        if (!r_gfx) begin
             pa = t; pb = t;
-        end else if (m_640) begin
-            if (hclk) pb = (m_en && g0[3'd7 - col]) ? cc[3:0] : 4'h0;
+        end else if (r_640) begin
+            if (r.hclk) pb = (r_en && g0_d[3'd7 - col]) ? r.cc[3:0] : 4'h0;
             else begin
-                pa = (m_en && word[4'd15 - {col, 1'b0}]) ? cc[3:0] : 4'h0;
-                pb = (m_en && word[4'd14 - {col, 1'b0}]) ? cc[3:0] : 4'h0;
+                pa = (r_en && word[4'd15 - {col, 1'b0}]) ? r.cc[3:0] : 4'h0;
+                pb = (r_en && word[4'd14 - {col, 1'b0}]) ? r.cc[3:0] : 4'h0;
             end
-        end else if (hclk)
+        end else if (r.hclk)
             pb = overscan;
         else begin
-            pa = m_en ? pal(word[4'd15 - {col, 1'b0} -: 2]) : cc[3:0];
+            pa = r_en ? pal(word[4'd15 - {col, 1'b0} -: 2], r.cc, r_bw, r_gfx, r_640) : r.cc[3:0];
             pb = pa;
         end
-    end else if (!card_hb && !card_vb) begin
+    end else if (!r.hb && !r.vb) begin
         pa = overscan; pb = overscan;
     end
 end
@@ -356,11 +408,24 @@ dot_t hold, out, fin;
 logic [9:0] hpos;
 logic [8:0] vpos;
 logic [3:0] chs_cnt;                    // lchars since the CRTC HSYNC began
-logic       cvs_trig;
 logic [3:0] cvs_sh;
 wire        d_ch = card_hb && chs_cnt >= 4'd2 && chs_cnt <= 4'd5;
 wire        d_cv = cvs_sh[0] && !cvs_sh[3];
 wire        d_cb = card_hb && !m_bw && !c_vs && (chs_cnt == 4'd7 || chs_cnt == 4'd8);
+wire dly_t  now  = '{de, c_cur, mode, cc, card_hb, card_vb, cur_blink_on, txt_blink_on,
+                    d_ch, d_cv, d_cb, dc, hclk, drw, bnd};
+
+`ifndef SYNTHESIS
+// the I/O end from the next-clk values is the end of the strobe (the original:
+// the clk after the strobe, io_*_q && !io_*)
+logic io_rd_q, io_wr_q, io_rd_end_q, io_wr_end_q;
+always_ff @(posedge clk) begin
+    io_rd_q <= io_rd;  io_wr_q <= io_wr;
+    io_rd_end_q <= io_rd_end;  io_wr_end_q <= io_wr_end;
+    if (!reset && (io_rd_end_q != (io_rd_q && !io_rd) || io_wr_end_q != (io_wr_q && !io_wr)))
+        $fatal(1, "cga_card: I/O end from the next-clk bus mispredicted");
+end
+`endif
 
 always_ff @(posedge clk) begin
     if (reset) begin
@@ -370,8 +435,6 @@ always_ff @(posedge clk) begin
         mode      <= 6'd0;
         mode_pend <= 1'b0;
         cc        <= 6'h30;
-        io_rd_q   <= 1'b0;
-        io_wr_q   <= 1'b0;
         lp_latch  <= 1'b0;
         lp_trig_q <= 1'b0;
         acc       <= 1'b0;
@@ -394,19 +457,31 @@ always_ff @(posedge clk) begin
         txt_blink_on <= 1'b0;
         hold <= '0; out <= '0; fin <= '0;
         hpos <= 10'h3FF; vpos <= 9'h1FF;
-        chs_cnt <= 4'd0; cvs_trig <= 1'b0; cvs_sh <= 4'd0;
+        chs_cnt <= 4'd0; cvs_sh <= 4'd0;
+        for (int i = 0; i < DLY; i++) dl[i] <= '0;
+        att_d <= 8'h00; glyph_d <= 8'h00; g0_d <= 8'h00; g1_d <= 8'h00; blink_d <= 1'b0;
     end else begin
         // ---------------------------------------------- dot tick
         if (tick) begin
             dc <= dn;
-            if (hclk) begin
+            dl[0] <= now;
+            for (int i = 1; i < DLY; i++) dl[i] <= dl[i-1];
+            if (r.hclk) begin
                 out  <= hold;
-                hold <= '{pb, card_hb, card_vb, d_ch, d_cv, d_cb, dc[1:0]};
-            end else if (drw) begin
-                out  <= '{pa, card_hb, card_vb, d_ch, d_cv, d_cb, dc[1:0] - 2'd1};
-                hold <= '{pb, card_hb, card_vb, d_ch, d_cv, d_cb, dc[1:0]};
+                hold <= '{pb, r.hb, r.vb, r.ch, r.cv, r.cb, r.dc[1:0]};
+            end else if (r.drw) begin
+                out  <= '{pa, r.hb, r.vb, r.ch, r.cv, r.cb, r.dc[1:0] - 2'd1};
+                hold <= '{pb, r.hb, r.vb, r.ch, r.cv, r.cb, r.dc[1:0]};
             end else
                 out  <= hold;
+            // the dots after a character clock show that character's fetch
+            if (r.bnd) begin
+                att_d   <= att;
+                glyph_d <= glyph;
+                g0_d    <= g0;
+                g1_d    <= g1;
+                blink_d <= blink_snap;
+            end
             fin <= out;
             if (out.h && !fin.h) hpos <= 10'd0;
             else if (hpos != 10'h3FF) hpos <= hpos + 10'd1;
@@ -452,8 +527,11 @@ always_ff @(posedge clk) begin
             default: ;
         endcase
 
-        // the 80-column clock switches on lchar boundaries only
-        if (dc == 4'd0 && !tick) hclk <= m_hires;
+        // the 80-column clock switches on lchar boundaries only. pc10-iii:
+        // with the mode a pending change gives it in the same clk (post): at
+        // 28.63636 MHz that clk is the only one of the lchar phase 0 without
+        // a tick (on the 100 MHz clock there were 5 more)
+        if (dc == 4'd0 && !tick) hclk <= hs_mode && post ? mode_reg[0] : m_hires;
 
         // ---------------------------------------------- CPU memory access
         if (!mem_any) begin
@@ -466,7 +544,9 @@ always_ff @(posedge clk) begin
             acc_a  <= isa_addr[13:0];
             acc_d  <= isa_dout;
             lead   <= 5'(mem_wr ? WR_LEAD : RD_LEAD);
-            el     <= 5'd0;
+            // pc10-iii: a strobe seen in a tick's clk counts that tick (on
+            // the 100 MHz clock the access started 5 clk before the tick)
+            el     <= tick ? 5'd1 : 5'd0;
         end else if (tick && el != 5'd31)
             el <= el + 5'd1;
         if (acc && mem_any && rel_due) rel <= 1'b1;
@@ -479,13 +559,7 @@ always_ff @(posedge clk) begin
         end
 
         // ---------------------------------------------- I/O
-        io_rd_q   <= io_rd;
-        io_wr_q   <= io_wr;
         lp_trig_q <= lpen_trig;
-        if (io_rd || io_wr) begin
-            io_a <= isa_addr[3:0];
-            io_d <= isa_dout;
-        end
         if (lp_set_ev) lp_latch <= 1'b1;
         if (lp_clr_ev) lp_latch <= 1'b0;
         if (io_wr_end && io_a == 4'h8) begin
@@ -500,13 +574,13 @@ always_ff @(posedge clk) begin
         if (io_wr_end && io_a == 4'h9) cc <= io_d[5:0];
 
         // ---------------------------------------------- composite sync counters
+        // (pc10-iii: the VSYNC shift in the same clk as the HSYNC count, not
+        // one clk later: done before the next tick)
         if (post_lclk) begin
             if (!c_hs) chs_cnt <= 4'd0;
             else if (chs_cnt != 4'd15) chs_cnt <= chs_cnt + 4'd1;
-            cvs_trig <= c_hs && chs_cnt == 4'd1;
-        end else
-            cvs_trig <= 1'b0;
-        if (cvs_trig) cvs_sh <= c_vs ? {cvs_sh[2:0], 1'b1} : 4'd0;
+            if (c_hs && chs_cnt == 4'd1) cvs_sh <= c_vs ? {cvs_sh[2:0], 1'b1} : 4'd0;
+        end
     end
 end
 

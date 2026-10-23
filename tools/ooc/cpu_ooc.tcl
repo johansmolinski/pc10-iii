@@ -1,7 +1,6 @@
 # cpu_ooc.tcl - out-of-context synthesis + implementation of the CPU alone
 # (rtl/cpu/cpu8088.sv: z8086 EU + tables + biu88) for the MEGA65 R6 part
-# at 100.2273 MHz, with the CPU's constraints (rtl/cpu/cpu8088.xdc, scoped to
-# cpu8088 as in the system).
+# at 28.63636 MHz, the PC's clock (no exceptions: every path is single-clock).
 #   cd <repo>/tools/ooc && vivado -mode batch -source cpu_ooc.tcl [-tclargs synth|explore]
 # Results: ./out/ (utilization, timing summary, critical paths). With "synth"
 # the run stops after synthesis (quick estimate); with "explore" the
@@ -20,12 +19,9 @@ read_verilog $here/cpu_ooc_top.v
 read_verilog -sv [list $cpu/z8086/alu.sv $cpu/z8086/z86_tables.sv $cpu/z8086/z86_eu.sv \
     $cpu/z8086/cpu_z86.sv $cpu/biu88.sv $cpu/cpu8088.sv]
 set clkxdc [open $here/out/clk.xdc w]
-puts $clkxdc {create_clock -name clk -period 9.977 [get_ports clk]}
+puts $clkxdc {create_clock -name clk -period 34.921 [get_ports clk]}
 close $clkxdc
 read_xdc $here/out/clk.xdc
-if {[file exists $cpu/cpu8088.xdc]} {
-    read_xdc -ref cpu8088 $cpu/cpu8088.xdc
-}
 synth_design -top cpu_ooc_top -mode out_of_context -flatten_hierarchy rebuilt \
     -include_dirs $cpu/z8086
 report_utilization -file $here/out/synth_util.rpt

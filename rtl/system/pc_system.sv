@@ -113,16 +113,17 @@ module pc_system #(
 );
 
 // ------------------------------------------------------------ clocks
-logic ce_14m, cpu_step, cpu_fall, rdy_ce, ce_pclk, pit_clk;
+logic ce_14m, cpu_step, cpu_fall, rdy_ce, cpu_prestep, ce_pclk, pit_clk;
 pc_clocks u_clocks (
-    .clk      (clk),
-    .reset    (reset),
-    .ce_14m   (ce_14m),
-    .cpu_step (cpu_step),
-    .cpu_fall (cpu_fall),
-    .rdy_ce   (rdy_ce),
-    .ce_pclk  (ce_pclk),
-    .pit_clk  (pit_clk)
+    .clk        (clk),
+    .reset      (reset),
+    .ce_14m     (ce_14m),
+    .cpu_step   (cpu_step),
+    .cpu_fall   (cpu_fall),
+    .rdy_ce     (rdy_ce),
+    .cpu_prestep(cpu_prestep),
+    .ce_pclk    (ce_pclk),
+    .pit_clk    (pit_clk)
 );
 assign vid_ce = ce_14m;
 
@@ -172,6 +173,7 @@ xt_board #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW)) u_board (
     .cpu_step     (cpu_step),
     .cpu_fall     (cpu_fall),
     .rdy_ce       (rdy_ce),
+    .cpu_prestep  (cpu_prestep),
     .pit_clk      (pit_clk),
     .cpu_ad       (cpu_ad),
     .cpu_din      (cpu_din),
@@ -232,6 +234,9 @@ cga_card #(.REG_READY(1'b1)) u_cga (
     .isa_addr_next  (isa_addr_next),
     .isa_memr_n_next(isa_memr_n_next),
     .isa_memw_n_next(isa_memw_n_next),
+    .isa_aen_next   (isa_aen_next),
+    .isa_ior_n_next (isa_ior_n_next),
+    .isa_iow_n_next (isa_iow_n_next),
     .isa_dout   (isa_dout),
     .isa_din    (cga_din_c),
     .isa_dsel   (cga_dsel_c),

@@ -1,5 +1,5 @@
 # cga_ooc.tcl - out-of-context synthesis + implementation of the CGA card
-# alone for the MEGA65 R6 part at 100.2273 MHz.
+# alone for the MEGA65 R6 part at 28.63636 MHz.
 #   cd <repo>/tools/ooc && vivado -mode batch -source cga_ooc.tcl
 # Results: ./out_cga/ (utilization, timing summary, critical paths).
 set here [file normalize [file dirname [info script]]]
@@ -8,7 +8,7 @@ file mkdir $here/out_cga
 set_part xc7a200tfbg484-2
 read_verilog -sv [list $rtl/cga_crtc.sv $rtl/cga_card.sv]
 synth_design -top cga_card -mode out_of_context -flatten_hierarchy rebuilt
-create_clock -name clk -period 9.977 [get_ports clk]
+create_clock -name clk -period 34.921 [get_ports clk]
 report_utilization -file $here/out_cga/synth_util.rpt
 report_timing_summary -file $here/out_cga/synth_timing.rpt
 opt_design

@@ -20,6 +20,9 @@ module KF8237_Timing_And_Control (
     input   logic           clock,
     input   logic           cpu_clock_posedge,
     input   logic           cpu_clock_negedge,
+    // pc10-iii: the clk before cpu_clock_posedge; in S4 the strobes end there,
+    // one clk before the edge at which the 8237 leaves S4 (xt_board.sv cmd_en)
+    input   logic           cpu_clock_preposedge,
     input   logic           reset,
 
     // Internal Bus
@@ -623,6 +626,8 @@ module KF8237_Timing_And_Control (
                 io_read_n_out_next = 1'b1;
             else
                 io_read_n_out_next = io_read_n_out;
+        else if (cpu_clock_preposedge && state == S4)   // pc10-iii
+            io_read_n_out_next = 1'b1;
         else
             io_read_n_out_next = io_read_n_out;
     end
@@ -647,6 +652,8 @@ module KF8237_Timing_And_Control (
                 memory_read_n_next = 1'b1;
             else
                 memory_read_n_next = memory_read_n;
+        else if (cpu_clock_preposedge && state == S4)   // pc10-iii
+            memory_read_n_next = 1'b1;
         else
             memory_read_n_next = memory_read_n;
     end
@@ -692,6 +699,8 @@ module KF8237_Timing_And_Control (
                     io_write_n_out_next = io_write_n_out;
             else
                 io_write_n_out_next = io_write_n_out;
+        else if (cpu_clock_preposedge && state == S4)   // pc10-iii
+            io_write_n_out_next = 1'b1;
         else
             io_write_n_out_next = io_write_n_out;
     end
@@ -721,6 +730,8 @@ module KF8237_Timing_And_Control (
                     memory_write_n_next = memory_write_n;
             else
                 memory_write_n_next = memory_write_n;
+        else if (cpu_clock_preposedge && state == S4)   // pc10-iii
+            memory_write_n_next = 1'b1;
         else
             memory_write_n_next = memory_write_n;
     end

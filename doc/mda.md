@@ -34,8 +34,8 @@ clock, section 2), `HRES_STOP` (section 3.5), `AP_X/AP_W/AP_Y/AP_H`
 
 The MDA has its own 16.257 MHz crystal (the Hercules card 16.000 MHz),
 asynchronous to the PC's 14.318 MHz. The core has one clock,
-`clk` = 100.2273 MHz = 2205/22 MHz, and 16.257 MHz is not a divisor of it
-(6.165 clk per dot).
+`clk` = 28.63636 MHz = 315/11 MHz (since 2026-10-23; 100.2273 MHz before),
+and 16.257 MHz is not a divisor of it (1.761 clk per dot).
 
 **Choice:** a fractional accumulator inside the card, on `clk`. Each clk it
 adds `DOT_INC`; when it passes `DOT_MOD` that clk is a rising dot clock
@@ -43,20 +43,27 @@ edge; when it passes `DOT_MOD`/2 it is a falling edge.
 
 | Card | Dot clock | `DOT_INC` / `DOT_MOD` | clk per dot |
 |---|---|---|---|
-| MDA | 16.257000 MHz | 59609 / 367500 (= 16.257 x 22 / 2205) | 6.165 |
-| Hercules | 16.000000 MHz | 704 / 4410 (= 16 x 22 / 2205) | 6.264 |
+| MDA | 16.257000 MHz | 59609 / 105000 (= 16.257 x 11 / 315) | 1.761 |
+| Hercules | 16.000000 MHz | 352 / 630 (= 16 x 11 / 315) | 1.790 |
 
-- The average frequency is exact (no drift: 367500 clk give exactly
+- The average frequency is exact (no drift: 105000 clk give exactly
   59609 dots).
-- Each dot lasts 6 or 7 clk (59.9 or 69.8 ns instead of 61.5 ns): a jitter
-  of at most one clk (10 ns) on each edge. Inside the card this changes
+- Each dot lasts 1 or 2 clk (34.9 or 69.8 ns instead of 61.5 ns): a jitter
+  of at most one clk (35 ns) on each edge. Inside the card this changes
   nothing, because the card's logic only counts edges. On the video output
-  it is a 1-clk uncertainty of the dot edges, which the shell's scaler
-  removes anyway (it samples the dots at `vid_ce`).
+  it is a 1-clk uncertainty of the dot edges, which a scaler removes anyway
+  (it samples the dots at `vid_ce`).
+- A clk can hold both edges. A falling edge before the rising one (the
+  accumulator passes `DOT_MOD`/2, then `DOT_MOD`) is taken in that clk, its
+  logic seeing the state before the rising edge's update, as it should; a
+  falling edge after it (the accumulator passes `DOT_MOD`, then
+  `DOT_MOD` + `DOT_MOD`/2) is taken in the next clk (`fall_pend`), before
+  that clk's rising edge. So there is at most one falling edge per clk and
+  none is lost (at 100 MHz neither case existed).
 - The CPU side stays exact on `clk`: the board samples IOCHRDY at its
-  `cpu_fall` as the real 8284 samples the asynchronous card. Because the
+  `rdy_ce` as the real 8284 samples the asynchronous card. Because the
   ratio is not periodic over a short time (the pattern repeats only after
-  367500 clk), the dot phase seen by the CPU walks through all values as on
+  105000 clk), the dot phase seen by the CPU walks through all values as on
   a real PC.
 - A separate clock domain (an MMCM at 16.257 MHz) was not taken: the MMCM
   cannot make 16.257 MHz exactly from 100 MHz either, and it would need
@@ -186,25 +193,29 @@ character.
 
 The board (`xt_board.sv`) asserts MEMR and IOR at the falling CLK edge in
 T1, MEMW and IOW at the falling edge in T2 (the 8288's advanced write
-commands, as on the 5160), and samples IOCHRDY on `rdy_ce`, 2 clk before
-each rising CLK edge, as the 8284's first RDY stage: IOCHRDY 2 clk before the
-edge that ends T2 decides whether T3 is the last state, before the edge that
-ends T3 whether the first Tw is, and so on (doc/architecture.md section 3).
-The card sees MEMR/IOR 32 clk before the first of these samples and MEMW/IOW
-11 clk before it; IOCHRDY rises 5.5 to 14.5 dots (34 to 89 clk) after the
-strobe. Every CPU I/O cycle gets one extra wait from the board. That gives
-(measured in `tb/mda`, test `waits`, 3,000 accesses):
+commands, as on the 5160), and samples IOCHRDY on `rdy_ce`, 1 clk (35 ns)
+before each rising CLK edge, as the 8284's first RDY stage: IOCHRDY 1 clk
+before the edge that ends T2 decides whether T3 is the last state, before
+the edge that ends T3 whether the first Tw is, and so on
+(doc/architecture.md section 3). The card sees MEMR/IOR 9 clk (314 ns)
+before the first of these samples and MEMW/IOW 3 clk (105 ns) before it;
+IOCHRDY rises 5.5 to 14.5 dots (338 to 892 ns) after the strobe. Every CPU
+I/O cycle gets one extra wait from the board. That gives (measured in
+`tb/mda`, test `waits`, 3,000 accesses; 28.63636 MHz, 2026-10-23):
 
 | Access | Wait states | Mean |
 |---|---|---|
-| VRAM read (MEMR) | 1-3 | 1.89 |
-| VRAM write (MEMW) | 2-4 | 2.97 |
-| 6845 read (IOR, incl. the board's 1; right after the 3B4 write) | 1-2 | 1.20 |
-| 6845 write (IOW, incl. the board's 1) | 2-4 | 3.01 |
+| VRAM read (MEMR) | 1-3 | 2.06 |
+| VRAM write (MEMW) | 2-4 | 3.14 |
+| 6845 read (IOR, incl. the board's 1; right after the 3B4 write) | 1-3 (3 in 1%) | 1.35 |
+| 6845 write (IOW, incl. the board's 1) | 2-4 | 3.21 |
 | 3BA read | 1 (the board's) | 1.0 |
 
+(On the 100.2273 MHz clock, with the sample 20 ns before the edge and the
+dot edges on a 10 ns grid: 1.89, 2.97, 1-2 / 1.20 and 3.01.)
+
 Reads fit IBM's "at least one wait state will be inserted": IOCHRDY is
-never high at the first sample (the request is at most 32 clk = 319 ns old
+never high at the first sample (the request is at most 9 clk = 314 ns old
 there, the slot needs 338 ns).
 
 **Writes wait for the slot, and the write is done in it.** The card pulls
@@ -222,7 +233,7 @@ away for the transfer, the request is gone (U4 preset), and the returning
 strobe is a new request that writes in its own slot.
 
 The reads start one CPU clock before the 8288's MRDC/IORC on this board
-(doc/architecture.md section 3); on a real 5160 the read strobe comes 21 clk
+(doc/architecture.md section 3); on a real 5160 the read strobe comes one CPU clock
 later relative to the samples, so a real MDA's reads would get about one
 wait state more than these (open point, section 10).
 

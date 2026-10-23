@@ -41,7 +41,7 @@
 #include "verilated.h"
 #include "ucode_file.h"
 
-static const double CLK_HZ = 100227272.7;
+static const double CLK_HZ = 28636363.64;      // 315/11 MHz
 
 // A hard disk image and its geometry: -G, else the end CHS of the MBR's
 // partitions (heads = end head + 1, spt = end sector), else 16 x 63.
@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
     const char *fontfile = nullptr, *imgfile = nullptr;
     bool woracle = false;
     int wmax = 20;
-    int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 6)
+    int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 2)
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-b") && i + 1 < argc) bios = argv[++i];

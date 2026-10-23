@@ -15,12 +15,13 @@
 //
 // Timing (doc/hdc.md section 4; deterministic for a given backend):
 //   - BSY in the clk after the command write;
-//   - non-data commands, IDENTIFY and the first DRQ of a write: CMD_US;
+//   - non-data commands, IDENTIFY and the first DRQ of a write: CMD_US
+//     (IDENTIFY: or the 512 clk that writing its sector takes, if longer);
 //   - between DRQ blocks: at least BLK_US, and until the next block of a
 //     read is in the buffer (or a write has room for it);
 //   - a write completes when the backend has stored every sector;
 //   - power-up / RESET DRV / SRST: BSY for RESET_US after the reset ends.
-// The time base is a 1 us enable from a phase accumulator (clk x 22/2205).
+// The time base is a 1 us enable from a phase accumulator (clk x 11/315).
 //
 // The sector buffer has 8 slots of 512 bytes (hdc_secbuf.sv): reads are
 // prefetched up to 8 sectors ahead of the host, writes are committed behind
@@ -31,8 +32,8 @@
 module ata_dev #(
     parameter int SLOTS_LOG2 = 3,
     parameter int MULT_MAX   = 8,       // power of 2, <= 2**SLOTS_LOG2
-    parameter int US_NUM     = 22,      // 1 us = clk * US_NUM / US_DEN
-    parameter int US_DEN     = 2205,
+    parameter int US_NUM     = 11,      // 1 us = clk * US_NUM / US_DEN (28.63636 MHz = 315/11 MHz)
+    parameter int US_DEN     = 315,
     parameter int CMD_US     = 5,
     parameter int BLK_US     = 2,
     parameter int RESET_US   = 1000
@@ -628,7 +629,9 @@ always_ff @(posedge clk) begin
             h_sec <= 9'd0;  h_byte <= 10'd0;  blk_end <= 9'd1;
             e_next <= 9'd1;  e_done <= 9'd1;  e_err <= 1'b0;
             x_bsy <= 1'b1;  x_drq <= 1'b0;  pf_ok <= 1'b0;
-            tmr <= 16'(CMD_US);
+            // (pc10-iii, 28.63636 MHz: CMD_US runs from the command, while the
+            // 512 bytes are written, 18 us; it was reloaded here when that
+            // took 5 us at 100 MHz)
             st <= S_XFER;
         end else begin
             a_addr  <= {SLOTS_LOG2'(0), id_idx[8:0]};
