@@ -55,10 +55,10 @@ why, test numbers).
 
 ## Harness facts
 
-- **Clocking:** CORE_CLK 100 MHz, CLK 4.7727 MHz from a phase accumulator
-  (20 or 21 core clocks per 8088 clock), 1/3 duty. biu88 steps at `step`,
-  the EU at `step` + 3 clk (its enable, one microinstruction per 8088 clock);
-  each changes state only there. The harness streams the microcode bundle
+- **Clocking:** CORE_CLK 28.63636 MHz (the PC's clock, doc/clock-plan.md),
+  CLK 4.7727 MHz = 6 core clocks per 8088 clock, high for 2 (1/3 duty).
+  biu88 steps at `step`, the EU at `step` + 1 clk (its enable, `EU_DELAY`,
+  one microinstruction per 8088 clock); each changes state only there. The harness streams the microcode bundle
   through the load port once per process (`$PC10_UCODE`).
 - **Loader:** the CPU's registers come from a program served on the bus
   (POPF, MOV r16,imm, MOV sreg,AX, JMP FAR).

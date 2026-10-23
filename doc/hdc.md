@@ -19,7 +19,7 @@ by sector, like the floppy images.
 | `tb/sys/hd/mbr.S`, `mkhdimg.py` | the hard disk test image of the system bench |
 | `tools/xubcfg.py` | configures an XUB binary for the card (device type, port), pads it and fixes the checksum |
 
-All on `clk` (100.2273 MHz) with a 1 us enable inside `ata_dev`. One RAMB36
+All on `clk` (28.63636 MHz) with a 1 us enable inside `ata_dev` (clk x 11/315). One RAMB36
 for the buffer; the ROM socket is the glue's (8 KB = 2, 16 KB = 4 RAMB36).
 
 ## 2. Which XTIDE
@@ -198,7 +198,7 @@ What the CPU sees is deterministic for a given backend:
 | Event | Time | Source |
 |---|---|---|
 | BSY after a command write | the next clk | ATA: within 400 ns |
-| non-data command, IDENTIFY, first DRQ of a write | `CMD_US` = 5 us | plausible for a fast drive / CF card; MartyPC answers at once |
+| non-data command, IDENTIFY, first DRQ of a write | `CMD_US` = 5 us (IDENTIFY: or the 512 clk = 18 us of writing its sector into the buffer, if longer) | plausible for a fast drive / CF card; MartyPC answers at once |
 | first DRQ of a read | `CMD_US`, or later when the backend is slower | the backend's latency |
 | between DRQ blocks | `BLK_US` = 2 us, plus any wait for the backend | |
 | end of a write | when the backend has stored every sector | write-through, like the FDC |
@@ -309,7 +309,7 @@ tests run for each of the three register maps:
 - MULTIPLE: ABRT before SET MULTIPLE, SET MULTIPLE 128/16/3 ABRT, 8 and 4
   accepted, READ MULTIPLE 20 (blocks 8+8+4), 13 (m = 4), 256 through the
   ring, WRITE MULTIPLE 21 and 9, the number of interrupts per command;
-- timing and INTRQ: IDENTIFY DRQ ~10 us after the command, alternate status
+- timing and INTRQ: IDENTIFY DRQ ~18 us after the command (10 us at 100 MHz), alternate status
   vs status, no interrupt at the end of a read, one per block, the first
   sector after the backend's 50 us, later ones `BLK_US` after the block's
   last strobe (prefetched), nIEN, no INTRQ before a write's first block, the

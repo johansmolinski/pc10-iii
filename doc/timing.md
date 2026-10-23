@@ -5,6 +5,10 @@ its own branch (`cpu-timing`); this is everything else in `pc_system` and the
 glue that failed 100.2273 MHz in build `pc10-real-d` (doc/m2m-shell.md
 section 11).
 
+**Since 2026-10-23 the PC runs on 28.63636 MHz** (branch `clk28`,
+doc/clock-plan.md): sections 1-4 are the history of the 100 MHz design;
+section 5 says what of it is left and what the slower clock changed.
+
 The rule: **no change of behaviour**. Every change in `pc_system` is a
 retiming that keeps the value of every signal the rest of the design sees in
 every `clk`, or one whose difference is provably never used (the 8253
@@ -308,3 +312,53 @@ setup slack between the blocks on `main_clk` (final checkpoint, reports in
 | LUTs | 26381 | 26524 |
 | FFs | 18716 | 19089 |
 | Block RAM tiles | 238.5 | 238.5 |
+
+## 5. The PC on 28.63636 MHz (2026-10-23, branch `clk28`)
+
+The PC runs on the PC10-III's master clock, 28.63636 MHz = 2 x OSC
+(doc/clock-plan.md, doc/architecture.md section 1): a clock is 34.9 ns
+instead of 10 ns, and the whole PC side closes out of context with a large
+margin (doc/history.md, 2026-10-23). What that changes here:
+
+- **No exceptions.** `rtl/cpu/cpu8088.xdc` (3-clock multicycle paths between
+  the EU and biu88) is gone; the EU's enable is one clk after the step
+  (`EU_DELAY` 1), so biu88 -> EU is a single-clock path anyway. CORE.xdc
+  lost the floppy geometry's 4-clock multicycle, the PC reset's
+  `FORCE_MAX_FANOUT` and the main/video clock pair (one clock now).
+- **The RAM answers after 2 clocks** (`pc_ram.vhd`: request register, the
+  banks' block RAM registers, a multiplexer), not 6. Section 2.10 holds as
+  before: the board takes the data at `ram_ack`; tb/sys gives the identical
+  trace with `-L 2`.
+- **What stays**: the retimings of section 2 (registered bus address, DACK,
+  command registers, the 8253 decrements, the FDC's and the CGA's registered
+  decodes, the 765's op decodes, the FDC's per-drive LBA). They are exact
+  (checked in simulation) and cost little; at 28.6 MHz they are not needed
+  for timing, but taking them out is a change of its own.
+- **The order within an OSC tick.** On the 100 MHz clock a tick had 7 clk:
+  the board's edge (sub-slot 0), 5 clk in which registered follow-ups of a
+  bus event happened (a command ending one clk after T4 began, the CPU's
+  command one clk after AEN fell, the CGA's I/O access one clk after the
+  strobe, DRQ0 two registers deep), `rdy_ce` (5) and the CGA's dot tick (6).
+  At 28.63636 MHz a tick has 2 clk: the board's edge and the tick, with
+  `rdy_ce` in the tick's clk. Every follow-up that the next tick (or the
+  next CPU edge) saw on the 100 MHz clock must therefore happen at the
+  board's edge itself:
+  - the commands end at the edge where T4 begins (`cyc_end`, from a mirror of
+    biu88's "this T3/Tw is the last" flag, checked in simulation);
+  - the 8237 ends its strobes one clk before the edge that ends S4
+    (`cpu_prestep`), and the CPU's commands come back with AEN (no `aen_d`);
+    the memory keeps driving a DMA read's data in that clk (`dma_mem_src`),
+    as the trace shows it;
+  - the 8237's DREQ register takes DRQ0's D input;
+  - the CGA acts on I/O in the strobe's last clk (from `isa_*_next`), counts
+    the tick in which an access starts, and computes its dots 3 ticks late
+    (doc/cga.md section 2).
+  The MartyPC system trace (DRQ0_SKEW 7, 1.27 s) is byte-identical to the
+  100 MHz design's (SHA-256), the `-d EE` trace too; SST and the card benches
+  as before (doc/history.md).
+- **Real time** stays real time: the FDC's and the XTIDE's 1 us enables count
+  11/315 per clk; the XTIDE's CMD_US for IDENTIFY now runs while the card
+  writes the sector (512 clk = 18 us at 28.6 MHz, 5 us before). The MDA's
+  crystal is 59609/105000 (Hercules 352/630) of clk: a dot is 1.76 clk, so a
+  falling dot edge after the rising one in the same clk is taken in the next
+  clk (`fall_pend`, doc/mda.md section 2).

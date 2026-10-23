@@ -1,11 +1,13 @@
 # Clock plan: the PC on the PC10-III's master clock
 
-Status: 2026-10-22, an assessment (phase C of the z86 work), nothing
-implemented. Today the whole PC runs on `clk` = 100.2273 MHz = 7 x OSC with
-clock enables (doc/architecture.md section 1). Since the 8088 is z8086's EU
-with biu88 at one step per 8088 clock (doc/z8086.md), nothing in the PC needs
-a clock faster than the real machine's. This note is what it takes to run the
-PC on the PC10-III's own master clock.
+Status: **done** (2026-10-23, branch `clk28`; section 6 says what was done
+and where it went beyond this plan). Sections 1-5 are the assessment of
+2026-10-22 (phase C of the z86 work), written while the whole PC ran on
+`clk` = 100.2273 MHz = 7 x OSC with clock enables. Since the 8088 is z8086's
+EU with biu88 at one step per 8088 clock (doc/z8086.md), nothing in the PC
+needs a clock faster than the real machine's. This note is what it takes to
+run the PC on the PC10-III's own master clock. Turbo (section 5, step 5) is
+still open.
 
 ## 1. The master clock
 
@@ -172,3 +174,47 @@ PC's clock or keep their own CDCs (section 4).
 5. Turbo: 0x63 in the board, wait states (the FE2010A's table), the 9.54 MHz
    falling edge; needs a reference (a PC10-III with a logic analyser, or the
    FE2010A's documentation if it turns up).
+
+## 6. Done (2026-10-23, branch `clk28`)
+
+The whole PC side runs on one 28.63636 MHz clock (MMCM as before: VCO
+1102.5 MHz / 38.5; `main_clk` = M2M's video clock, one net). Steps 1-4 of
+section 5; turbo (step 5) is not part of it.
+
+- `pc_clocks.sv`: a modulo-24 counter (OSC/12) and the CPU clock's own
+  modulo-6 counter (`CPU_DIV`, `CPU_HIGH` = 2: the 8284's 1/3 duty).
+  `ce_14m` every 2, `cpu_step` every 6, `cpu_fall` = step + 2, `rdy_ce` =
+  step - 1, a new `cpu_prestep` (the clk before the step), PCLK every 24.
+  PHASE is in OSC ticks.
+- CPU: `EU_DELAY` 1; `rtl/cpu/cpu8088.xdc` deleted (and its entry in
+  `CORE/CORE-R6.xpr`, `tools/gen_xpr.py`).
+- Board, beyond the plan: on the 100 MHz clock four things happened a clk or
+  two after a CPU edge, still before anything else ticked; at 2 clk per OSC
+  tick they would have come a tick (or a CPU clock) late (doc/timing.md
+  section 5). The commands now end at the edge where T4 begins (`cyc_end`,
+  the board mirrors biu88's "last T3/Tw" flag); the 8237 ends its strobes
+  one clk before the edge that ends S4 (`cpu_prestep`) and the CPU's
+  commands return with AEN (`aen_d` is gone); the 8237's DREQ register takes
+  DRQ0's D input; `DRQ0_SKEW` counts CPU clocks of 6 clk.
+- CGA, beyond `CE_DELAY` 1: I/O acts in the strobe's last clk (next-clk bus
+  values, three new ports), an access counts the tick it starts in, the
+  80-column switch takes a pending mode in the post clk, the composite VSYNC
+  shift is one clk earlier, and the dots are computed 3 ticks late
+  (the character fetch takes 5 clk, a tick 2; doc/cga.md section 2).
+  RD_LEAD/WR_LEAD and the IOCHRDY release are unchanged (ticks).
+- MDA: 59609/105000 (16.257 MHz), Hercules 352/630 (16.000 MHz); a falling
+  dot edge that comes after the rising one in the same clk is taken in the
+  next clk (`fall_pend`; without it the accumulator could pass it unseen).
+- FDC/XTIDE: `US_NUM/US_DEN` 11/315; the XTIDE's IDENTIFY keeps CMD_US from
+  the command (it was reloaded after writing the sector, 512 clk).
+- CORE: `clk.vhd` one output; `main.vhd` registers RGBI, syncs, blanks and
+  `vid_ce` together on that clock (no crossing); `pc_ram.vhd` latency 2;
+  CORE.xdc: one clock, no multicycle, no `FORCE_MAX_FANOUT`. QNICE <-> main
+  stays bounded to 20 ns. `pc_fdd_sd`, `pc_bios`, `pc_font`, `pc_ucode`,
+  `keyboard`: unchanged (their copies take 3.5 times longer, under 0.3 ms).
+- Testbenches: tb/sys (`CLK_HZ`), tb/sst (6 clk per CPU clock, integer),
+  tb/cga (2/6 clk, the T4 end, next-clk values, `LAT` 6), tb/mda (the same,
+  the model's accumulator), tb/fdc and tb/hdc (bus cycles in units of
+  `C` = 6), tb/shell (clock period, RAM latency 2, longer copy waits, the
+  stand-in's constants).
+- Results: doc/history.md (2026-10-23).

@@ -1,34 +1,48 @@
 # PC10-III core - architecture
 
-Status: 2026-10-22, the contract between the parallel work tracks (CPU,
-system board, CGA, floppy, hard disk, MEGA65 shell). Change it only together
-with every module it names.
+Status: 2026-10-23 (the PC on 28.63636 MHz, doc/clock-plan.md), the contract
+between the parallel work tracks (CPU, system board, CGA, floppy, hard disk,
+MEGA65 shell). Change it only together with every module it names.
 
 ## 1. Clocks
 
-One clock domain for the whole PC: **`clk` = 100.2273 MHz = 7 x 14.31818 MHz**
-(MMCM from the board's 100 MHz: M = 55.125, D = 5, O = 11, VCO 1102.5 MHz;
-exact, 2205/22 MHz). Everything PC-side runs on `clk` with clock enables:
+One clock domain for the whole PC: **`clk` = 28.63636 MHz = 2 x 14.31818
+MHz**, the PC10-III's master clock (its FE2010A takes a 28.63636 MHz crystal;
+doc/clock-plan.md). MMCM from the board's 100 MHz: M = 55.125, D = 5,
+O = 38.5, VCO 1102.5 MHz; exact, 315/11 MHz. The same net is M2M's video
+clock. Everything PC-side runs on `clk` with clock enables:
 
 | Enable | Rate | Period in `clk` | Use |
 |---|---|---|---|
-| `ce_14m` | 14.31818 MHz (OSC) | 7 | CGA dot clock, composite, the master phase |
-| `cpu_step` | 4.77273 MHz (CLK88) | 21 | biu88/EU step (the 8088 clock edge) |
-| `rdy_ce` | 4.77273 MHz | 21, 2 before `cpu_step` | the 8284's RDY sample (READY) |
-| `ce_pclk` | 1.19318 MHz (PCLK) | 84 | 8253 counters (OSC/12) |
+| `ce_14m` | 14.31818 MHz (OSC) | 2 | CGA dot clock, composite, the master phase |
+| `cpu_step` | 4.77273 MHz (CLK88) | 6 | biu88 step (the 8088 clock's rising edge) |
+| `cpu_fall` | 4.77273 MHz | 6, 2 after `cpu_step` | the falling CLK edge (8288 commands, 8237) |
+| `rdy_ce` | 4.77273 MHz | 6, 1 before `cpu_step` | the 8284's RDY sample (READY) |
+| `cpu_prestep` | 4.77273 MHz | 6, 1 before `cpu_step` | the 8237's strobe end in S4 (section 3) |
+| `ce_pclk` | 1.19318 MHz (PCLK) | 24 | 8253 counters (OSC/12) |
 
-- All enables derive from **one modulo-84 counter** (`pc_clocks.sv`), so the
-  OSC/CLK88/PCLK phase relation is fixed like the 8284 + 74LS175 on the
-  5160 board. *Area 5150* depends on the CPU-CGA phase; the counter's reset
-  phase is a parameter.
-- The 8088 CLK has a 1/3 duty cycle: high for 7 `clk`, low for 14. Logic that
-  the IBM schematic clocks on the falling CLK edge uses `cpu_fall`
-  (7 `clk` after `cpu_step`).
-- `ce_14m` falls on `cpu_step` and on `cpu_fall` (7 and 21 are multiples of 7).
-- The 8088 (`cpu8088`, `CPU = "z86"`, doc/z8086.md): biu88 steps at
-  `cpu_step`; z8086's EU executes one microinstruction per 8088 clock, at
-  `cpu_step` + 3 `clk` (its clock enable). Both change state only there.
-- Turbo (FE2010A 7.16/9.54 MHz) is not part of this contract yet.
+An enable is high for one `clk`; what it enables happens at the clock edge
+that ends that `clk`.
+
+- All enables derive from **one modulo-24 counter** and the CPU clock's own
+  modulo-6 counter (`pc_clocks.sv`), so the OSC/CLK88/PCLK phase relation is
+  fixed like the 8284 + 74LS175 on the 5160 board. *Area 5150* depends on the
+  CPU-CGA phase; the counter's reset phase is a parameter (OSC ticks).
+- The 8088 CLK has the 8284's 1/3 duty cycle: high for 2 `clk`, low for 4.
+  Logic that the IBM schematic clocks on the falling CLK edge uses `cpu_fall`.
+- `ce_14m`, `cpu_step` and `cpu_fall` are in even `clk`s: the edges that end
+  them are OSC rising edges. `rdy_ce`, `cpu_prestep` and the CGA's dot tick
+  (`cga_card.sv` CE_DELAY = 1) are in odd ones, half an OSC period later.
+  With only one `clk` between the board's edge and the card's tick, nothing
+  the board does on a CPU edge may take a `clk` longer before a card sees it
+  (the commands' end, the DMA hand-over, section 3; the CGA's own bus logic,
+  doc/cga.md section 2; doc/timing.md section 5).
+- The 8088 (`cpu8088`, doc/z8086.md): biu88 steps at `cpu_step`; z8086's EU
+  executes one microinstruction per 8088 clock, at `cpu_step` + 1 `clk` (its
+  clock enable, `EU_DELAY`). Both change state only there; every path between
+  them is an ordinary single-clock path (no multicycle constraints).
+- Turbo (FE2010A 7.16/9.54 MHz: the CPU clock divided by 4 and 3 instead of
+  6) is not part of this contract yet; `pc_clocks.sv` is structured for it.
 
 ## 2. Module tree
 
@@ -86,7 +100,10 @@ I/O: FDC 3F0-3F7, XTIDE 300-31F (variant 0) or 300-30F (variants 1/2).
 Bus timing (`xt_board.sv`, the 8288 function; marked CAL there, cards such as
 the CGA depend on it):
 - MEMR/IOR/INTA go low at the CLK falling edge (`cpu_fall`) in T1, MEMW/IOW
-  at the falling edge in T2; all go high in the `clk` where T4 begins (+1).
+  at the falling edge in T2; all go high at the CLK edge where T4 begins
+  (`cyc_end`: the board knows in the `clk` before that edge that the CPU
+  enters T4, from READY at the edge that started the running T3/Tw; on the
+  100 MHz clock they went high one `clk` after that edge).
 - MEMW/IOW are the 8288's **advanced** write commands (AMWC/AIOWC), as on
   the 5160 (IBM wires AMWC/AIOWC to -MEMW/-IOW, MWTC/IOWC are unused; so does
   KFPC-XT, built from the 5160 logic). MartyPC asserts MRDC and AMWC/AIOWC
@@ -101,14 +118,13 @@ the CGA depend on it):
   then falling edge) and the 8088 samples READY at the next rising edge, the
   one that ends T3/Tw. So RDY at the rising edge that ends T2 decides whether
   T3 is the last state, RDY at the edge that ends T3 whether the first Tw is,
-  and so on. `xt_board.sv` samples `isa_ready` on `rdy_ce` (`pc_clocks`, 2
-  `clk` before `cpu_step`: the edge, less the RDY setup time) into the
-  register that drives READY_IN, so READY_IN is stable over the clock before
-  the step and the step's own (biu88 reads it on the step's clock, and its
-  copy `p1_ready` two clocks later). biu88 decides at that step whether the
-  T3/Tw it enters is the last (MartyPC: wait states fixed at T2).
+  and so on. `xt_board.sv` samples `isa_ready` on `rdy_ce` (`pc_clocks`, 1
+  `clk` = 35 ns before `cpu_step`: the edge, less the RDY setup time) into
+  the register that drives READY_IN, so READY_IN is stable over the step's
+  clock (biu88 reads it there). biu88 decides at that step whether the T3/Tw
+  it enters is the last (MartyPC: wait states fixed at T2).
 - A card that pulls IOCHRDY low on the strobe therefore stretches both kinds
-  of cycle: MEMR/IOR are 33 `clk` old at the first sample, MEMW/IOW 12
+  of cycle: MEMR/IOR are 9 `clk` old at the first sample, MEMW/IOW 3
   (IBM's rule for the I/O channel: "drive it low immediately upon detecting a
   valid address and a read or write command"). Until 2026-10-22 IOCHRDY was
   sampled at `cpu_fall` in T2, the edge where MEMW starts: no write could
@@ -117,14 +133,20 @@ the CGA depend on it):
   DMA term changes only on `cpu_step`, so `rdy_ce` sees the value `cpu_fall`
   saw (checked in simulation); every CPU I/O cycle gets one wait state,
   counted only where the DMA wait is over (MartyPC's cycle.rs).
-- After a DMA transfer the CPU's commands come back one `clk` after AEN
-  falls (`cmd_en` in `xt_board.sv`): AEN falls in the `clk` in which the
-  8237 ends its strobes, so a CPU command the DMA held would otherwise
-  continue the 8237's strobe of the same kind without a high phase (a
-  refresh's IOW running into the CPU's OUT; the FDC dropped the DOR write,
-  2026-10-22). A strobe line never changes owner while it is low (checked
-  in simulation), so a strobe that starts with AEN high is the DMA's to its
-  end.
+- After a DMA transfer the CPU's commands come back with AEN low (`cmd_en`
+  in `xt_board.sv`). AEN falls at the CLK edge that ends S4, and the 8237
+  ends its strobes one `clk` before that edge (`cpu_prestep`, KF8237), so a
+  CPU command the DMA held starts after a high phase: without it, it would
+  continue the 8237's strobe of the same kind (a refresh's IOW running into
+  the CPU's OUT; the FDC dropped the DOR write, 2026-10-22). A strobe line
+  never changes owner while it is low (checked in simulation), so a strobe
+  that starts with AEN high is the DMA's to its end. (On the 100 MHz clock
+  the gap was the `clk` after AEN fell; at 28.63636 MHz that `clk` is after
+  the cards' next dot tick, so the gap moved before the edge. The memory
+  still drives a DMA read's data in that last `clk`.)
+- DRQ0 (refresh): the 8237's own DREQ register takes the 74LS74's D input,
+  so a request that the 8253 raises at a rising CLK edge is seen at the
+  falling edge 2 `clk` later, as on the 100 MHz clock.
 - Read data is taken in the `clk` where T4 begins.
 - `ce_14m` coincides with `cpu_step` and `cpu_fall` (pc_clocks, any PHASE);
   the card state that `rdy_ce` samples is the one after the dot update for
@@ -139,7 +161,7 @@ module pc_system #(
     parameter bit CGA_FIT = 1'b1,     // the CGA is in the machine
     parameter int MDA_FIT = 0         // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
 ) (
-    input  logic        clk,          // 100.2273 MHz
+    input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high, >= 1 CPU clock
 
     // The 8088's microcode bundle (tools/mkucode.py, doc/z8086.md), owned by
@@ -173,7 +195,7 @@ module pc_system #(
     output logic        vid_vblank,
 
     // MDA / Hercules video (MDA_FIT != 0), doc/mda.md section 6: one dot per
-    // mda_ce (16.257 MHz / Hercules 16.000 MHz on average, 6 or 7 clk);
+    // mda_ce (16.257 MHz / Hercules 16.000 MHz on average, 1 or 2 clk);
     // 882 x 370 dots per frame, 18.43 kHz, 49.8 Hz
     output logic        mda_ce,
     output logic        mda_video,    // +VIDEO
@@ -243,17 +265,17 @@ module pc_system #(
 ```
 
 Notes (2026-10-21, from the shell build):
-- `ram_ack` may come later than 1 clk (the shell answers after 6: the request
-  is pipelined on its way to and from 160 BRAM tiles, doc/timing.md);
+- `ram_ack` may come later than 1 clk (the shell answers after 2 since
+  2026-10-23, after 6 on the 100 MHz clock, doc/timing.md);
   `xt_board` takes read data at `ram_ack`, well before the CPU samples it at
   the end of T3.
 - The keyboard self-test answer (0xAA after the BIOS holds the clock low for
   more than ~10 ms) comes from `xt_board`; the glue only sends scan codes.
 - The CGA's 59.92 Hz against HDMI's 60 Hz drops or repeats a frame about
   every 13 s; a 59.92 Hz HDMI mode would be a new framework exception.
-- Timing closure (open): the CPU alone misses 100.2 MHz by 6.6 ns (BIU) and
-  2.6 ns (EU); the BIU's state only advances on `cpu_step`, so it can be
-  restructured into multicycle paths without changing its behaviour.
+- Timing closure: at 100.2273 MHz it took multicycle paths in the CPU and
+  the retimings of doc/timing.md; since 2026-10-23 the PC runs on 28.63636
+  MHz without exceptions (doc/clock-plan.md section 6).
 
 Notes (2026-10-22, hard disk):
 - The option ROM socket belongs to the XTIDE card (a real XTIDE carries its
