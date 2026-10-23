@@ -70,6 +70,11 @@ entity main is
       font_data_i             : in  std_logic_vector(7 downto 0);
       font_thin_i             : in  std_logic;
 
+      -- The 8088's microcode bundle (pc_ucode.vhd): the file, one byte per clock, in reset
+      ucl_we_i                : in  std_logic;
+      ucl_addr_i              : in  std_logic_vector(12 downto 0);
+      ucl_data_i              : in  std_logic_vector(7 downto 0);
+
       -- Floppy drives and the sector port (pc_fdd_sd.vhd)
       drv_80trk_i             : in  std_logic_vector(1 downto 0);
       img_present_i           : in  std_logic_vector(1 downto 0);
@@ -123,6 +128,9 @@ architecture synthesis of main is
          font_addr   : in  std_logic_vector(12 downto 0);
          font_data   : in  std_logic_vector(7 downto 0);
          font_thin   : in  std_logic;
+         ucl_we      : in  std_logic;
+         ucl_addr    : in  std_logic_vector(12 downto 0);
+         ucl_data    : in  std_logic_vector(7 downto 0);
          drv_80trk   : in  std_logic_vector(1 downto 0);
          img_present : in  std_logic_vector(1 downto 0);
          img_wp      : in  std_logic_vector(1 downto 0);
@@ -215,6 +223,9 @@ begin
          font_addr   => font_addr_i,
          font_data   => font_data_i,
          font_thin   => font_thin_i,
+         ucl_we      => ucl_we_i,
+         ucl_addr    => ucl_addr_i,
+         ucl_data    => ucl_data_i,
          drv_80trk   => drv_80trk_i,
          img_present => img_present_i,
          img_wp      => img_wp_i,

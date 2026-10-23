@@ -11,6 +11,16 @@ module tb_sys #(
 ) (
     input  logic        clk,
     input  logic        reset,
+    // the 8088's microcode bundle (sys_run.cpp streams the file in reset)
+    input  logic        ucl_we,
+    input  logic [12:0] ucl_addr,
+    input  logic [7:0]  ucl_data,
+    // instruction log (sys_run -i): the EU's dispatch of a first byte
+    output logic        it_disp,
+    output logic [7:0]  it_op,
+    output logic [15:0] it_ip,
+    output logic [15:0] it_ax, it_bx, it_cx, it_dx, it_sp, it_bp, it_si, it_di,
+    output logic [15:0] it_ds, it_es, it_ss, it_f,
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -122,6 +132,9 @@ assign ram_rdata = rd_sh[ram_lat - 1];
 pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT)) u_pc (
     .clk        (clk),
     .reset      (reset),
+    .ucl_we     (ucl_we),
+    .ucl_addr   (ucl_addr),
+    .ucl_data   (ucl_data),
     .ram_addr   (ram_addr),
     .ram_en     (ram_en),
     .ram_we     (ram_we),
@@ -203,12 +216,48 @@ assign io_wr    = !u_pc.isa_iow_n && !iow_d && !u_pc.isa_aen;
 assign io_addr  = u_pc.isa_addr[15:0];
 assign io_data  = u_pc.isa_dout;
 assign cpu_step = u_pc.cpu_step;
-assign cs       = u_pc.u_cpu.biu.reg_cs;
-assign ip       = u_pc.u_cpu.biu.eu_ip;
+assign cs       = u_pc.u_cpu.dbg_cs;
+assign ip       = u_pc.u_cpu.dbg_ip;
 assign bus_t    = u_pc.cpu_bus_t;
 assign bus_type = u_pc.cpu_bus_type;
 assign bus_addr = u_pc.u_board.cpu_addr;  // the CPU's latched address (as MartyPC's trace)
 assign bus_data = u_pc.cpu_bus_type == 3'd6 || u_pc.cpu_bus_type == 3'd2 ? u_pc.isa_dout : u_pc.cpu_din;
 assign qs       = u_pc.cpu_qs;
+
+// the EU's first clock of an instruction (not an interrupt): its opcode is q_top
+assign it_disp = u_pc.u_cpu.cpu.dbg_ce && u_pc.u_cpu.cpu.eu.FC && !u_pc.u_cpu.cpu.eu.irq_take;
+assign it_op   = u_pc.u_cpu.cpu.eu.q_top;
+assign it_ip   = u_pc.u_cpu.cpu.eu.biu_ip;
+assign it_ax   = u_pc.u_cpu.cpu.eu.AX;
+assign it_bx   = u_pc.u_cpu.cpu.eu.BX;
+assign it_cx   = u_pc.u_cpu.cpu.eu.CX;
+assign it_dx   = u_pc.u_cpu.cpu.eu.DX;
+assign it_sp   = u_pc.u_cpu.cpu.eu.SP;
+assign it_bp   = u_pc.u_cpu.cpu.eu.BP;
+assign it_si   = u_pc.u_cpu.cpu.eu.SI;
+assign it_di   = u_pc.u_cpu.cpu.eu.DI;
+assign it_ds   = u_pc.u_cpu.cpu.eu.DS;
+assign it_es   = u_pc.u_cpu.cpu.eu.ES;
+assign it_ss   = u_pc.u_cpu.cpu.eu.SS;
+assign it_f    = u_pc.u_cpu.cpu.eu.F;
+
+// +ztrace_from=<step> +ztrace_to=<step>: one line per EU clock (sys_run passes
+// plusargs through), the step number as the -t trace's first column
+longint unsigned zsteps = 0, zfrom = 0, zto = 0;
+initial begin
+    if ($value$plusargs("ztrace_from=%d", zfrom)) ;
+    if ($value$plusargs("ztrace_to=%d", zto)) ;
+end
+always_ff @(posedge clk) if (u_pc.cpu_step && !reset) zsteps <= zsteps + 1;
+always_ff @(posedge clk)
+    if (zto != 0 && zsteps >= zfrom && zsteps < zto && u_pc.u_cpu.cpu.dbg_ce)
+        $display("z %0d ls=%0d FC=%b SC=%b ROME=%b st=%b busy=%b row=%03h RNI=%b NXT=%b qe=%b qt=%02h IR=%02h ip=%04h t=%0d irq=%b int=%b F=%04h CX=%04h",
+                 zsteps, u_pc.u_cpu.cpu.eu.loader_state, u_pc.u_cpu.cpu.eu.FC,
+                 u_pc.u_cpu.cpu.eu.SC, u_pc.u_cpu.cpu.eu.ROME, u_pc.u_cpu.cpu.eu.stall,
+                 u_pc.u_cpu.cpu.eu.bus_busy, u_pc.u_cpu.cpu.tables.uc_row,
+                 u_pc.u_cpu.cpu.eu.RNI, u_pc.u_cpu.cpu.eu.NXT, u_pc.u_cpu.cpu.eu.q_empty,
+                 u_pc.u_cpu.cpu.eu.q_top, u_pc.u_cpu.cpu.eu.IR, u_pc.u_cpu.cpu.eu.biu_ip,
+                 u_pc.cpu_bus_t, u_pc.u_cpu.cpu.eu.irq_take, u_pc.u_cpu.cpu.eu.int_cond,
+                 u_pc.u_cpu.cpu.eu.F, u_pc.u_cpu.cpu.eu.CX);
 
 endmodule

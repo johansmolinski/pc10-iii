@@ -39,6 +39,7 @@
 #include "Vtb_sys.h"
 #include "Vtb_sys___024root.h"
 #include "verilated.h"
+#include "ucode_file.h"
 
 static const double CLK_HZ = 100227272.7;
 
@@ -169,8 +170,21 @@ int main(int argc, char **argv) {
         fclose(xh);
         xplus = "+xub=" + xhex;
     }
-    const char *vargs[] = {argv[0], plus.c_str(), plat.c_str(), xplus.c_str()};
-    Verilated::commandArgs(xub ? 4 : 3, vargs);
+    // $SYS_PLUSARGS: more plusargs for the model, e.g. "+ztrace_from=606000 +ztrace_to=606050"
+    std::vector<std::string> extra;
+    if (const char *e = getenv("SYS_PLUSARGS")) {
+        std::string t;
+        for (const char *c = e;; c++) {
+            if (*c == ' ' || *c == 0) { if (!t.empty()) extra.push_back(t); t.clear(); if (!*c) break; }
+            else t += *c;
+        }
+    }
+    static const char *vargs[32];
+    int nv = 0;
+    vargs[nv++] = argv[0]; vargs[nv++] = plus.c_str(); vargs[nv++] = plat.c_str();
+    if (xub) vargs[nv++] = xplus.c_str();
+    for (auto &x : extra) if (nv < 32) vargs[nv++] = x.c_str();
+    Verilated::commandArgs(nv, vargs);
     Vtb_sys *tb = new Vtb_sys;
     FILE *tf = trace ? fopen(trace, "w") : nullptr;
     FILE *itf = itrace ? fopen(itrace, "w") : nullptr;
@@ -238,6 +252,18 @@ int main(int argc, char **argv) {
         tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval();
     }
     tb->font_we = 0;
+    {
+        // the 8088's microcode bundle through the CPU's load port, in reset
+        // ($PC10_UCODE, else make Z86_UCODE=...), as the core's firmware loads it
+        std::vector<uint8_t> uc;
+        std::string err;
+        if (!ucode_read(uc, err)) { fprintf(stderr, "%s\n", err.c_str()); return 2; }
+        for (size_t i = 0; i < uc.size(); i++) {
+            tb->ucl_we = 1; tb->ucl_addr = i; tb->ucl_data = uc[i];
+            tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval();
+        }
+        tb->ucl_we = 0;
+    }
     if (!trace) unlink(hex.c_str());       // the ROM is loaded (initial block ran)
     if (xub) unlink(xhex.c_str());
     tb->reset = 0;
@@ -366,26 +392,15 @@ int main(int argc, char **argv) {
         // instruction log: at the EU's dispatch of an instruction's first
         // byte (a prefix starts the instruction it belongs to)
         auto *r = tb->rootp;
-        bool disp = ((r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_rom_address >> 8) & 0x1F) == 1;
+        bool disp = tb->it_disp;
         static bool disp_d = false, in_prefix = false;
         if (itf && disp && !disp_d && cyc >= itrace_cyc) {
-            unsigned ob = r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__op_byte;
+            unsigned ob = tb->it_op;
             bool pre = ob == 0x26 || ob == 0x2E || ob == 0x36 || ob == 0x3E || ob == 0xF0 || ob == 0xF2 || ob == 0xF3;
             if (!in_prefix)
             fprintf(itf, "%.6f %04X:%04X AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X DS=%04X ES=%04X SS=%04X F=%04X\n",
-                    cyc / CLK_HZ * 1e3, tb->cs, r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__op_ip,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_ax,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_bx,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_cx,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_dx,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_sp,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_bp,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_si,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_register_di,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__reg_ds,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__reg_es,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__biu__DOT__reg_ss,
-                    r->tb_sys__DOT__u_pc__DOT__u_cpu__DOT__eu__DOT__eu_flags);
+                    cyc / CLK_HZ * 1e3, tb->cs, tb->it_ip, tb->it_ax, tb->it_bx, tb->it_cx, tb->it_dx,
+                    tb->it_sp, tb->it_bp, tb->it_si, tb->it_di, tb->it_ds, tb->it_es, tb->it_ss, tb->it_f);
             in_prefix = pre;
         }
         disp_d = disp;

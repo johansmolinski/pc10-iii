@@ -13,6 +13,12 @@ module pc_system #(
     input  logic        clk,
     input  logic        reset,
 
+    // the 8088's microcode bundle (tools/mkucode.py, doc/z8086.md): the file,
+    // one byte per clk at offset ucl_addr, while reset is high
+    input  logic        ucl_we,
+    input  logic [12:0] ucl_addr,
+    input  logic [7:0]  ucl_data,
+
     output logic [19:0] ram_addr,
     output logic        ram_en,
     output logic        ram_we,
@@ -131,6 +137,9 @@ cpu8088 u_cpu (
     .clk      (clk),
     .reset    (reset),
     .step     (cpu_step),
+    .ucl_we   (ucl_we),
+    .ucl_addr (ucl_addr),
+    .ucl_data (ucl_data),
     .ready    (cpu_ready),
     .intr     (cpu_intr),
     .nmi      (cpu_nmi),

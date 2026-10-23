@@ -5,15 +5,20 @@
 #   make MDA=1      build obj_mda/sys_run with the MDA fitted (MDA=2: Hercules,
 #                   obj_hgc); sys_run -m sets the mono DIP switches (doc/mda.md)
 
+# The 8088's microcode bundle (tools/mkucode.py, not in the repository) is
+# read at run time: $$PC10_UCODE, else Z86_UCODE compiled in.
+
 RTL  = ../../rtl
-CPU  = $(RTL)/cpu/mcl86
+Z86  = $(RTL)/cpu/z8086
 KF   = $(RTL)/system/kf
-ROMHEX ?= $(abspath $(CPU))/microcode.hex
+Z86_UCODE ?= $(HOME)/pcxt-work/ucode/8088.bin
+CPUSRC = $(Z86)/z86_eu.sv $(Z86)/z86_tables.sv $(Z86)/alu.sv $(Z86)/cpu_z86.sv $(RTL)/cpu/biu88.sv
+CPUDEF = -I$(Z86) -CFLAGS -DZ86_UCODE='\"$(Z86_UCODE)\"' -CFLAGS -I$(abspath ../common)
 CGA  ?= $(RTL)/video/cga/cga_crtc.sv $(RTL)/video/cga/cga_card.sv
 MDA  ?= 0
 VJ   ?= 0
 MDASRC = $(RTL)/video/mda/mda_card.sv
-SRC  = $(CPU)/eu.v $(CPU)/biu88.v $(CPU)/eu_rom.v $(RTL)/cpu/cpu8088.sv \
+SRC  = $(CPUSRC) $(RTL)/cpu/cpu8088.sv \
        $(wildcard $(KF)/KF8237/*.sv) $(wildcard $(KF)/KF8253/*.sv) \
        $(wildcard $(KF)/KF8255/*.sv) $(wildcard $(KF)/KF8259/*.sv) \
        $(RTL)/system/pc_clocks.sv $(RTL)/system/xt_board.sv $(RTL)/system/pc_system.sv \
@@ -34,6 +39,6 @@ DRQ0_SKEW ?= 0
 $(OBJ)/sys_run: $(SRC) sys_run.cpp
 	verilator --cc --exe --build -O3 -j $(VJ) -Wno-fatal -Wno-lint -Wno-style \
 	    --public-flat-rw --Mdir $(OBJ) --top-module tb_sys $(INC) \
-	    +define+MCL86_ROM='"$(ROMHEX)"' -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) \
+	    -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) $(CPUDEF) \
 	    $(SRC) sys_run.cpp -o sys_run -CFLAGS -O2
 	@true

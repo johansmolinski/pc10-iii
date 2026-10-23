@@ -1122,3 +1122,208 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
     tb/mda PASS (MDA and Hercules).
 - Not built yet: `cmd_en` adds one register input in front of the four CPU
   strobes (the bitstream's timing to be checked with the next build).
+
+## 2026-10-22 - Evaluation: z8086's EU (Intel's microcode) in front of biu88 (branch `z8086-eval`, not merged)
+
+- **What:** nand2mario's z8086 (Apache 2.0, commit 596d9a6) runs the 8086's own
+  microcode (Jenner's extraction) on a rebuilt micro-architecture. Its EU,
+  cut loose from its bus and 6-byte queue (`rtl/cpu/z8086/z86_eu.sv`), runs
+  one microinstruction per 8088 clock (a clock enable 3 clk after biu88's
+  step) in front of biu88, unchanged, through an adapter that issues MCL86
+  commands (`cpu_z86.sv`). `make CPU=z86` in tb/sst; the ROM image stays
+  outside the repository (rule 4, `Z86_UCODE`). Full write-up:
+  `doc/z8086-eval.md`.
+- **Structural fixes** (none instruction-specific; the rules are Jenner's,
+  from his microcode-level 8088 emulator XTCE): NX also in type 4 (STU 5 and
+  WB,NX); W,RNI takes effect when the write is done; RNI/NX suppression for a
+  memory destination from the microcode (a move to M in memory) instead of
+  z8086's opcode table (CMP r/m wrote its operand back, POP r/m ended before
+  its write); SUSP waits for a running fetch, CORR for the idle bus; the EU
+  resumes a clock after biu88's done for writes and SUSP. ALU: DAA/DAS
+  compare with 9Fh when AF is set; byte NEG of a memory operand took CF from
+  16 bits.
+- **Runs** (`~/pcxt-work/results/`): z86-a state 3,006,849 (99.99%), trace
+  2,956,172 (98.31%); z86-b (ALU fixes) state 3,007,000 (100.00%), trace 2,956,172 (98.31%).
+  Main (y5): 3,007,000 / 3,006,693. Of z86-b's trace failures, 50,521 go
+  through the interrupt routine (INT 3, INT n, INTO taken, divide errors of
+  DIV/IDIV/AAM), which is the 8086's in z8086 and differs in the 8088 (Jenner);
+  the other 307 are C6, the same tests MCL86 fails (biu88). Everything else,
+  MUL/DIV, REP strings, shifts by CL, far control transfers included, is
+  exact on every cycle.
+- **Size** (OOC, xc7a200t-2): z86_eu 1,541 LUTs, 534 FFs, 0.5 BRAM tile,
+  ~97 MHz single-cycle; with biu88 4,324 LUTs, 2,333 FFs (main's MCL86 +
+  biu88: 3,126 LUTs, 8 BRAM tiles).
+- **Recommendation:** adopt Intel-microcode-at-one-per-clock as the faithful
+  EU's base. Open: the 8088 ROM (interrupt routine), the rule 4 decision, a
+  native EU/BIU interface for biu88 (then no 100 MHz), INTR/NMI/LOCK/HLT/WAIT,
+  tb/sys.
+
+## 2026-10-22 - z8086 is the 8088, Intel's microcode from the SD card (branch `z86`, phase A)
+
+- **CPU:** `cpu8088` (`CPU = "z86"`, the default) is z8086's EU running Intel's
+  8088 microcode, one microinstruction per 8088 clock, in front of biu88 (the
+  evaluation's adapter, doc/z8086.md). MCL86 stays selectable (`CPU = "mcl86"`,
+  `make CPU=mcl86` in tb/sys and tb/sst).
+- **Rule 4:** the four Intel tables (microcode, its address decoder, the
+  translation ROM, the group decode ROM) are RAMs (`z86_tables.sv`) without
+  initial contents, filled from the microcode bundle; z8086's `group_decode`,
+  `translate` and `uaddr_pack` logic is gone and upstream `z8086.sv` was
+  removed. `tools/mkucode.py` builds the bundle (6144 bytes, magic
+  `PC10UCOD`, checksum; format in the tool and doc/z8086.md) from the user's
+  copy of Jenner's public `8086_microcode_v2.zip`, decoding the bit images
+  as XTCE does; the tool has no table data. Checked: the 8086 images give
+  z8086's `ucode.hex` word for word, the decoded decoder/translation/group
+  tables equal z8086's functions entry for entry.
+- **Finding: the archive has the 8088 ROM** (`l0.txt`..`r3.txt`,
+  `translation_8088.txt`; XTCE loads them for the 8088), which the evaluation
+  had missed. It differs from the 8086's in 11 words (interrupt routines) and
+  in the INTR translation entry. The default bundle is the genuine 8088 one
+  (flag bit 0: the overlay is off).
+- **SD card:** `/pc10/ucode.bin`, a mandatory auto-load ROM next to the BIOS
+  (`C_DEV_PC_UCODE` 0x0104, `pc_ucode.vhd`: 8 KB image, read back by the
+  firmware's `UCODE_START` for its checks (size, magic, version, size field,
+  checksum), then copied into the CPU through `pc_system`'s new `ucl_*` port;
+  the PC stays in reset until then). Missing: the Shell's file-not-found
+  screen; invalid: "/pc10/ucode.bin is not a valid 8088 microcode bundle
+  (tools/mkucode.py)". Simulation: `~/pcxt-work/ucode/8088.bin`
+  (`$PC10_UCODE`, `make Z86_UCODE=`), checked like the firmware
+  (`tb/common/ucode_file.h`) and streamed through the same port. tb/shell
+  checks `pc_ucode.vhd` (readback, the copy, the gate, forget). Firmware:
+  31,991 of 32,768 words.
+- **The 8088 interrupt overlay** (`z86_overlay.svh`, for an 8086 bundle): our
+  own words for 9 rows plus the INTR translation entry, written from Jenner's
+  description, MartyPC's sequences and the SST traces before looking at the
+  8088 words (derivation in doc/z8086.md section 5). The INTA "word" is
+  {2nd cycle, 1st cycle} with the genuine ROM (it takes the vector from the
+  high byte); with the overlay biu88 delivers the vector in the low byte, as
+  the 8086's own second INTA access does (`INTA_VEC_LO`).
+- **Pins:** INTR, NMI and TEST sampled at the 8088 clock edge; NMI on a
+  rising edge; INTR when IF is set and was set at the start of the
+  instruction (one instruction after STI/POPF/IRET); single step on TF at the
+  instruction's start; none after a prefix or a segment register load; the
+  INT and TEST jump conditions (z8086 never took them: no interrupt in a REP
+  string, WAIT); HLT waits for an interrupt (the halt bus cycle needs biu88's
+  native interface: phase B); LOCK from the prefix to the start of the
+  instruction after the locked one (z8086 took F0 for REP). An FC with an
+  interrupt no longer waits for a queue byte.
+- **EU fixes found on the way:** a REP prefix whose SC came in the clock of
+  the previous instruction's RNI (NX overlap) was lost (z8086 cleared F1 at
+  RNI; now at the SC after a non-prefix instruction, as XTCE): REPE SCASW ran
+  as one SCASW in GLaBIOS's memory test. The SST suite never has that
+  overlap.
+- **Timing:** every EU register changes only at its clock enable (the bus
+  tracking moved into `cpu_z86.sv`), so `cpu8088.xdc` gives EU -> EU paths 2
+  clocks. Out of context (`rooc.sh z86b-a`, 100.2273 MHz, R6 part): WNS
+  +0.492 ns, WHS +0.071 ns; 4,702 LUTs, 2,444 FFs, 1.5 BRAM tiles (the CPU
+  with its tables; MCL86 + biu88 was 3,126 LUTs and 8 tiles).
+- **Gates:**
+  - SST, full suite (`z86d-88`, genuine 8088 bundle): state 3,007,000
+    (100.00%), trace 3,006,693 (99.99%), only C6 (307, biu88's known case);
+    no file worse than y5. With the 8086 bundle + overlay (`z86c-86`, before
+    the F1 fix): the same numbers. Before the change the evaluation had
+    2,956,172 (98.31%); CC, CD, CE, F6.6, F6.7, F7.6, F7.7, D4 now 100%.
+  - Floppy boot (`sys_run -a hello360.img -s 10 -C 40`): FDC reset, C0 H0
+    S1/S2 at 9,005 ms, "Booted from floppy A: (pc10-iii FDC+DMA)"; the CGA
+    oracle 134 reads and 14,147 writes, 0 differ.
+  - MartyPC trace (`DRQ0_SKEW=7`, 1.27 s): first difference at reference
+    clock **2,227,925**: a LOOP that is not taken. MartyPC takes 6 clocks from
+    the opcode to the next opcode, the 8088's microcode 5 (140 DEC, 141 to
+    CX, 142 the displacement and the not-taken long jump, 143 RNI; Intel's
+    table: 17 taken / 5 not taken); MartyPC's `mc_140` runs a cycle for 143
+    and then its fetch cycle, which is 143 itself. The suite has no LOOP
+    with CX = 1. With that cycle removed from MartyPC
+    (`~/pcxt-work/scratch/z86b/marty_loopfix.py`, reference
+    `GLABIOS_0.4.2_8X-6000000-loopfix`, identical to the original up to
+    2,227,926), the first difference is at **2,439,294**, after MCL86's
+    2,439,285: OR AL,DL and TEST AL,2 now come on time (the EU lateness is
+    gone). There an IN 62h (the SW1 switches) reads 06 against MartyPC's 0E:
+    tb/sys's default SW1 (0x6D, two drives) is not MartyPC's machine (no
+    floppy drives). With MartyPC's switches (`-d EE`, IN 62h then reads 0E
+    as MartyPC) the first difference is at 2,439,417: a read of 0:03FA
+    returns FF against MartyPC's 00 (memory left by the BIOS's earlier
+    tests, not the CPU's timing). The `-C` oracle in the 0x6D run: 13,305 CGA
+    writes, 0 differ.
+  - tb/cga PASS, tb/mda PASS, tb/fdc PASS (208 checks), tb/hdc PASS (3,184
+    checks); tb/shell PASS.
+
+## 2026-10-22 - biu88 with the real chip's EU/BIU interface (branch `z86`, phase B)
+
+- **biu88** (`rtl/cpu/biu88.sv`, new): MartyPC's BIU model (the one the MCL86
+  biu88 carried: T-states, address cycle, fetch policy, request phases, the
+  abort, word transfers as byte cycles), stepped once per 8088 clock and
+  changing state only at `step`. The EU's events of its last clock (queue
+  read, request, FLUSH, SUSP, HALT; LOCK) are taken at the next step before
+  the cycle, as MartyPC runs EU actions between cycles; the EU reads the
+  queue head, its IP, the T-state, `done`/`done_imm` and the read data, all
+  registers set at the step. The MCL86 command layer, end counters,
+  releases, scheduled reads, taken bytes, the cycle counters and the
+  per-core-clock fast part with its six candidate states are gone; the old
+  BIU stays with MCL86 as `biu88_mcl` (`rtl/cpu/mcl86/biu88.v`) until MCL86
+  is removed.
+- **EU:** the done tracking that the adapter did per core clock is the
+  EU's own (`bus_busy`, the XTCE resume rule from `done`/`done_imm`); the
+  segment registers are read by biu88 instead of mirrored; `cpu_z86.sv` is
+  tables + EU + biu88, no adapter.
+- **New in biu88:** the halt bus cycle (MartyPC's `biu_halt`: fetching stops,
+  the running cycle finishes, one Ti, then status 011 in a T1 with ALE, then
+  passive); the INTA "word" as {2nd, 1st} for the genuine 8088 microcode (the
+  overlay gets the vector in the low byte); the reset jump to FFFF:0000 as a
+  flush in the EU's first clock, as the adapter did. Not compared with a
+  trace: HLT (not in the suite, GLaBIOS does not halt in the traced time).
+- **Timing:** `cpu8088.xdc`: every EU or biu88 register to every EU or biu88
+  register is a 3-clock path (biu88 -> EU is EU_DELAY = 3 clk, the others at
+  least 18). Out of context (`rooc.sh z86b-b`, 100.2273 MHz): WNS +2.800 ns
+  (was +0.492), WHS +0.112 ns; the CPU is 2,749 LUTs (biu88 483, EU 1,479,
+  tables 766 of which 576 LUTRAM), 793 FFs, 1.5 BRAM tiles (phase A: 4,702
+  LUTs, 2,444 FFs; biu88_mcl alone was 2,820 LUTs). The longest paths in
+  clocks: EU -> EU 18.1 ns, EU -> biu88 18.1 ns, biu88 -> biu88 17.7 ns,
+  biu88 -> EU 11.1 ns, i.e. single-cycle at 28.636 MHz (34.9 ns).
+- **Gates** (the same as phase A, unchanged numbers):
+  - SST full (`z86e-88`): state 3,007,000 (100.00%), trace 3,006,693
+    (99.99%), C6 only (307); no file worse than phase A (`z86d-88`) or y5.
+    8086 bundle + overlay (`z86e-86`): the same.
+  - Floppy boot: C0 H0 S1/S2 at 9,005 ms, "Booted from floppy A:", the CGA
+    oracle 134 reads and 14,147 writes, 0 differ.
+  - MartyPC trace: first difference 2,227,925 (MartyPC's LOOP); with the
+    LOOP-fixed reference 2,439,294 (SW1 0x6D) and 2,439,417 with MartyPC's
+    switches (`-d EE`), as phase A; the `-C` oracle 13,305 writes, 0 differ.
+  - tb/cga, tb/mda, tb/fdc (208 checks), tb/hdc (3,184 checks) PASS.
+
+## 2026-10-22 - MCL86 removed (branch `z86`)
+
+- `rtl/cpu/mcl86/` (MCL86's EU, its microcode listing and image, biu88_mcl,
+  biu_max), `tb/sst/tb_mcl86*.v`, the microcode tools (`mcasm.py`,
+  `mcset.py`, `gen_ea_modes.py`, `gen_strings.py`, `gen_muldiv.py`) and the
+  `CPU` parameter of `cpu8088`/`pc_system` are gone; the project, the OOC
+  script and the build gate (the MCL86 microcode image) with them. MCL86
+  reached 99.99% of the suite's traces after two days of per-instruction
+  timing (the entries above); the z86 CPU reaches the same with Intel's
+  microcode and no instruction-specific timing. doc/cpu-timing.md is kept as
+  history.
+- Gates after the removal (`z86f-88`, gates `f`): SST state 3,007,000
+  (100.00%), trace 3,006,693 (99.99%, C6 only), no file worse than y5;
+  floppy boot ("Booted from floppy A:", sectors at 9,005 ms, the CGA oracle
+  134 reads / 14,147 writes, 0 differ); MartyPC trace 2,227,925 (2,439,294
+  against the LOOP-fixed reference, 2,439,417 with `-d EE`); tb/cga, tb/mda,
+  tb/fdc, tb/hdc, tb/shell PASS. The floppy boot with the 8086 bundle and the
+  overlay (hardware IRQs through rows 0x19A-0x19D) boots the same way, with
+  the same oracle numbers.
+
+## 2026-10-22 - Clock plan: the PC on 28.63636 MHz (phase C, assessment only)
+
+- doc/clock-plan.md: what it takes to run the whole PC on the PC10-III's
+  master clock instead of 100.2273 MHz. The FE2010A (no datasheet found;
+  Sergey Kiselev's reverse-engineered notes for the Micro 8088) makes 4.77,
+  7.15 and 9.54 MHz from a 28.63636 MHz crystal (XSEL), 9.54 MHz with a 50%
+  duty cycle; the PC10-III's 9.54 MHz needs that crystal, so its master clock
+  is 28.63636 MHz = 2 x OSC (not verified on a PC10-III board). The MMCM
+  already makes it (M2M's video clock, VCO 1102.5 / 38.5; 100 x 31.5 / 5 / 22
+  is equivalent).
+- Every constant in clk units is listed with its value at 28.6 MHz:
+  `pc_clocks` (84/21/7 -> 24/6,4,3/2), `xt_board` (`cmd_en`, DRQ0_SKEW, the
+  RAM answer, the keyboard delays in CPU clocks), the CPU (`EU_DELAY` 1, the
+  multicycle constraints go: the longest EU/biu88 paths are 18 ns), CGA
+  (`CE_DELAY`), MDA (`DOT_INC/DOT_MOD`), FDC/XTIDE (`US_NUM/US_DEN` 11/315),
+  `pc_ram` (6-clk latency must shrink for 9.54 MHz), the video crossing in
+  `main.vhd` (gone), the duty cycles (1/3 at /6; /4 undocumented; /3 at 50%
+  is off the clock grid) and the turbo switch. Not implemented.

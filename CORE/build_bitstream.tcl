@@ -33,15 +33,9 @@ if {[get_property PROGRESS [get_runs synth_1]] ne "100%"} {
     exit 1
 }
 
-# the MCL86 microcode ROM must have been read (a missing file is only a warning: a dead CPU)
-set synth_log [file join [get_property DIRECTORY [get_runs synth_1]] runme.log]
+# (the 8088's microcode is not in the bitstream: the core loads it from the SD card,
+# pc_ucode.vhd, AGENTS.md rule 4)
 set uc_gate ""
-if {[string match *MCL86_ROM* [get_property verilog_define [current_fileset]]]} {
-    set f [open $synth_log r]; set log [read $f]; close $f
-    if {![regexp {microcode\.hex' is read successfully} $log]} {
-        set uc_gate "the MCL86 microcode image was not read by synthesis"
-    }
-}
 
 if {$impl_ref ne ""} {
     puts "REF_DCP: incremental implementation from $impl_ref"

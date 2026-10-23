@@ -50,6 +50,10 @@ module pc_system #(
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
     input  logic        font_thin,
+
+    input  logic        ucl_we,       // the 8088's microcode load port (ignored)
+    input  logic [12:0] ucl_addr,
+    input  logic [7:0]  ucl_data,
     input  logic [1:0]       drv_80trk,
     input  logic [1:0]       img_present,
     input  logic [1:0]       img_wp,
