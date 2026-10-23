@@ -16,7 +16,7 @@
 
 module cpu_z86 #(
     parameter int EU_DELAY = 3,
-    parameter bit OVERLAY  = 1'b1
+    parameter bit OVERLAY  = 1'b0
 ) (
     input             clk,
     input             reset,
