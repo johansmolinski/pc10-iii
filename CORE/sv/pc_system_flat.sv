@@ -74,7 +74,7 @@ assign tracks = img_tracks;
 assign heads  = img_heads;
 assign spt    = img_spt;
 
-pc_system #(.RAM_KB(RAM_KB)) u_pc (
+pc_system #(.RAM_KB(RAM_KB), .FE2010A(1'b1)) u_pc (     // the PC10-III's FE2010A port logic
     .clk, .reset,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,

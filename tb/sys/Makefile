@@ -4,6 +4,8 @@
 #   ./obj/sys_run -b ~/pcxt-work/bios/GLABIOS_0.4.2_8X.ROM -s 2
 #   make MDA=1      build obj_mda/sys_run with the MDA fitted (MDA=2: Hercules,
 #                   obj_hgc); sys_run -m sets the mono DIP switches (doc/mda.md)
+#   make FE=1 OBJ=obj_fe   the PC10-III's FE2010A port logic (xt_board); its switches
+#                   differ from the 5160's: sys_run -d 5D (80x25 colour, 2 drives)
 
 # The 8088's microcode bundle (tools/mkucode.py, not in the repository) is
 # read at run time: $$PC10_UCODE, else Z86_UCODE compiled in.
@@ -35,10 +37,11 @@ endif
 RAM_KB ?= 640
 # DRQ0_SKEW=7: MartyPC's refresh phase (trace comparison with MartyPC)
 DRQ0_SKEW ?= 0
+FE ?= 0
 
 $(OBJ)/sys_run: $(SRC) sys_run.cpp
 	verilator --cc --exe --build -O3 -j $(VJ) -Wno-fatal -Wno-lint -Wno-style \
 	    --public-flat-rw --Mdir $(OBJ) --top-module tb_sys $(INC) \
-	    -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) $(CPUDEF) \
+	    -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) -GFE2010A=$(FE) $(CPUDEF) \
 	    $(SRC) sys_run.cpp -o sys_run -CFLAGS -O2
 	@true

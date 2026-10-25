@@ -27,7 +27,11 @@ module xt_board #(
     // the 8253's reload); tb/sys sets this to compare traces past the first
     // refresh. 0 = the hardware.
     parameter int DRQ0_SKEW = 0,
-    parameter int CLK_PER_CPU = 6       // clk per 8088 clock (DRQ0_SKEW only)
+    parameter int CLK_PER_CPU = 6,      // clk per 8088 clock (DRQ0_SKEW only)
+    // 1: the PC10-III's Faraday FE2010A instead of the 5160's 8255 (see the
+    // 8255 section): fixed port directions, 63h is the chipset's configuration
+    // register, PB2 selects the switch nibble. 0: IBM 5160 (the MartyPC gates).
+    parameter bit FE2010A = 1'b0
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -434,29 +438,84 @@ assign cpu_intr = pic_int;
 // ------------------------------------------------------------ 8255
 // 5160: A = keyboard scan code; B = outputs; C = switch nibble (PB3 selects
 // SW1 5-8 vs 1-4) in PC0-3, OUT2 in PC5.
+//
+// FE2010A (PC10-III): the chip has the 8255's ports built in with fixed
+// directions (A in, B out, C in) and no mode register; port 63h is the
+// chipset's configuration register instead (the Commodore BIOS 4.41 writes
+// 01h, 41h, 45h, 51h, 80h, (BIOS byte 0040:0012 & C0h) | 01h there; as 8255
+// mode words they made port A an output and reset port B, so the keyboard
+// test got no scan code and counter 2's gate stayed low: "No scancode from
+// keyboard", "Timer chip counter 2 failed").
+// Registers (Sergey Kiselev, micro_8088 Documentation/Faraday-XT_Controller-
+// FE2010A.md):
+//   61h  port B; bit 2 = switch select (bit 3 unused: 2 and 3 are swapped
+//        against the IBM PC); reads back the last value written. 00h after
+//        reset (assumed; the 8255 came up as inputs).
+//   62h  read: PC0-3 = select 0: SW5-6 (the VID0/VID1 pins: the PC10-III's
+//        CONFIG switches 3 and 4) and SW7-8 (floppies), select 1: SW1, SW2
+//        (8087), SW3-4 (memory); PC5 = OUT2, PC6-7 = the check bits (0).
+//        write: the emulated switches SW1-4 (bits 0-3) and SW7-8 (bits 6-7);
+//        reset value from dip_sw1 (5160 layout: SW1 bit 0 .. SW8 bit 7).
+//   63h  configuration (write only; reads return it here): bit 0 parity
+//        checker off, 1 8087 NMI, 2 and 4 on-board RAM size (00 640K, 01
+//        256K, 10 512K: RAM above it does not answer), 3 lock (bits 0-4 and
+//        the switch register until reset), 5 fast, 6 7.15 MHz, 7 9.54 MHz
+//        (the clock bits are kept, not used yet: the turbo is a later step).
+// The Commodore BIOS reads the switches at F000:C5B2 (select 0 first), sizes
+// the RAM with 45h/51h/41h and writes the switch register (F000:C389).
 logic [7:0] ppi_dout, kbd_data;
 logic [7:0] pc_in;
-assign pc_in = {1'b0, 1'b0, out2, 1'b0, pb[3] ? dip_sw1[7:4] : dip_sw1[3:0]};
-
-KF8255 u_ppi (
-    .clock          (clk),
-    .reset          (reset),
-    .chip_select_n  (~cs_ppi),
-    .read_enable_n  (io_rd_n),
-    .write_enable_n (io_wr_n),
-    .address        (bus_addr[1:0]),
-    .data_bus_in    (bus_wdata),
-    .data_bus_out   (ppi_dout),
-    .port_a_in      (kbd_data),
-    .port_a_out     (),
-    .port_a_io      (),
-    .port_b_in      (8'h00),
-    .port_b_out     (pb),
-    .port_b_io      (pb_io),
-    .port_c_in      (pc_in),
-    .port_c_out     (),
-    .port_c_io      ()
-);
+logic [7:0] fe_cfg;
+logic [7:0] fe_sw;                       // FE2010A switch register (bits 5-4 unused)
+generate
+    if (FE2010A) begin : g_fe2010a
+        assign pc_in = {1'b0, 1'b0, out2, 1'b0,
+                        pb[2] ? fe_sw[3:0] : {fe_sw[7:6], dip_sw1[5:4]}};
+        wire lock = fe_cfg[3];
+        always_ff @(posedge clk)
+            if (reset) begin
+                pb <= 8'h00;  fe_cfg <= 8'h00;  fe_sw <= dip_sw1 & 8'hCF;
+            end else if (cs_ppi && !io_wr_n) begin
+                case (bus_addr[1:0])
+                    2'd1: pb <= bus_wdata;
+                    2'd2: if (!lock) fe_sw <= bus_wdata & 8'hCF;
+                    2'd3: fe_cfg <= lock ? {bus_wdata[7:5], fe_cfg[4:0]} : bus_wdata;
+                    default: ;
+                endcase
+            end
+        assign pb_io = 1'b0;
+        always_comb
+            case (bus_addr[1:0])
+                2'd0:    ppi_dout = kbd_data;
+                2'd1:    ppi_dout = pb;
+                2'd2:    ppi_dout = pc_in;
+                default: ppi_dout = fe_cfg;
+            endcase
+    end else begin : g_8255
+        assign pc_in = {1'b0, 1'b0, out2, 1'b0, pb[3] ? dip_sw1[7:4] : dip_sw1[3:0]};
+        assign fe_cfg = 8'h00;
+        assign fe_sw  = 8'h00;
+        KF8255 u_ppi (
+            .clock          (clk),
+            .reset          (reset),
+            .chip_select_n  (~cs_ppi),
+            .read_enable_n  (io_rd_n),
+            .write_enable_n (io_wr_n),
+            .address        (bus_addr[1:0]),
+            .data_bus_in    (bus_wdata),
+            .data_bus_out   (ppi_dout),
+            .port_a_in      (kbd_data),
+            .port_a_out     (),
+            .port_a_io      (),
+            .port_b_in      (8'h00),
+            .port_b_out     (pb),
+            .port_b_io      (pb_io),
+            .port_c_in      (pc_in),
+            .port_c_out     (),
+            .port_c_io      ()
+        );
+    end
+endgenerate
 
 // ------------------------------------------------------------ NMI mask (A0)
 logic nmi_en;
@@ -539,7 +598,18 @@ end
 
 // ------------------------------------------------------------ memory decode
 localparam logic [19:0] RAM_TOP = 20'(RAM_KB * 1024);
-wire  sel_ram = bus_addr < RAM_TOP;
+// FE2010A: the on-board RAM size of the configuration register (63h bits 4, 2)
+logic [19:0] ram_top;
+always_comb begin
+    ram_top = RAM_TOP;
+    if (FE2010A)
+        case ({fe_cfg[4], fe_cfg[2]})
+            2'b01:   ram_top = RAM_TOP < 20'h40000 ? RAM_TOP : 20'h40000;
+            2'b10:   ram_top = RAM_TOP < 20'h80000 ? RAM_TOP : 20'h80000;
+            default: ram_top = RAM_TOP;
+        endcase
+end
+wire  sel_ram = bus_addr < ram_top;
 wire  sel_rom = bus_addr[19:16] == 4'hF;
 wire  refresh = !dack_n[0];
 

@@ -7,7 +7,8 @@
 module tb_sys #(
     parameter int RAM_KB = 640,
     parameter int DRQ0_SKEW = 0,
-    parameter int MDA_FIT = 0
+    parameter int MDA_FIT = 0,
+    parameter bit FE2010A = 1'b0
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -129,7 +130,7 @@ end
 assign ram_ack   = ack_sh[ram_lat - 1];
 assign ram_rdata = rd_sh[ram_lat - 1];
 
-pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT)) u_pc (
+pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT), .FE2010A(FE2010A)) u_pc (
     .clk        (clk),
     .reset      (reset),
     .ucl_we     (ucl_we),
