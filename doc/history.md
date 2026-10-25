@@ -1621,3 +1621,7 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   14 (5 new mono mutants), pc_drvsnd 27 of 27, signature 5 of 5 killed. ghdl
   analysis of config/main/mega65.vhd clean.
 - Not verified: Vivado, hardware.
+- **Hardware** (build pc10-real-p = 193e09b, WNS +0.320, WHS +0.036, BRAM 252
+  of 365 tiles, was 234): the Commodore BIOS 4.41 in colour without snow, and
+  in mono (Display: Monochrome, green) over HDMI, confirmed by the user
+  2026-10-25.
