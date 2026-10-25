@@ -264,4 +264,16 @@ always_ff @(posedge clk)
                  u_pc.cpu_bus_t, u_pc.u_cpu.cpu.eu.irq_take, u_pc.u_cpu.cpu.eu.int_cond,
                  u_pc.u_cpu.cpu.eu.F, u_pc.u_cpu.cpu.eu.CX);
 
+// FE2010A: log the configuration and switch registers (63h, 62h) when they change
+generate if (FE2010A) begin : g_felog
+    logic [7:0] cfg_q = 8'h00, sw_q = 8'h00;
+    always_ff @(posedge clk) begin
+        cfg_q <= u_pc.u_board.fe_cfg;  sw_q <= u_pc.u_board.fe_sw;
+        if (!reset && (u_pc.u_board.fe_cfg != cfg_q || u_pc.u_board.fe_sw != sw_q))
+            $display("[step %0d] FE cfg %02h sw %02h", zsteps, u_pc.u_board.fe_cfg, u_pc.u_board.fe_sw);
+        if (ram_en && ram_we && (ram_addr == 20'h00410 || ram_addr == 20'h00411) && ram[ram_addr] != ram_wdata)
+            $display("[step %0d] equipment %05h <= %02h", zsteps, ram_addr, ram_wdata);
+    end
+end endgenerate
+
 endmodule
