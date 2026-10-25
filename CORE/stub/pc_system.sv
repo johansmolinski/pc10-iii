@@ -62,6 +62,9 @@ module pc_system #(
     input  logic [1:0][5:0]  img_spt,
     output logic [1:0]       drv_motor,
     output logic             fdc_active,
+    output logic [1:0]       drv_select,
+    output logic             drv_step,
+    output logic             drv_step_in,
     output logic        sp_req,
     output logic        sp_write,
     output logic        sp_drive,
@@ -187,6 +190,9 @@ module pc_system #(
 
     assign drv_motor = 2'b00;
     assign fdc_active = 1'b0;
+    assign drv_select = 2'b00;
+    assign drv_step = 1'b0;
+    assign drv_step_in = 1'b0;
     assign {sp_req, sp_write, sp_drive, sp_head, sp_wr_valid} = '0;
     assign {sp_cyl, sp_sector, sp_lba, sp_wr_data} = '0;
     // no hard disk card in the stand-in

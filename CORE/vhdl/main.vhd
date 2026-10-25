@@ -81,6 +81,9 @@ entity main is
       img_spt_i               : in  std_logic_vector(11 downto 0);
       drv_motor_o             : out std_logic_vector(1 downto 0);
       fdc_active_o            : out std_logic;
+      drv_select_o            : out std_logic_vector(1 downto 0);   -- drive LED, drive sound
+      drv_step_o              : out std_logic;
+      drv_step_in_o           : out std_logic;
       sp_req_o                : out std_logic;
       sp_write_o              : out std_logic;
       sp_drive_o              : out std_logic;
@@ -136,6 +139,9 @@ architecture synthesis of main is
          img_spt     : in  std_logic_vector(11 downto 0);
          drv_motor   : out std_logic_vector(1 downto 0);
          fdc_active  : out std_logic;
+         drv_select  : out std_logic_vector(1 downto 0);
+         drv_step    : out std_logic;
+         drv_step_in : out std_logic;
          sp_req      : out std_logic;
          sp_write    : out std_logic;
          sp_drive    : out std_logic;
@@ -231,6 +237,9 @@ begin
          img_spt     => img_spt_i,
          drv_motor   => drv_motor_o,
          fdc_active  => fdc_active_o,
+         drv_select  => drv_select_o,
+         drv_step    => drv_step_o,
+         drv_step_in => drv_step_in_o,
          sp_req      => sp_req_o,
          sp_write    => sp_write_o,
          sp_drive    => sp_drive_o,

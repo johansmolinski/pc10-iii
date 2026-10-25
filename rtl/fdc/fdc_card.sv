@@ -64,6 +64,13 @@ module fdc_card #(
     input  logic [1:0][5:0]  img_spt,       // 8 or 9 (15/18 need a faster data rate)
     output logic [1:0]       drv_motor,     // for LEDs / drive sounds
     output logic             fdc_active,    // a read/write/format is executing
+    // pc10-iii (drive LED, drive sound): drive n selected = the DOR selects it and
+    // its motor bit is set (the drive's select line: its front-panel LED); the
+    // selected drive's head moved one cylinder (one clk, the clk after the 765's
+    // step pulse that moved it; not at the drive's stops) and in which direction
+    output logic [1:0]       drv_select,
+    output logic             drv_step,
+    output logic             drv_step_in,   // 1 = inward (cylinder + 1)
 
     // sector port (doc/fdc.md)
     output logic        sp_req,
@@ -300,6 +307,14 @@ always_ff @(posedge clk)
 
 assign drv_motor  = dor[5:4];
 assign fdc_active = active;
+assign drv_select = {drv_sel && pd, drv_sel && !pd};
+
+// pc10-iii (drive sound): the head movements of the selected drive, as the
+// drive mechanics above take them (a 765 step pulse at a stop moves nothing)
+always_ff @(posedge clk) begin
+    drv_step    <= !reset && cyl_next[pd] != cyl[pd];
+    drv_step_in <= step_dir;
+end
 
 // geometry of the selected drive's medium and the image address
 // (pc10-iii: g_cyl_ok = cyl[pd] < tracks for the 765's track format check)
