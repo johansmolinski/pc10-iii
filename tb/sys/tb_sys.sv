@@ -336,15 +336,33 @@ generate if (XTA) begin : g_xtalog
     initial if ($test$plusargs("xtalog")) xlog = 1'b1;
     longint unsigned cyc = 0, t_cmd = 0, n_drq = 0, n_dack = 0;
     logic [2:0] ph_q = 3'd0;
-    logic drq_q = 1'b0, dack_q = 1'b0;
+    logic drq_q = 1'b0, dack_q = 1'b0, tc_q = 1'b0;
     always_ff @(posedge clk) begin
         cyc  <= reset ? 0 : cyc + 1;      // sys_run's time: from the end of the reset
         ph_q <= u_pc.g_xta.u_xta.phase;
         drq_q  <= u_pc.isa_drq[3];
+        tc_q   <= u_pc.isa_tc;
         dack_q <= !u_pc.isa_dack_n[3];
         if (u_pc.isa_drq[3] && !drq_q) n_drq <= n_drq + 1;
-        if (!u_pc.isa_dack_n[3] && !dack_q) n_dack <= n_dack + 1;
+        if (!u_pc.isa_dack_n[3] && !dack_q) begin
+            n_dack <= n_dack + 1;
+            if (xlog && n_dack == 0)
+                $display("[%10.3f ms] XTA first DACK3: phase %0d mask %b h_act %b h_dma %b req %b aen %b ior %b iow %b drq %b",
+                         real'(cyc) / 28636.36364, u_pc.g_xta.u_xta.phase, u_pc.g_xta.u_xta.mask, u_pc.g_xta.u_xta.h_act,
+                         u_pc.g_xta.u_xta.h_dma, u_pc.g_xta.u_xta.req, u_pc.isa_aen, !u_pc.isa_ior_n, !u_pc.isa_iow_n,
+                         u_pc.isa_drq[3]);
+        end
         if (u_pc.g_xta.u_xta.phase == 3'd3 && ph_q != 3'd3) begin t_cmd <= cyc; n_drq <= 0; n_dack <= 0; end
+        // while a command runs: the CPU's writes to the DMA and interrupt
+        // controllers, the 8237's terminal count
+        if (xlog && !reset && u_pc.g_xta.u_xta.phase != 3'd0 && io_wr &&
+            (io_addr < 16'h0010 || io_addr == 16'h0081 || io_addr == 16'h0082 || io_addr == 16'h0083 ||
+             io_addr == 16'h0020 || io_addr == 16'h0021))
+            $display("[%10.3f ms] XTA busy, CPU OUT %02h <= %02h (%04h:%04h), %0d DACK3 so far",
+                     real'(cyc) / 28636.36364, io_addr[7:0], io_data, u_pc.u_cpu.dbg_cs, u_pc.u_cpu.dbg_ip, n_dack);
+        if (xlog && !reset && u_pc.g_xta.u_xta.phase != 3'd0 && u_pc.isa_tc && !tc_q)
+            $display("[%10.3f ms] XTA busy, 8237 TC (DACK %b), %0d DACK3 so far", real'(cyc) / 28636.36364,
+                     u_pc.isa_dack_n, n_dack);
         // a command that runs for long: its state every 100 ms
         if (xlog && !reset && u_pc.g_xta.u_xta.phase != 3'd0 && cyc > t_cmd && (cyc - t_cmd) % 2863636 == 0)
             $display("[%10.3f ms] XTA busy: phase %0d st %0d m_st %0d mi %0d mdone %0d hdone %0d rd_cnt %0d h_act %b h_cnt %0d req %b mask %b drq %b dack %0d/%0d drq rises",
