@@ -21,7 +21,8 @@ def rtl(pattern):
 
 VHDL = ["vhdl/globals.vhd", "vhdl/config.vhd", "vhdl/clk.vhd", "vhdl/keyboard.vhd",
         "vhdl/pc_ram.vhd", "vhdl/pc_bios.vhd", "vhdl/pc_font.vhd", "vhdl/pc_ucode.vhd", "vhdl/pc_fdd_sd.vhd",
-        "vhdl/pc_drvsnd.vhd", "vhdl/main.vhd", "vhdl/mega65.vhd"]
+        "vhdl/pc_drvsnd.vhd", "vhdl/pc_chipset.vhd",
+        "vhdl/main.vhd", "vhdl/mega65.vhd"]
 KF_DIRS = ["KF8237", "KF8253", "KF8255", "KF8259"]
 # the PC (rtl/, doc/architecture.md section 2); --stub: the shell-only stand-in instead
 PC = (["../rtl/cpu/biu88.sv",

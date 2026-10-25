@@ -15,10 +15,12 @@
 --   device C_DEV_PC_UCODE, copied into the CPU's tables; the PC stays in reset until then
 -- * pc_fdd_sd.vhd: floppy A: and B: from image files on the SD card (QNICE devices
 --   C_DEV_PC_FDA/FDB, the SD host's engine port)
+-- * pc_chipset.vhd: the menu's chipset (FE2010A / 8255), its switches, the restart on a change
 -- * pc_drvsnd.vhd: the drive LED (yellow while A: or B: is selected) and the drive sound (the
 --   MEGA65's internal drive follows the motors and head steps of A: and B:)
--- * the OSM settings (config.vhd): floppy images and write protection, drive sound, memory
---   size, CGA thin font, HDMI mode (60 Hz only: the CGA is a 59.92 Hz source), analog
+-- * the OSM settings (config.vhd): floppy images and write protection, drive sound, chipset
+--   (PC10-III's FE2010A or IBM XT's 8255, with its switches; a change restarts the PC),
+--   memory size, CGA thin font, HDMI mode (60 Hz only: the CGA is a 59.92 Hz source), analog
 --   15 kHz / CSYNC, reset
 --
 -- The entity is the Megamiga fork's MEGA65_Core (M2M-UPSTREAM exceptions: floppy, SDRAM,
@@ -340,25 +342,29 @@ architecture synthesis of MEGA65_Core is
 constant C_MENU_WP_A          : natural := 4;
 constant C_MENU_WP_B          : natural := 5;
 constant C_MENU_DRV_SOUND     : natural := 6;
-constant C_MENU_MEM_640       : natural := 11;
-constant C_MENU_MEM_512       : natural := 12;
-constant C_MENU_MEM_256       : natural := 13;
-constant C_MENU_MEM_128       : natural := 14;
-constant C_MENU_CGA_THIN      : natural := 24;
-constant C_MENU_HDMI_720P     : natural := 20;
-constant C_MENU_HDMI_480P     : natural := 21;
-constant C_MENU_ANALOG_15KHZ  : natural := 25;
-constant C_MENU_ANALOG_CSYNC  : natural := 26;
-constant C_MENU_RESET         : natural := 29;
+constant C_MENU_CHIP_PC10     : natural := 11;
+constant C_MENU_CHIP_XT       : natural := 12;
+constant C_MENU_MEM_640       : natural := 18;
+constant C_MENU_MEM_512       : natural := 19;
+constant C_MENU_MEM_256       : natural := 20;
+constant C_MENU_MEM_128       : natural := 21;
+constant C_MENU_CGA_THIN      : natural := 31;
+constant C_MENU_HDMI_720P     : natural := 27;
+constant C_MENU_HDMI_480P     : natural := 28;
+constant C_MENU_ANALOG_15KHZ  : natural := 32;
+constant C_MENU_ANALOG_CSYNC  : natural := 33;
+constant C_MENU_RESET         : natural := 36;
 
--- The PC's switches in the 5160 layout (bit = 1: switch off), as the FE2010A gives them
--- (pc_system_flat sets FE2010A, xt_board.sv): bit 0 = 1 normal POST, bit 1 = 0 no 8087,
--- bits 3..2 = 11 memory, bits 7..6 = 01 two floppy drives (bits 0-3, 6-7 are the reset value
--- of the chip's switch register, which the BIOS rewrites); bits 5..4 are the VID0/VID1 pins,
--- the PC10-III's CONFIG switches 3 and 4: 01 = switch 3 off, 4 on = 80 x 25 colour (the
--- Commodore BIOS swaps 01/10 into the IBM equipment bits; manual section 2.2). tb/sys
--- 5160 runs use 0x6D, FE2010A runs (make FE=1) -d 5D.
-constant C_DIP_SW1            : std_logic_vector(7 downto 0) := x"5D";
+-- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
+-- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
+-- POST, bit 1 = 0 no 8087, bits 3..2 = 11 memory, bits 7..6 = 01 two floppy drives (bits 0-3,
+-- 6-7 are the reset value of the chip's switch register, which the BIOS rewrites); bits 5..4
+-- are the VID0/VID1 pins, the PC10-III's CONFIG switches 3 and 4: 01 = switch 3 off, 4 on =
+-- 80 x 25 colour (the Commodore BIOS swaps 01/10 into the IBM equipment bits; manual section
+-- 2.2). IBM XT (5160 SW1 as the 8255 reads it): bits 5..4 = 10 CGA 80 x 25, the rest the
+-- same. tb/sys 5160 runs use 0x6D, FE2010A runs (make FE=1) -d 5D.
+constant C_DIP_SW1_FE         : std_logic_vector(7 downto 0) := x"5D";
+constant C_DIP_SW1_XT         : std_logic_vector(7 downto 0) := x"6D";
 
 ---------------------------------------------------------------------------------------------
 -- Clocks and resets
@@ -377,6 +383,9 @@ signal main_ucl_we            : std_logic;
 signal main_ucl_addr          : std_logic_vector(12 downto 0);
 signal main_ucl_data          : std_logic_vector(7 downto 0);
 signal main_mem_size          : std_logic_vector(1 downto 0);
+signal main_fe2010a           : std_logic;             -- the chipset: 1 = PC10-III (FE2010A)
+signal main_chip_rst          : std_logic;
+signal main_dip_sw1           : std_logic_vector(7 downto 0);
 
 ---------------------------------------------------------------------------------------------
 -- PC memory ports
@@ -611,14 +620,29 @@ begin
 
    -- Every reset source, registered (pc_system wants a synchronous reset): the MMCM lock,
    -- the M2M resets (reset button short/long, the Shell's CSR reset, i.e. the OSM's "Reset
-   -- the PC" and the loading of the BIOS), and a BIOS that has not been released yet.
+   -- the PC" and the loading of the BIOS), a BIOS that has not been released yet, and a
+   -- change of the menu's chipset: it restarts the PC (pc_chipset.vhd: 2.3 ms of reset;
+   -- xt_board takes the chipset while reset is high, the switches follow it).
    p_reset : process (main_clk)
    begin
       if rising_edge(main_clk) then
          main_pc_reset <= main_rst or main_reset_core_i or main_reset_m2m_i or not main_bios_valid or
-                          not main_ucode_valid;
+                          not main_ucode_valid or main_chip_rst;
       end if;
    end process p_reset;
+
+   i_pc_chipset : entity work.pc_chipset
+      generic map (
+         G_SW1_FE             => C_DIP_SW1_FE,
+         G_SW1_XT             => C_DIP_SW1_XT
+      )
+      port map (
+         clk_i                => main_clk,
+         xt_i                 => main_osm_control_i(C_MENU_CHIP_XT),
+         fe2010a_o            => main_fe2010a,
+         dip_sw1_o            => main_dip_sw1,
+         rst_o                => main_chip_rst
+      ); -- i_pc_chipset
 
    main_mem_size <= "01" when main_osm_control_i(C_MENU_MEM_512) = '1' else
                     "10" when main_osm_control_i(C_MENU_MEM_256) = '1' else
@@ -632,6 +656,7 @@ begin
       port map (
          clk_main_i           => main_clk,
          reset_i              => main_pc_reset,
+         fe2010a_i            => main_fe2010a,
 
          video_ce_o           => video_ce_o,
          video_ce_ovl_o       => video_ce_ovl_o,
@@ -690,7 +715,7 @@ begin
          sp_done_i            => main_sp_done,
          sp_err_i             => main_sp_err,
 
-         dip_sw1_i            => C_DIP_SW1
+         dip_sw1_i            => main_dip_sw1
       ); -- i_main
 
    i_pc_ram : entity work.pc_ram

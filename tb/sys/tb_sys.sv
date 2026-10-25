@@ -130,9 +130,10 @@ end
 assign ram_ack   = ack_sh[ram_lat - 1];
 assign ram_rdata = rd_sh[ram_lat - 1];
 
-pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT), .FE2010A(FE2010A)) u_pc (
+pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT)) u_pc (
     .clk        (clk),
     .reset      (reset),
+    .fe2010a    (FE2010A),                   // make FE=1: the PC10-III's chipset
     .ucl_we     (ucl_we),
     .ucl_addr   (ucl_addr),
     .ucl_data   (ucl_data),

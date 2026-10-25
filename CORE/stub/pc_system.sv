@@ -27,6 +27,7 @@ module pc_system #(
 ) (
     input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high
+    input  logic        fe2010a,      // the chipset (ignored here)
 
     output logic [19:0] ram_addr,
     output logic        ram_en,

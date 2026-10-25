@@ -8,6 +8,7 @@ module pc_system_flat #(
 ) (
     input  logic        clk,
     input  logic        reset,
+    input  logic        fe2010a,        // the chipset: 1 = PC10-III (FE2010A), 0 = IBM 5160 (8255)
 
     output logic [19:0] ram_addr,
     output logic        ram_en,
@@ -77,8 +78,8 @@ assign tracks = img_tracks;
 assign heads  = img_heads;
 assign spt    = img_spt;
 
-pc_system #(.RAM_KB(RAM_KB), .FE2010A(1'b1)) u_pc (     // the PC10-III's FE2010A port logic
-    .clk, .reset,
+pc_system #(.RAM_KB(RAM_KB)) u_pc (
+    .clk, .reset, .fe2010a,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,
     .vid_ce, .vid_rgbi, .vid_hsync, .vid_vsync, .vid_hblank, .vid_vblank,

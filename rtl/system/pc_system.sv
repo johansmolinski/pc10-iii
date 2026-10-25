@@ -8,11 +8,13 @@ module pc_system #(
     // fitted video cards (doc/architecture.md section 4, doc/mda.md section 7)
     parameter bit CGA_FIT = 1'b1,       // IBM CGA at B8000-BFFFF, 3D0-3DF
     parameter int MDA_FIT = 0,          // 0 none, 1 IBM MDA, 2 Hercules (B0000, 3B0-3BF)
-    parameter int DRQ0_SKEW = 0,        // simulation only (xt_board)
-    parameter bit FE2010A = 1'b0        // 1: the PC10-III's FE2010A port logic (xt_board), 0: IBM 5160
+    parameter int DRQ0_SKEW = 0         // simulation only (xt_board)
 ) (
     input  logic        clk,
     input  logic        reset,
+    // the chipset (xt_board): 1 = the PC10-III's FE2010A port logic, 0 = IBM
+    // 5160 (8255); taken while reset is high
+    input  logic        fe2010a,
 
     // the 8088's microcode bundle (tools/mkucode.py, doc/z8086.md): the file,
     // one byte per clk at offset ucl_addr, while reset is high
@@ -171,9 +173,10 @@ logic [7:2]  isa_irq;
 logic [3:1]  isa_drq;
 logic [3:0]  isa_dack_n;
 
-xt_board #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .FE2010A(FE2010A)) u_board (
+xt_board #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW)) u_board (
     .clk          (clk),
     .reset        (reset),
+    .fe2010a      (fe2010a),
     .cpu_step     (cpu_step),
     .cpu_fall     (cpu_fall),
     .rdy_ce       (rdy_ce),

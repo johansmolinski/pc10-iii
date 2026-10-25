@@ -6,6 +6,7 @@
 module pc_ooc_top (
     input  logic        clk,
     input  logic        reset,
+    input  logic        fe2010a,
     input  logic        ucl_we,
     input  logic [12:0] ucl_addr,
     input  logic [7:0]  ucl_data,
@@ -86,7 +87,7 @@ pc_ram u_ram (
 );
 
 pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2)) u_pc (
-    .clk, .reset, .ucl_we, .ucl_addr, .ucl_data,
+    .clk, .reset, .fe2010a, .ucl_we, .ucl_addr, .ucl_data,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,
     .vid_ce, .vid_rgbi, .vid_hsync, .vid_vsync, .vid_hblank, .vid_vblank,
