@@ -351,10 +351,14 @@ constant C_MENU_ANALOG_15KHZ  : natural := 25;
 constant C_MENU_ANALOG_CSYNC  : natural := 26;
 constant C_MENU_RESET         : natural := 29;
 
--- SW1 of the 5160 as the 8255 reads it (bit = 1: switch off): bit 0 = 1 normal POST (no
--- test loop), bit 1 = 0 no 8087, bits 3..2 = 11 all four planar banks, bits 5..4 = 10 CGA
--- 80 x 25, bits 7..6 = 01 two floppy drives (tb/sys uses the same 0x6D).
-constant C_DIP_SW1            : std_logic_vector(7 downto 0) := x"6D";
+-- The PC's switches in the 5160 layout (bit = 1: switch off), as the FE2010A gives them
+-- (pc_system_flat sets FE2010A, xt_board.sv): bit 0 = 1 normal POST, bit 1 = 0 no 8087,
+-- bits 3..2 = 11 memory, bits 7..6 = 01 two floppy drives (bits 0-3, 6-7 are the reset value
+-- of the chip's switch register, which the BIOS rewrites); bits 5..4 are the VID0/VID1 pins,
+-- the PC10-III's CONFIG switches 3 and 4: 01 = switch 3 off, 4 on = 80 x 25 colour (the
+-- Commodore BIOS swaps 01/10 into the IBM equipment bits; manual section 2.2). tb/sys
+-- 5160 runs use 0x6D, FE2010A runs (make FE=1) -d 5D.
+constant C_DIP_SW1            : std_logic_vector(7 downto 0) := x"5D";
 
 ---------------------------------------------------------------------------------------------
 -- Clocks and resets
