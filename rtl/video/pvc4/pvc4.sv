@@ -546,13 +546,16 @@ end
 // ============================================================ CPU memory access
 // The PVC4's memory sequence: the CPU part (CPU_T video clocks), then the
 // display's page-mode read; one sequence per 16 colour dots (an lchar), per
-// two characters in the mono personality (one Hercules graphics character).
+// two characters in the mono personality (one Hercules graphics character,
+// one character with the clock divided by 2). The sequencer runs on the
+// undivided video clock (the data sheet's 2000 ns READY limit holds in the
+// 40-column modes too).
 // The request (MEMR/MEMW decoded) is synchronised on the video clock; a
 // sequence that starts with it seen serves it: the access is done at the
 // end of the CPU part, and READY goes high (doc/pvc4.md section 4). READY
 // goes low as soon as the strobe is there (data sheet: 30 ns).
-wire   vtick     = mono ? rise : tick;
-wire   seq_start = mono ? ev_e && (gfx_c ? 1'b1 : !cpar) : tick && dn == 4'd0;
+wire   vtick     = mono ? osc_rise : tick;
+wire   seq_start = mono ? ev_e && (gfx_c || !cpar || !m_hires) : tick && dn == 4'd0;
 logic  req_s, busy, done;
 logic [3:0] cpu_cnt;
 logic  mem_any_q;

@@ -551,11 +551,13 @@ static void print_hist(Sim &s) {
 
 static void test_waits() {
     printf("waits\n");
-    for (int mono = 0; mono < 2; mono++) {
+    for (int k = 0; k < 4; k++) {
+        // colour 80 columns, mono, colour 40 columns, mono with the clock / 2
+        int mono = k & 1;
         Sim s(ibm_font, false, mono ? PAR_MONO : PAR_COLOUR);
-        if (mono) s.bios_mode7(); else s.bios_mode(3);
+        if (mono) s.bios_mode7(k == 3 ? 0x28 : 0x29); else s.bios_mode(k == 2 ? 1 : 3);
         s.run_ops();
-        std::mt19937 rng(7 + mono);
+        std::mt19937 rng(7 + k);
         uint32_t b = mono ? 0xB0000 : 0xB8000;
         int n = 0;
         for (int i = 0; i < 3000; i++) {
@@ -583,7 +585,8 @@ static void test_waits() {
             if (h != s.g.mem[p]) bad++;
         }
         CHECK(bad == 0, "VRAM: %d bytes differ", bad);
-        printf("  %s: %d accesses, %d reads checked\n", mono ? "mono" : "colour", n, s.reads_checked);
+        static const char *KN[4] = {"colour 80", "mono", "colour 40", "mono / 2"};
+        printf("  %s: %d accesses, %d reads checked\n", KN[k], n, s.reads_checked);
     }
 }
 

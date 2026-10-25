@@ -440,10 +440,11 @@ struct Pvc4Model {
             m.hpos = hp; m.vpos = vp; m.hs_prev = hs; m.vs_prev = m.vs1;
             if (m.ph == 4) m_cclk_fall();
         }
+        // the sequencer counts the undivided oscillator; a sequence starts with
+        // an even character (every character when the clock is divided)
+        int phn = m.ph >= m_last() ? 0 : m.ph + 1;
+        if (orise && req) slot_edge(rise && phn == 0 && (m.wide || !m.cpar || !hires), memw, a, d);
         if (rise) {
-            int phn = m.ph >= m_last() ? 0 : m.ph + 1;
-            bool seq = phn == 0 && (m.wide || !m.cpar);
-            if (req) slot_edge(seq, memw, a, d);
             m.dots++;
             bool v, i;
             m_dot_value(v, i);
