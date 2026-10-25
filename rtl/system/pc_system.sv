@@ -7,6 +7,7 @@ module pc_system #(
     parameter int RAM_KB  = 640,
     // fitted video cards (doc/architecture.md section 4, doc/mda.md section 7)
     parameter bit CGA_FIT = 1'b1,       // IBM CGA at B8000-BFFFF, 3D0-3DF
+    parameter bit CGA_SNOW = 1'b1,      // the IBM CGA's 80-column snow (cga_card SNOW)
     parameter int MDA_FIT = 0,          // 0 none, 1 IBM MDA, 2 Hercules (B0000, 3B0-3BF)
     parameter int DRQ0_SKEW = 0         // simulation only (xt_board)
 ) (
@@ -233,7 +234,7 @@ logic       cga_dsel, cga_ready, cga_dsel_c, cga_ready_c;
 logic [3:0] cga_rgbi;
 logic       cga_hs, cga_vs, cga_hb, cga_vb;
 
-cga_card #(.REG_READY(1'b1)) u_cga (
+cga_card #(.REG_READY(1'b1), .SNOW(CGA_SNOW)) u_cga (
     .clk        (clk),
     .reset      (reset),
     .ce_14m     (ce_14m),
