@@ -423,6 +423,12 @@ Open points:
 
 ## 11. For the shell (MEGA65 glue)
 
+- **PC10-III:** the PC10-III's onboard video is the Paradise PVC4
+  (doc/pvc4.md), whose mono personality reuses this card's display logic (on
+  16.257 MHz also for the Hercules mode, as the PC10-III manual says, and
+  without the horizontal drive gate). The IBM cards' font copies take only
+  font port writes with `font_addr_hi` = 0.
+
 - Video: 18.43 kHz / 49.8 Hz, 882 x 370 dots per frame at 16.257 MHz; the
   visible 720 x 350 (Hercules graphics 720 x 348). A 15 kHz-style analog
   output does not apply (the 5151 is an 18 kHz TTL monitor). For HDMI the

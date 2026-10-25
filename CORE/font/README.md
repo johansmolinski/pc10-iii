@@ -12,6 +12,8 @@ it into the CGA card at power-up.
   This image is an adaptation of them and is under the same licence.
 - 80-FF: empty (GLaBIOS has no upper half).
 - 0x1000-0x17FF: the "thin" font, derived from the same glyphs (each row with
-  its right edges removed), 0x0000-0x0FFF: zero (the MDA font, unused).
+  its right edges removed); 0x0000-0x0FFF: the MDA font, the same glyphs
+  stretched from 8 to 14 rows (used by the PVC4's mono personality,
+  doc/pvc4.md; since 2026-10-25, zero before).
 
 Regenerate: `tools/mkcgafont.py <GLaBIOS>/src/GLABIOS.ASM CORE/font/cga_default.hex`.

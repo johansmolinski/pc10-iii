@@ -1,5 +1,5 @@
 // pc_ooc_top.sv - the PC side for an out-of-context Vivado run at 28.63636 MHz
-// (tools/ooc/pc_ooc.tcl): pc_system with every card (CGA, Hercules, FDC, XTIDE)
+// (tools/ooc/pc_ooc.tcl): pc_system with every card (CGA, Hercules, FDC, XTIDE) and the PVC4
 // and the shell's system RAM (CORE/vhdl/pc_ram.vhd, latency 2), the BIOS ROM and
 // the XTIDE option ROM as block RAMs read in 1 clk. The rest of pc_system's ports
 // are the top's; out of context they are not timed, the paths inside are.
@@ -22,6 +22,10 @@ module pc_ooc_top (
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
     input  logic        font_thin,
+    input  logic [1:0]  font_addr_hi,
+    input  logic        font_cbm,
+    input  logic [1:0]  cbm_dip,
+    output logic        vid_mono, vid_monomode,
     input  logic [1:0]  drv_80trk, img_present, img_wp,
     input  logic [1:0][7:0] img_tracks,
     input  logic [1:0][1:0] img_heads,
@@ -86,13 +90,14 @@ pc_ram u_ram (
     .ram_wdata_i(ram_wdata), .ram_rdata_o(ram_rdata), .ram_ack_o(ram_ack)
 );
 
-pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2)) u_pc (
+pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2), .PVC4_FIT(1'b1)) u_pc (
     .clk, .reset, .fe2010a, .ucl_we, .ucl_addr, .ucl_data,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,
     .vid_ce, .vid_rgbi, .vid_hsync, .vid_vsync, .vid_hblank, .vid_vblank,
     .mda_ce, .mda_video, .mda_intens, .mda_hsync, .mda_vsync, .mda_hblank, .mda_vblank,
-    .font_we, .font_addr, .font_data, .font_thin,
+    .font_we, .font_addr, .font_data, .font_thin, .font_addr_hi, .font_cbm, .cbm_dip,
+    .vid_mono, .vid_monomode,
     .drv_80trk, .img_present, .img_wp, .img_tracks, .img_heads, .img_spt,
     .drv_motor, .fdc_active, .drv_select, .drv_step, .drv_step_in,
     .sp_req, .sp_write, .sp_drive, .sp_cyl, .sp_head, .sp_sector, .sp_lba,
