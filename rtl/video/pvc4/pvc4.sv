@@ -231,12 +231,19 @@ always_ff @(posedge clk) begin
     vb_q1 <= vram1[vb_addr];
 end
 
-// Character generator ROM (32 KB)
+// Character generator ROM (32 KB). The Commodore ROM (318086-xx) holds the
+// leftmost dot in D0, IBM's in D7: the PC10-III board wires the ROM's data
+// lines to the PVC4 in reverse order (the ROMs on zimmers.net: '[' is ']' read
+// MSB-first; the hardware showed every glyph mirrored without this), so a
+// Commodore image is stored reversed and everything after it is IBM-ordered.
 logic [7:0]  font [32768];
 logic [14:0] fr_addr;
 logic [7:0]  fr_q;
+wire  [7:0]  font_wd = font_cbm ? {font_data[0], font_data[1], font_data[2], font_data[3],
+                                   font_data[4], font_data[5], font_data[6], font_data[7]}
+                                : font_data;
 always_ff @(posedge clk) begin
-    if (font_we) font[font_addr] <= font_data;
+    if (font_we) font[font_addr] <= font_wd;
     fr_q <= font[fr_addr];
 end
 

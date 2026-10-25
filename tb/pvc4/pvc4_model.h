@@ -28,6 +28,14 @@ struct Pvc4Model {
     bool enable = true;
     bool cbm = false, a14 = true, a11 = true;
     std::vector<uint8_t> font = std::vector<uint8_t>(32768, 0);
+    // a Commodore ROM holds the leftmost dot in D0 (the board reverses the data lines)
+    uint8_t glyph(int a) const {
+        uint8_t v = font[a];
+        if (!cbm) return v;
+        uint8_t r = 0;
+        for (int i = 0; i < 8; i++) if (v & (1 << i)) r |= 0x80 >> i;
+        return r;
+    }
     std::vector<uint8_t> mem = std::vector<uint8_t>(65536, 0);
     int cpu_t = 5;
 
@@ -147,7 +155,7 @@ struct Pvc4Model {
         c.cur_fg = c.cur_attr & 0x0F;
         if (c.blinking) { c.cur_bg = (c.cur_attr >> 4) & 7; c.cur_blink = c.cur_attr & 0x80; }
         else            { c.cur_bg = c.cur_attr >> 4;       c.cur_blink = false; }
-        c.glyph = font[cg(c.cur_char, crtc.ra(), false)];
+        c.glyph = glyph(cg(c.cur_char, crtc.ra(), false));
         int ga = 0x8000 | ((((crtc.vma & 0x0FFF) | ((crtc.ra() & 1) << 12)) << 1));
         c.g0 = mem[ga];     c.g1 = mem[ga + 1];
         c.h0 = mem[ga | 0x4000]; c.h1 = mem[(ga + 1) | 0x4000];
@@ -286,7 +294,7 @@ struct Pvc4Model {
                                : (ma & 0x1FFF) << 1;
         m.n_chr = mem[addr];
         m.n_att = mem[addr | 1];
-        m.n_glyph = font[cg(m.s1_chr, ra, true)];
+        m.n_glyph = glyph(cg(m.s1_chr, ra, true));
     }
 
     // ---------------------------------------------------------------- the bus

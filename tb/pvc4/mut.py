@@ -84,6 +84,8 @@ MUTANTS = [
      "if (cbm) return {1'b1, a13, ch[7], a11, ch[6:0], row};", 'cbm'),
     ('CBM char bit 7 at A11', "if (cbm) return {a14, a13, ch[7], a11, ch[6:0], row};",
      "if (cbm) return {a14, a13, a11, ch[7], ch[6:0], row};", 'cbm'),
+    ('CBM data not reversed', "wire  [7:0]  font_wd = font_cbm ?", "wire  [7:0]  font_wd = 1'b0 ?", 'cbm'),
+    ('IBM data reversed too', "wire  [7:0]  font_wd = font_cbm ?", "wire  [7:0]  font_wd = 1'b1 ?", 'cmode3'),
 ]
 
 

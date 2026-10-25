@@ -1649,3 +1649,13 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   each byte = image byte mod 16384, `font_cbm` = 1), grows it to 32 KB (1:1)
   and checks the overflow bit; it caught the copy's GO bit left at the old
   CDC index (main_ctl(14) after the word grew to 17 bits).
+- **Hardware** (build pc10-real-q, WNS +0.263, BRAM 258): with
+  `/pc10/char.rom` = 318086-03 every glyph was mirrored left-right (user's
+  photo). The Commodore ROM holds the leftmost dot in D0, IBM's in D7 (read
+  MSB-first, '[' is ']'; the first check of the ROMs used symmetric glyphs
+  and missed it): the board wires the ROM's data lines to the PVC4 in reverse
+  order. `pvc4.sv` now stores a Commodore image bit-reversed (`font_wd`), the
+  reference model reverses its glyph fetch for `cbm`, and the test ROM
+  (`make_cbm`) holds the real bit order. tb/pvc4 PASS; mutants "CBM data not
+  reversed" (cbm: 39,394 dots differ) and "IBM data reversed too" (cmode3:
+  78,796) killed.

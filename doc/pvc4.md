@@ -459,6 +459,9 @@ with an expansion CGA.
   section 8). The Commodore ROMs on zimmers.net confirm section 5's wiring:
   318086-02/-03 hold USA/Europe at A14 = 1, Scandinavian at A14 = 0, and
   the 9x14 mono font where A13 = A11 (8x8 colour where they differ).
+  The ROM holds the leftmost dot in D0 (IBM: D7): the board wires its data
+  lines to the PVC4 reversed, so `pvc4.sv` stores a Commodore image
+  bit-reversed (found on hardware 2026-10-25: mirrored glyphs).
 
 ### 8.1 The video path through M2M
 

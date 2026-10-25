@@ -870,7 +870,9 @@ static std::vector<uint8_t> make_cbm(const std::vector<uint8_t> &ibm) {
                         : ibm[((row & 8) << 8) | (ch << 3) | (row & 7)];
         if (a13) v = (uint8_t)~v;
         if (!a14) v = (uint8_t)((v << 4) | (v >> 4));
-        f[a] = v;
+        uint8_t r = 0;                  // the real ROM's bit order: leftmost dot in D0
+        for (int i = 0; i < 8; i++) if (v & (1 << i)) r |= 0x80 >> i;
+        f[a] = r;
     }
     return f;
 }
