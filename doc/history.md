@@ -1461,3 +1461,52 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
 - Not verified: the hardware (the MEGA65 drive's step rate limit, TRK0 delay
   and /DSKCHG behaviour), the firmware's settings-file path beyond the two
   callbacks (the Shell's load/save around them), Vivado (synthesis, timing).
+
+## 2026-10-25 - The chipset as a menu choice: PC10-III (FE2010A) or IBM XT (8255) (branch `chipset`)
+
+- **Why:** the Commodore BIOS 4.41 needs the FE2010A's port logic (b00d54a),
+  GLaBIOS (the free default BIOS) selects the switch nibble with PB3 like a
+  5160 and stops with "POST Error 0800 FDD" on it. The user chose a menu item.
+- **xt_board.sv:** the `FE2010A` parameter is now the input `fe2010a`, taken
+  into `fe_mode` while reset is high. Both port logics are always there: the
+  KF8255 as before (its chip select gated with !fe_mode, its port C from the
+  5160 switch nibble), the FE2010A registers (port B, 62h switch register, 63h
+  configuration, written only in FE mode); port B, its drive flag and the read
+  data are multiplexed by `fe_mode`, and the 63h RAM size limits `ram_top` only
+  in FE mode. pc_system has the input instead of the parameter; tb/sys keeps
+  its `FE2010A` parameter (`make FE=1`) and drives the input with it;
+  pc_system_flat, main.vhd, the stub and the OOC top pass it through.
+- **Shell:** `pc_chipset.vhd`: the menu bit, the switches (5D FE2010A, 6D
+  8255) and a restart on a change (the PC held in reset for 2^16 clocks =
+  2.3 ms from the clock the menu bit changes, OR-ed into `main_pc_reset`). The
+  memory size, by contrast, acts at once (`pc_ram.vhd`), so there was no
+  restart path to reuse.
+- **Menu:** submenu `Chipset: %s` at line 8 (headline, `PC10-III (FE2010A)`
+  default at 11, `IBM XT (8255)` at 12, back at 14), behind the drive sound;
+  39 lines, every C_MENU_* from Memory on moved by 7, OPTM_DY 19, menu heap
+  demand 806 of 1024. Settings signature `menu=3` (old files get the
+  defaults once). Firmware ROM 32037 words (unchanged), RAM unchanged.
+- **Tests:** `tb/shell/tb_chipset.vhd` PASS; `tb/shell/mut.py`: pc_chipset 7
+  of 7, pc_drvsnd 27 of 27, firmware 5 of 5 killed; `tb/shell/run.sh` PASS.
+- **Gates** (fedora, `gates.sh chipset` and `chipset-base` = main 00a51da
+  exported, `~/pcxt-work/clk/chipset*`): 8255 mode (tb/sys default):
+  - MartyPC trace (`DRQ0_SKEW=7`, `-s 1.27 -q -C 40 -t`): SHA-256 a72753ca...
+    on both (unchanged since clk28), first difference 2,227,925 (MartyPC's
+    LOOP); `-d EE` bd612823... and `-L 2` a72753ca... on both;
+  - floppy boot (GLaBIOS, `-a hello360.img -s 10 -C 40`): the log identical to
+    main's but the wall time (C0 H0 S1/S2 at 9,005.376/9,005.394 ms, "Booted
+    from floppy A:", the CGA oracle 134 reads / 14,147 writes, 0 differ);
+  - tb/fdc 232 checks, tb/hdc 3,182 checks, tb/cga, tb/mda, tb/shell PASS.
+- **FE2010A mode** (`make FE=1`, the Commodore BIOS 4.41,
+  `-s 24 -a hello360.img -d 5D`, `~/pcxt-work/chipset/cbm-fe`): the banner,
+  "Hard disk not found", no timer or keyboard error, "System RAM 256 KBytes
+  OK" at 24 s (the RAM test still running); the log (CS:IP every 50 ms over
+  24 s, POST codes, the screen) is identical to the run of main's code in
+  `~/pcxt-work/scratch/cbm/fe2_cbm.log` but for that run's extra screenshot
+  at 18 s.
+- The same at 50 s (`~/pcxt-work/chipset/cbm-fe45`, 3,489 s wall): "System
+  RAM 640 KBytes OK", the boot sector read (C0 H0 S1/S2) at 38,205.376 ms
+  and "Booted from floppy A: (pc10-iii FDC+DMA)"; the PC sits in the boot
+  sector's loop (0000:7C1D) from 39.9 s on. Not verified: the menu, the
+  restart and the settings file in the real shell (no Vivado, no hardware);
+  GLaBIOS with 6D on the 8255 is covered by tb/sys only.

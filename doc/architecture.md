@@ -54,7 +54,9 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
  +- xt_board        rtl/system/xt_board.sv: the 5160 system board logic
  |   +- 8288 function (bus commands from S2-S0)
  |   +- 8237 DMA, page register, refresh (8253 ch1 -> DRQ0)
- |   +- 8253 PIT, 8255 PPI, 8259 PIC, NMI mask, speaker
+ |   +- 8253 PIT, 8259 PIC, NMI mask, speaker
+ |   +- ports 60-63: the 5160's 8255 PPI or the PC10-III's FE2010A port logic
+ |       (input fe2010a, taken in reset; the menu's "Chipset")
  |   +- ready / wait-state logic (DMA hold, IOCHRDY)
  |   +- keyboard interface (shift register, IRQ1, clear via PB7)
  +- the "ISA slots": modules on the card bus (section 3)
@@ -163,6 +165,9 @@ module pc_system #(
 ) (
     input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high, >= 1 CPU clock
+    input  logic        fe2010a,      // the chipset (xt_board): 1 = the PC10-III's
+                                      // FE2010A port logic, 0 = the 5160's 8255;
+                                      // taken while reset is high
 
     // The 8088's microcode bundle (tools/mkucode.py, doc/z8086.md), owned by
     // the glue (QNICE loads /pc10/ucode.bin, pc_ucode.vhd): the file, one byte
@@ -262,7 +267,11 @@ module pc_system #(
     input  logic [7:0]  dip_sw1       // SW1 of the 5160 as the 8255 reads it
                                       // (1 = switch off); bit 0 = switch 1;
                                       // bits 5-4: 11 MDA/Hercules, 10 CGA 80,
-                                      // 01 CGA 40 (the primary display)
+                                      // 01 CGA 40 (the primary display); with
+                                      // the FE2010A bits 5-4 are its VID pins
+                                      // (01 = CGA 80 for the Commodore BIOS),
+                                      // the rest the switch register's reset
+                                      // value (the shell: 5D FE2010A, 6D 8255)
 );
 ```
 

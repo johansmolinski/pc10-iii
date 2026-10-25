@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# mut.py - mutants of CORE/vhdl/pc_drvsnd.vhd against tb_drvsnd.vhd (ghdl) and of the
+# mut.py - mutants of CORE/vhdl/pc_drvsnd.vhd against tb_drvsnd.vhd (ghdl), of
+# CORE/vhdl/pc_chipset.vhd against tb_chipset.vhd and of the
 # firmware's settings file signature (CORE/m2m-rom/m2m-rom.asm) against run_cfgsig.sh (QNICE
 # emulator). Every mutant must be killed: the bench reports FAIL, or the simulation stops
 # with an error (a counter leaving its range counts as killed). Run from anywhere.
@@ -47,6 +48,29 @@ MUT = [
     ('led_green',     "   led_col_o <= x\"FFFF00\";", "   led_col_o <= x\"00FF00\";"),
 ]
 
+CS = os.path.join(R, 'CORE', 'vhdl', 'pc_chipset.vhd')
+CS_TB = os.path.join(H, 'tb_chipset.vhd')
+CS_MUT = [
+    ('cs_no_restart', "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe else '0';",
+                      "   rst_o     <= '0';"),
+    ('cs_no_stretch', "            cnt <= (others => '1');", "            cnt <= (others => '0');"),
+    ('cs_late',       "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe else '0';",
+                      "   rst_o     <= '1' when cnt /= 0 else '0';"),
+    ('cs_sw_swapped', "   dip_sw1_o <= G_SW1_FE when fe = '1' else G_SW1_XT;",
+                      "   dip_sw1_o <= G_SW1_XT when fe = '1' else G_SW1_FE;"),
+    ('cs_sw_fixed',   "   dip_sw1_o <= G_SW1_FE when fe = '1' else G_SW1_XT;", "   dip_sw1_o <= G_SW1_FE;"),
+    ('cs_default_xt', "   signal fe   : std_logic := '1';", "   signal fe   : std_logic := '0';"),
+    ('cs_count_once', "         elsif cnt /= 0 then", "         elsif cnt = 1 then"),
+]
+
+
+def run_cs(dut_path, work):
+    os.makedirs(work, exist_ok=True)
+    cmd = ('ghdl -a --std=08 "{d}" "{t}" && ghdl -e --std=08 tb_chipset && '
+           'ghdl -r --std=08 tb_chipset').format(d=dut_path, t=CS_TB)
+    p = subprocess.run(['bash', '-c', cmd], cwd=work, capture_output=True, text=True)
+    return 'CHIPSET TB: PASS' in p.stdout + p.stderr and p.returncode == 0
+
 FW = os.path.join(R, 'CORE', 'm2m-rom', 'm2m-rom.asm')
 FW_MUT = [
     ('sig_always',    "                RBRA    _CFGSC_OK, Z", "                RBRA    _CFGSC_OK, 1"),
@@ -88,6 +112,19 @@ def main():
             print('%-15s %s' % (name, 'SURVIVED' if ok else 'killed'))
             killed += not ok
         print('pc_drvsnd mutants: %d of %d killed' % (killed, len(MUT)))
+        csrc = open(CS).read()
+        if not run_cs(CS, os.path.join(tmp, 'cs_orig')):
+            print('the chipset bench does not pass'); return 1
+        ck = 0
+        for name, a, b in CS_MUT:
+            if csrc.count(a) != 1:
+                print('%-15s pattern found %d times' % (name, csrc.count(a))); return 1
+            p = os.path.join(tmp, name + '.vhd')
+            open(p, 'w').write(csrc.replace(a, b))
+            ok = run_cs(p, os.path.join(tmp, name))
+            print('%-15s %s' % (name, 'SURVIVED' if ok else 'killed'))
+            ck += not ok
+        print('pc_chipset mutants: %d of %d killed' % (ck, len(CS_MUT)))
         fsrc = open(FW).read()
         if not run_fw(FW):
             print('the firmware test does not pass'); return 1
@@ -101,7 +138,7 @@ def main():
             print('%-15s %s' % (name, 'SURVIVED' if ok else 'killed'))
             fk += not ok
         print('firmware signature mutants: %d of %d killed' % (fk, len(FW_MUT)))
-        return 0 if killed == len(MUT) and fk == len(FW_MUT) else 1
+        return 0 if killed == len(MUT) and ck == len(CS_MUT) and fk == len(FW_MUT) else 1
 
 
 sys.exit(main())

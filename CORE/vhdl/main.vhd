@@ -29,6 +29,7 @@ entity main is
    port (
       clk_main_i              : in  std_logic;     -- 28.63636 MHz, also M2M's video clock
       reset_i                 : in  std_logic;     -- synchronous, high active (all reset sources)
+      fe2010a_i               : in  std_logic;     -- chipset: 1 = PC10-III (FE2010A), 0 = IBM XT (8255)
 
       -- Video output (on clk_main_i with video_ce_o)
       video_ce_o              : out std_logic;
@@ -110,6 +111,7 @@ architecture synthesis of main is
       port (
          clk         : in  std_logic;
          reset       : in  std_logic;
+         fe2010a     : in  std_logic;
          ram_addr    : out std_logic_vector(19 downto 0);
          ram_en      : out std_logic;
          ram_we      : out std_logic;
@@ -204,6 +206,7 @@ begin
       port map (
          clk         => clk_main_i,
          reset       => reset_i,
+         fe2010a     => fe2010a_i,
          ram_addr    => ram_addr_o,
          ram_en      => ram_en_o,
          ram_we      => ram_we_o,

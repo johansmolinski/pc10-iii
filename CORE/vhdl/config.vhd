@@ -186,46 +186,53 @@ constant OPTM_S_SAVING     : string := "<Saving>";
 
 -- Size of menu and menu items. The line numbers are the bits of qnice_osm_control_i
 -- (mega65.vhd C_MENU_*):
---     0  PC10-III                 headline
+--     0  PC10-III                headline
 --     1  ----
---     2  A:%s                     floppy image of A: (manual ROM load 0, pc_fdd_sd.vhd)
---     3  B:%s                     floppy image of B: (manual ROM load 1)
---     4  A: write protected       C_MENU_WP_A
---     5  B: write protected       C_MENU_WP_B
+--     2  A:%s                    floppy image of A: (manual ROM load 0, pc_fdd_sd.vhd)
+--     3  B:%s                    floppy image of B: (manual ROM load 1)
+--     4  A: write protected      C_MENU_WP_A
+--     5  B: write protected      C_MENU_WP_B
 --     6  Drive sound (int. drive) C_MENU_DRV_SOUND (default on; pc_drvsnd.vhd)
 --     7  ----
---     8  Memory: %s               submenu
---     9    Memory size            headline
+--     8  Chipset: %s             submenu (a change restarts the PC, mega65.vhd)
+--     9    Chipset               headline
 --    10    ----
---    11    640 KB                 C_MENU_MEM_640 (default)
---    12    512 KB                 C_MENU_MEM_512
---    13    256 KB                 C_MENU_MEM_256
---    14    128 KB                 C_MENU_MEM_128
---    15    ----
---    16    Back to main menu
---    17  HDMI: %s                 submenu
---    18    HDMI mode              headline
---    19    ----
---    20    720p 60 Hz 16:9        C_MENU_HDMI_720P (default)
---    21    480p 59.94 Hz 4:3      C_MENU_HDMI_480P
+--    11    PC10-III (FE2010A)    C_MENU_CHIP_PC10 (default; switches 5D)
+--    12    IBM XT (8255)         C_MENU_CHIP_XT (switches 6D)
+--    13    ----
+--    14    Back to main menu
+--    15  Memory: %s              submenu
+--    16    Memory size           headline
+--    17    ----
+--    18    640 KB                C_MENU_MEM_640 (default)
+--    19    512 KB                C_MENU_MEM_512
+--    20    256 KB                C_MENU_MEM_256
+--    21    128 KB                C_MENU_MEM_128
 --    22    ----
 --    23    Back to main menu
---    24  CGA: thin font           C_MENU_CGA_THIN (jumper P3)
---    25  Analog: 15 kHz RGB       C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
---    26  Analog: CSYNC            C_MENU_ANALOG_CSYNC
---    27  ----
---    28  Help
---    29  Reset the PC             C_MENU_RESET (momentary: the firmware resets and clears it)
---    30  ----
---    31  Close Menu
+--    24  HDMI: %s                submenu
+--    25    HDMI mode             headline
+--    26    ----
+--    27    720p 60 Hz 16:9       C_MENU_HDMI_720P (default)
+--    28    480p 59.94 Hz 4:3     C_MENU_HDMI_480P
+--    29    ----
+--    30    Back to main menu
+--    31  CGA: thin font          C_MENU_CGA_THIN (jumper P3)
+--    32  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
+--    33  Analog: CSYNC           C_MENU_ANALOG_CSYNC
+--    34  ----
+--    35  Help
+--    36  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
+--    37  ----
+--    38  Close Menu
 --
 -- The settings file keeps one byte per line, so the layout is part of its format: the
 -- firmware's CFG_SIGCHECK accepts only a file whose text carries this menu's signature
 -- (m2m-rom.asm, CFG_SIG_VAL; change it with every layout change), any other file is reset to
 -- the defaults.
-constant OPTM_SIZE         : natural := 32;
+constant OPTM_SIZE         : natural := 39;
 constant OPTM_DX           : natural := 28;
-constant OPTM_DY           : natural := 18;   -- the visible main menu (lines 0-8, 17, 24-31)
+constant OPTM_DY           : natural := 19;   -- the visible main menu (lines 0-8, 15, 24, 31-38)
 
 constant OPTM_ITEMS        : string :=
    " PC10-III\n"              &
@@ -236,6 +243,13 @@ constant OPTM_ITEMS        : string :=
    " B: write protected\n"    &
    " Drive sound (int. drive)\n" &
    "\n"                       &
+   " Chipset: %s\n"           &
+   " Chipset\n"               &
+   "\n"                       &
+   " PC10-III (FE2010A)\n"    &
+   " IBM XT (8255)\n"         &
+   "\n"                       &
+   " Back to main menu\n"     &
    " Memory: %s\n"            &
    " Memory size\n"           &
    "\n"                       &
@@ -273,6 +287,7 @@ constant OPTM_G_15KHZ      : integer := 8;
 constant OPTM_G_CSYNC      : integer := 9;
 constant OPTM_G_RESET      : integer := 10;
 constant OPTM_G_DRVSND     : integer := 11;
+constant OPTM_G_CHIP       : integer := 12;
 
 type OPTM_GTYPE is array (0 to OPTM_SIZE - 1) of integer range 0 to 2**OPTM_GTC- 1;
 
@@ -284,30 +299,37 @@ constant OPTM_GROUPS       : OPTM_GTYPE := ( OPTM_G_TEXT + OPTM_G_HEADLINE,     
                                              OPTM_G_WPB + OPTM_G_SINGLESEL,            --  5 B: write protected
                                              OPTM_G_DRVSND + OPTM_G_SINGLESEL + OPTM_G_STDSEL, --  6 Drive sound
                                              OPTM_G_LINE,                              --  7
-                                             OPTM_G_SUBMENU,                           --  8 Memory: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            --  9 Memory size
+                                             OPTM_G_SUBMENU,                           --  8 Chipset: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            --  9 Chipset
                                              OPTM_G_LINE,                              -- 10
-                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 11 640 KB
-                                             OPTM_G_MEM,                               -- 12 512 KB
-                                             OPTM_G_MEM,                               -- 13 256 KB
-                                             OPTM_G_MEM,                               -- 14 128 KB
-                                             OPTM_G_LINE,                              -- 15
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 16 Back
-                                             OPTM_G_SUBMENU,                           -- 17 HDMI: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 18 HDMI mode
-                                             OPTM_G_LINE,                              -- 19
-                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 20 720p 60 Hz
-                                             OPTM_G_HDMI,                              -- 21 480p 59.94 Hz
+                                             OPTM_G_CHIP + OPTM_G_STDSEL,              -- 11 PC10-III (FE2010A)
+                                             OPTM_G_CHIP,                              -- 12 IBM XT (8255)
+                                             OPTM_G_LINE,                              -- 13
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 14 Back
+                                             OPTM_G_SUBMENU,                           -- 15 Memory: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 16 Memory size
+                                             OPTM_G_LINE,                              -- 17
+                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 18 640 KB
+                                             OPTM_G_MEM,                               -- 19 512 KB
+                                             OPTM_G_MEM,                               -- 20 256 KB
+                                             OPTM_G_MEM,                               -- 21 128 KB
                                              OPTM_G_LINE,                              -- 22
                                              OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 23 Back
-                                             OPTM_G_THIN + OPTM_G_SINGLESEL,           -- 24 CGA: thin font
-                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 25 Analog: 15 kHz
-                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 26 Analog: CSYNC
-                                             OPTM_G_LINE,                              -- 27
-                                             OPTM_G_HELP,                              -- 28 Help
-                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 29 Reset the PC
-                                             OPTM_G_LINE,                              -- 30
-                                             OPTM_G_CLOSE                              -- 31 Close Menu
+                                             OPTM_G_SUBMENU,                           -- 24 HDMI: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 25 HDMI mode
+                                             OPTM_G_LINE,                              -- 26
+                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 27 720p 60 Hz
+                                             OPTM_G_HDMI,                              -- 28 480p 59.94 Hz
+                                             OPTM_G_LINE,                              -- 29
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 30 Back
+                                             OPTM_G_THIN + OPTM_G_SINGLESEL,           -- 31 CGA: thin font
+                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 32 Analog: 15 kHz
+                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 33 Analog: CSYNC
+                                             OPTM_G_LINE,                              -- 34
+                                             OPTM_G_HELP,                              -- 35 Help
+                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 36 Reset the PC
+                                             OPTM_G_LINE,                              -- 37
+                                             OPTM_G_CLOSE                              -- 38 Close Menu
                                            );
 
 begin

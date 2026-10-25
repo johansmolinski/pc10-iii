@@ -27,14 +27,16 @@ module xt_board #(
     // the 8253's reload); tb/sys sets this to compare traces past the first
     // refresh. 0 = the hardware.
     parameter int DRQ0_SKEW = 0,
-    parameter int CLK_PER_CPU = 6,      // clk per 8088 clock (DRQ0_SKEW only)
-    // 1: the PC10-III's Faraday FE2010A instead of the 5160's 8255 (see the
-    // 8255 section): fixed port directions, 63h is the chipset's configuration
-    // register, PB2 selects the switch nibble. 0: IBM 5160 (the MartyPC gates).
-    parameter bit FE2010A = 1'b0
+    parameter int CLK_PER_CPU = 6       // clk per 8088 clock (DRQ0_SKEW only)
 ) (
     input  logic        clk,
     input  logic        reset,
+    // pc10-iii (chipset): 1 = the PC10-III's Faraday FE2010A port logic instead
+    // of the 5160's 8255 (see the 8255 section): fixed port directions, 63h is
+    // the chipset's configuration register, PB2 selects the switch nibble.
+    // 0: IBM 5160 (the MartyPC gates). Taken while reset is high (a change acts
+    // through a PC reset).
+    input  logic        fe2010a,
     input  logic        cpu_step,
     input  logic        cpu_fall,
     input  logic        rdy_ce,         // 1 clk before cpu_step (pc_clocks)
@@ -351,7 +353,7 @@ always_ff @(posedge clk)
 // ------------------------------------------------------------ 8253
 logic [7:0] pit_dout;
 logic       out0, out1, out2;
-logic [7:0] pb;                          // 8255 port B
+logic [7:0] pb;                          // port B (8255 or FE2010A)
 logic       pb_io;
 wire        pb_drv = !pb_io;
 
@@ -463,59 +465,67 @@ assign cpu_intr = pic_int;
 //        (the clock bits are kept, not used yet: the turbo is a later step).
 // The Commodore BIOS reads the switches at F000:C5B2 (select 0 first), sizes
 // the RAM with 45h/51h/41h and writes the switch register (F000:C389).
+// Both port logics are present; fe_mode (fe2010a, taken in reset) picks one.
+// The 8255 sees its chip select only in 5160 mode, the FE2010A's registers
+// change only in FE2010A mode, so the other one stays in its reset state.
+logic       fe_mode;
+always_ff @(posedge clk)
+    if (reset) fe_mode <= fe2010a;
 logic [7:0] ppi_dout, kbd_data;
-logic [7:0] pc_in;
+logic [7:0] kf_dout, fe_dout, kf_pb, fe_pb;
+logic       kf_pb_io;
+logic [7:0] kf_pc_in, fe_pc_in;
 logic [7:0] fe_cfg;
 logic [7:0] fe_sw;                       // FE2010A switch register (bits 5-4 unused)
-generate
-    if (FE2010A) begin : g_fe2010a
-        assign pc_in = {1'b0, 1'b0, out2, 1'b0,
-                        pb[2] ? fe_sw[3:0] : {fe_sw[7:6], dip_sw1[5:4]}};
-        wire lock = fe_cfg[3];
-        always_ff @(posedge clk)
-            if (reset) begin
-                pb <= 8'h00;  fe_cfg <= 8'h00;  fe_sw <= dip_sw1 & 8'hCF;
-            end else if (cs_ppi && !io_wr_n) begin
-                case (bus_addr[1:0])
-                    2'd1: pb <= bus_wdata;
-                    2'd2: if (!lock) fe_sw <= bus_wdata & 8'hCF;
-                    2'd3: fe_cfg <= lock ? {bus_wdata[7:5], fe_cfg[4:0]} : bus_wdata;
-                    default: ;
-                endcase
-            end
-        assign pb_io = 1'b0;
-        always_comb
-            case (bus_addr[1:0])
-                2'd0:    ppi_dout = kbd_data;
-                2'd1:    ppi_dout = pb;
-                2'd2:    ppi_dout = pc_in;
-                default: ppi_dout = fe_cfg;
-            endcase
-    end else begin : g_8255
-        assign pc_in = {1'b0, 1'b0, out2, 1'b0, pb[3] ? dip_sw1[7:4] : dip_sw1[3:0]};
-        assign fe_cfg = 8'h00;
-        assign fe_sw  = 8'h00;
-        KF8255 u_ppi (
-            .clock          (clk),
-            .reset          (reset),
-            .chip_select_n  (~cs_ppi),
-            .read_enable_n  (io_rd_n),
-            .write_enable_n (io_wr_n),
-            .address        (bus_addr[1:0]),
-            .data_bus_in    (bus_wdata),
-            .data_bus_out   (ppi_dout),
-            .port_a_in      (kbd_data),
-            .port_a_out     (),
-            .port_a_io      (),
-            .port_b_in      (8'h00),
-            .port_b_out     (pb),
-            .port_b_io      (pb_io),
-            .port_c_in      (pc_in),
-            .port_c_out     (),
-            .port_c_io      ()
-        );
+
+// FE2010A
+assign fe_pc_in = {1'b0, 1'b0, out2, 1'b0,
+                   fe_pb[2] ? fe_sw[3:0] : {fe_sw[7:6], dip_sw1[5:4]}};
+wire   fe_lock  = fe_cfg[3];
+always_ff @(posedge clk)
+    if (reset) begin
+        fe_pb <= 8'h00;  fe_cfg <= 8'h00;  fe_sw <= dip_sw1 & 8'hCF;
+    end else if (fe_mode && cs_ppi && !io_wr_n) begin
+        case (bus_addr[1:0])
+            2'd1: fe_pb <= bus_wdata;
+            2'd2: if (!fe_lock) fe_sw <= bus_wdata & 8'hCF;
+            2'd3: fe_cfg <= fe_lock ? {bus_wdata[7:5], fe_cfg[4:0]} : bus_wdata;
+            default: ;
+        endcase
     end
-endgenerate
+always_comb
+    case (bus_addr[1:0])
+        2'd0:    fe_dout = kbd_data;
+        2'd1:    fe_dout = fe_pb;
+        2'd2:    fe_dout = fe_pc_in;
+        default: fe_dout = fe_cfg;
+    endcase
+
+// IBM 5160
+assign kf_pc_in = {1'b0, 1'b0, out2, 1'b0, kf_pb[3] ? dip_sw1[7:4] : dip_sw1[3:0]};
+KF8255 u_ppi (
+    .clock          (clk),
+    .reset          (reset),
+    .chip_select_n  (~(cs_ppi && !fe_mode)),
+    .read_enable_n  (io_rd_n),
+    .write_enable_n (io_wr_n),
+    .address        (bus_addr[1:0]),
+    .data_bus_in    (bus_wdata),
+    .data_bus_out   (kf_dout),
+    .port_a_in      (kbd_data),
+    .port_a_out     (),
+    .port_a_io      (),
+    .port_b_in      (8'h00),
+    .port_b_out     (kf_pb),
+    .port_b_io      (kf_pb_io),
+    .port_c_in      (kf_pc_in),
+    .port_c_out     (),
+    .port_c_io      ()
+);
+
+assign pb       = fe_mode ? fe_pb   : kf_pb;
+assign pb_io    = fe_mode ? 1'b0    : kf_pb_io;
+assign ppi_dout = fe_mode ? fe_dout : kf_dout;
 
 // ------------------------------------------------------------ NMI mask (A0)
 logic nmi_en;
@@ -602,7 +612,7 @@ localparam logic [19:0] RAM_TOP = 20'(RAM_KB * 1024);
 logic [19:0] ram_top;
 always_comb begin
     ram_top = RAM_TOP;
-    if (FE2010A)
+    if (fe_mode)
         case ({fe_cfg[4], fe_cfg[2]})
             2'b01:   ram_top = RAM_TOP < 20'h40000 ? RAM_TOP : 20'h40000;
             2'b10:   ram_top = RAM_TOP < 20'h80000 ? RAM_TOP : 20'h80000;
