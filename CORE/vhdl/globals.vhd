@@ -35,9 +35,11 @@ constant QNICE_CODE_BANKS         : string  := "";
 -- Clock Speed(s)
 ----------------------------------------------------------------------------------------------------------
 
--- The PC's one clock: 100 MHz * 55.125 / 5 / 11 = 2205/22 MHz = 100.227272.. MHz = 7 x 14.31818 MHz
--- (doc/architecture.md section 1, CORE/vhdl/clk.vhd)
-constant CORE_CLK_SPEED       : natural := 100_227_273;
+-- The PC's one clock: 100 MHz * 55.125 / 5 / 38.5 = 315/11 MHz = 28.636363.. MHz = 2 x 14.31818 MHz
+-- (doc/architecture.md section 1, CORE/vhdl/clk.vhd). The framework derives the MEGA65 keyboard
+-- link (312.5 kHz, m2m_keyb) and its scan timing from it: a stale value runs the link too slow and
+-- the keyboard drops it (no keys, no Help, the keyboard LEDs blink; build pc10-real-i).
+constant CORE_CLK_SPEED       : natural := 28_636_364;
 
 -- System clock speed (crystal that is driving the FPGA) and QNICE clock speed
 -- !!! Do not touch !!!
