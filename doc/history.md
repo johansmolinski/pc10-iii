@@ -1504,3 +1504,9 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   24 s, POST codes, the screen) is identical to the run of main's code in
   `~/pcxt-work/scratch/cbm/fe2_cbm.log` but for that run's extra screenshot
   at 18 s.
+- The same at 50 s (`~/pcxt-work/chipset/cbm-fe45`, 3,489 s wall): "System
+  RAM 640 KBytes OK", the boot sector read (C0 H0 S1/S2) at 38,205.376 ms
+  and "Booted from floppy A: (pc10-iii FDC+DMA)"; the PC sits in the boot
+  sector's loop (0000:7C1D) from 39.9 s on. Not verified: the menu, the
+  restart and the settings file in the real shell (no Vivado, no hardware);
+  GLaBIOS with 6D on the 8255 is covered by tb/sys only.
