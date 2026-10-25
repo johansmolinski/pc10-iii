@@ -48,7 +48,8 @@
 //       \n Enter, \e Esc, \b Backspace, \t Tab; capitals and symbols with Shift);
 //       may be given more than once
 //   -w  warm start: the BIOS's warm-boot flag 0472h = 1234h is in the RAM at
-//       power-on (a BIOS then skips its memory test)
+//       power-on (GLaBIOS-style BIOSes skip their memory test; the Commodore BIOS
+//       4.41 still tests it and then fails "Bad DMA port = 0004h": not for it)
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

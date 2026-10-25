@@ -334,11 +334,24 @@ end endgenerate
 generate if (XTA) begin : g_xtalog
     bit xlog = 1'b0;
     initial if ($test$plusargs("xtalog")) xlog = 1'b1;
-    longint unsigned cyc = 0;
+    longint unsigned cyc = 0, t_cmd = 0, n_drq = 0, n_dack = 0;
     logic [2:0] ph_q = 3'd0;
+    logic drq_q = 1'b0, dack_q = 1'b0;
     always_ff @(posedge clk) begin
-        cyc  <= cyc + 1;
+        cyc  <= reset ? 0 : cyc + 1;      // sys_run's time: from the end of the reset
         ph_q <= u_pc.g_xta.u_xta.phase;
+        drq_q  <= u_pc.isa_drq[3];
+        dack_q <= !u_pc.isa_dack_n[3];
+        if (u_pc.isa_drq[3] && !drq_q) n_drq <= n_drq + 1;
+        if (!u_pc.isa_dack_n[3] && !dack_q) n_dack <= n_dack + 1;
+        if (u_pc.g_xta.u_xta.phase == 3'd3 && ph_q != 3'd3) begin t_cmd <= cyc; n_drq <= 0; n_dack <= 0; end
+        // a command that runs for long: its state every 100 ms
+        if (xlog && !reset && u_pc.g_xta.u_xta.phase != 3'd0 && cyc > t_cmd && (cyc - t_cmd) % 2863636 == 0)
+            $display("[%10.3f ms] XTA busy: phase %0d st %0d m_st %0d mi %0d mdone %0d hdone %0d rd_cnt %0d h_act %b h_cnt %0d req %b mask %b drq %b dack %0d/%0d drq rises",
+                     real'(cyc) / 28636.36364, u_pc.g_xta.u_xta.phase, u_pc.g_xta.u_xta.st, u_pc.g_xta.u_xta.m_st,
+                     u_pc.g_xta.u_xta.mi, u_pc.g_xta.u_xta.mdone, u_pc.g_xta.u_xta.hdone, u_pc.g_xta.u_xta.rd_cnt,
+                     u_pc.g_xta.u_xta.h_act, u_pc.g_xta.u_xta.h_cnt, u_pc.g_xta.u_xta.req, u_pc.g_xta.u_xta.mask,
+                     u_pc.isa_drq[3], n_dack, n_drq);
         if (xlog && !reset && u_pc.g_xta.u_xta.phase != ph_q) begin
             if (u_pc.g_xta.u_xta.phase == 3'd3)         // P_EXEC
                 $display("[%10.3f ms] XTA command %02h %02h %02h %02h %02h %02h  (%04h:%04h)",
@@ -346,8 +359,8 @@ generate if (XTA) begin : g_xtalog
                          u_pc.g_xta.u_xta.ccb[2], u_pc.g_xta.u_xta.ccb[3], u_pc.g_xta.u_xta.ccb[4],
                          u_pc.g_xta.u_xta.ccb[5], u_pc.u_cpu.dbg_cs, u_pc.u_cpu.dbg_ip);
             if (u_pc.g_xta.u_xta.phase == 3'd6)         // P_STAT
-                $display("[%10.3f ms] XTA completion %02h (sense %02h)", real'(cyc) / 28636.36364,
-                         u_pc.g_xta.u_xta.din_q, {u_pc.g_xta.u_xta.sn_av, 1'b0, u_pc.g_xta.u_xta.sn_code});
+                $display("[%10.3f ms] XTA completion %02h (sense %02h), %0d DACK3 cycles", real'(cyc) / 28636.36364,
+                         u_pc.g_xta.u_xta.din_q, {u_pc.g_xta.u_xta.sn_av, 1'b0, u_pc.g_xta.u_xta.sn_code}, n_dack);
             if (u_pc.g_xta.u_xta.phase == 3'd1)         // P_RESET
                 $display("[%10.3f ms] XTA reset", real'(cyc) / 28636.36364);
         end
