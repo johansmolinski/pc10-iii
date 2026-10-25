@@ -1,107 +1,459 @@
-# The PC20-III hard disk (plan)
+# The PC20-III hard disk (XTA)
 
-Status: plan, 2026-10-25. Nothing built yet.
+Status: 2026-10-25, branch `xta`. Step 1 is done: the interface, the commands
+and the timing below come from the Commodore BIOS 4.41 (318085-08), the
+PC10-III schematics, Western Digital's drive manual and three emulators.
+Nothing is built yet (section 9 is the design, section 10 the steps).
 
-## 1. What the real machine has
+The BIOS ROM is Commodore's copyrighted code. Its disassembly stays outside
+the repository (`~/pcxt-work/xta/`: `rom.dis`, `disk.lst`, `fmt.lst`,
+`main.lst`, made with `objdump -D -b binary -m i8086 --adjust-vma=0x8000`).
+This document describes what the code does, in our own words. Addresses are
+`F000:xxxx` (the ROM maps F8000-FFFFF).
 
-The service manual (German PC10/20-III technical manual, chapter 7.0 "Adding a
-Hard Disk to a PC10", page 7-1/7-2; rendered pages in `~/pcxt-work/manual/`,
-p44/p45, not in the repository):
+## 1. Sources
 
-- The PC20-III has a 3.5" 20 MB drive **without a controller card**: it plugs
-  into motherboard connector **CN202** with a **40-conductor** ribbon cable.
-  Commodore sold the same drive as an upgrade kit for the PC10-III; jumper
-  **JMP208** must be moved for it (position B = Commodore hard disk, position
-  A = none / a controller card in a slot). "The special drive may only be used
-  when no other hard disk controllers/disks are in the system."
-- Low-level format: `DEBUG`, `G=FA00:5` prints "WX2 Format Revision 1.08
-  (C) Copyright Western Digital Corp. 1986" and asks for drive, interleave (3)
-  and "dynamically configuring" (answer N for the Commodore drive).
-- The BIOS ROM (318085-xx, 32 KB) carries the disk BIOS in its lower half:
-  "IDE Superbios Rev. 1.0 (C) Copyright Western Digital Corp. 1988", the WX2
-  format program at FA00:5, "Hard disk not found".
+| Source | What it gives | Licence / where |
+|---|---|---|
+| Commodore PC BIOS 4.41, 318085-08 | the disk BIOS that has to run (WD "IDE SuperBIOS Rev. 1.0", 8 KB at F8000-F9FFF) and its formatter | the user's ROM, `~/pcxt-work/roms/` |
+| PC10/20-III technical manual (German/English): chapter 7 (p44-45), schematic 312626 sheet 2 "FDD_HDD_BIOS" (p80), CPU base assembly 312677 (p77) | CN202, JMP206-208, the host-side logic, the drive's part number | `~/pcxt-work/manual/` |
+| Western Digital, *WD93024/93034/93044-X Technical Reference Manual* 0098S, 10/89, as transcribed by the PC-DISK database (DCI AG) | the drive: geometry, translation, rotation, seek times, the J8 jumpers, the configuration register | http://computermuseum.informatik.uni-stuttgart.de/pcdisk/h/ASCII/4809.TXT (copy in `~/pcxt-work/xta/ref/wd4809.txt`) |
+| kobolt, *pc20iii* (a Commodore PC 20-III emulator, MIT), `xthdc.c` | a working model of the PC20-III's WD93024-X with Commodore BIOS 4.38: 615/4/17, configuration register FFh | https://codeberg.org/kobolt/pc20iii (`~/pcxt-work/xta/ref/pc20iii/`) |
+| 86Box `hdc_xta.c` (WDXT-140/150 XTA, BSD-3) and `hdc_st506_xt.c` (GPL, read only) | the XTA register set, the CCB, status bits, sense codes, the WDXT-150 switch tables | `~/pcxt-work/xta/ref/` |
+| MartyPC `devices/hdc/xebec.rs` (MIT) | the IBM/Xebec bus phases, the completion byte, when the interrupt clears | `~/pcxt-work/xta/ref/xebec.rs` |
 
-So the drive is a Western Digital **XT-IDE / XTA** drive: the controller is on
-the drive and speaks the IBM XT fixed-disk controller interface (the Xebec
-1210 / WD1002S-WX2 register set and command blocks), and the motherboard has
-only the host side (buffers, address decode, DMA/IRQ wiring). Not an MFM card
-and not the later XTIDE. The ROM's disk code confirms the interface:
+The emulators model the interface only. None of them models the drive's
+timing, so the timing comes from WD's figures (section 8).
 
-- I/O base **320h** (kept in BIOS data byte 0040:004C), status read at 322h;
-- **DMA channel 3** (8237 ports 06h/07h, page register 82h, mask 0Ah,
-  mode 0Bh), **IRQ 5** (PIC mask through 21h);
-- it also touches D4h/D6h (the AT's second 8237) - to be understood.
+## 2. The machine side: CN202 and the jumpers
 
-## 2. The interface (to be confirmed from the ROM, then from references)
+From the schematic sheet "FDD_HDD_BIOS" (312626, sheet 2):
 
-IBM XT fixed-disk controller (Xebec / WD1002-WX2 compatible), 8-bit:
+- **CN202**, 40 pins (odd pins carry signals, even pins are ground), is a
+  buffered piece of the I/O channel and nothing more:
+  - a 74LS244 (U202), always enabled, drives SA0, SA1, -IOW, -IOR, -DACK3,
+    -HDCS and RESET to the drive;
+  - a 74LS245 (U204) passes the data bus. Its direction comes from -IOR
+    (with IOR-DLY). It is enabled by -DACK3 AND -HDCS **through JMP208**: one
+    74LS08 gate acts as a negative OR, so the buffer is on while either
+    signal is low. In JMP208's other position the enable is pulled high
+    (4.7 kOhm), which cuts the drive off the data bus;
+  - the drive's IRQ (pin 31) reaches IRQ5 through JMP206, and its DRQ
+    reaches DRQ3 through JMP207;
+  - CN203 and 470 Ohm to +5 V go to one more pin. That pin is not
+    identified; it is probably the LED or a pull-up.
+  - CN202 carries no AEN, no TC and no clock. -HDCS comes from the
+    Commodore I/O chip (the "5720", U602 on the video sheet, which also
+    makes the FDC, COM, LPT and RTC selects; it qualifies them with AEN).
+    During DMA cycles the drive sees DACK3 without -HDCS.
+- **JMP208 position B** = the Commodore hard disk (the buffer follows the
+  decode); **position A** = none (buffer off). In position A the ports
+  320h-323h read FFh, which is what the BIOS sees today: `Hard disk not
+  found` (section 6). JMP206 and JMP207 connect IRQ5 and DRQ3; without them
+  a controller card in a slot could use those lines.
+- The decoded range of -HDCS is not legible. The BIOS uses only 320h-323h
+  (324h-327h belong to a second controller, which the PC10-III cannot have).
+- The drive is Commodore part **312711-01** ("HARD DISK DRIVE", fitted in
+  the PC20-III variants of assembly 312677, mounted with 6-32 screws).
+  kobolt identifies it as a **Western Digital WD93024-X** (he took it from
+  his own PC 20-III). The manual ("20 MB 3.5 inch drive", "special
+  Commodore drive" on CN202) and the ROM's WD SuperBIOS agree.
+
+## 3. The drive: WD93024-X
+
+A 3.5" drive with the XT controller on board (WD calls it an "intelligent
+storage peripheral"; other sources say "XTA" or "XT-IDE"). The drive itself
+answers the four ports of the IBM PC/XT fixed disk adapter.
+
+| | |
+|---|---|
+| Physical geometry | 782 cylinders, 2 heads, 27 sectors/track (RLL 2,7), 512 bytes |
+| Translate mode (J8 1-2 open) | **615 cylinders, 4 heads, 17 sectors** = 41,820 sectors = 21,411,840 bytes |
+| Rotation | **3329 rpm** (18.02 ms per revolution) |
+| Average latency | 9 ms |
+| Seek | track-to-track 5 ms, average 39 ms typ., 63 ms max. |
+| Data rate | 0.938 MB/s (internal and external) |
+| Landing zone | physical cylinder 862 (park with WD's PARKIDE) |
+| Precompensation | cylinder 784 |
+| Interleave | 3:1 standard (preformatted at the factory); 2:1 with DMA demand mode |
+
+The J8 jumpers (WD manual):
+- pins 1-2: physical mode (jumper fitted) or translate mode (open);
+- pins 3-4: DMA demand mode. It needs SuperBIOS 2.1 or later; ours is 1.0
+  and always programs single transfers;
+- pins 5-6: IRQ2 instead of IRQ5.
+
+WD's manual says: "The control processor firmware sets the configuration
+register (host port 322) according to the interrupt selection". So **port
+322h is the drive's configuration register**: the drive's firmware sets it
+from J8. It is not a switch on the host side.
+
+The PC20-III's drive runs in **translate mode**:
+- the BIOS tables (section 4) give 615/4/17 for it;
+- kobolt's emulator uses 615/4/17 with the configuration register at FFh;
+- the WD manual gives 615/4/17 as the WD93024-X's translated geometry.
+
+In physical mode the same BIOS would take 782/2/27 from its second table
+(section 4).
+
+The drive's translation is not documented. The plan uses the obvious one:
+logical sector number L = (C x 4 + H) x 17 + S (S 0-based) is physical
+sector L, which is physical cylinder L / 54, head (L / 27) mod 2, sector
+L mod 27. The 41,820 logical sectors then use physical cylinders 0-774.
+
+## 4. Registers (I/O 320h-323h)
 
 | Port | Read | Write |
 |---|---|---|
-| 320h | data (status byte, sense bytes, sector data in PIO) | data (command block, parameters) |
-| 321h | hardware status (REQ, I/O, C/D, BSY, interrupt) | controller reset |
-| 322h | drive configuration (jumpers / drive type) | controller select |
-| 323h | - | DMA and interrupt enable mask |
+| 320h | data: completion byte, sense bytes, sector data (PIO) | data: command block (CCB), drive parameters, sector data (PIO) |
+| 321h | status | controller reset (any value) |
+| 322h | configuration register | select (any value): starts a command |
+| 323h | - | mask: bit 0 enables DMA, bit 1 enables the interrupt |
 
-Command control block (6 bytes): opcode, head/drive, sector/cylinder high,
-cylinder low, block count, control (step rate, retries). Commands: test
-drive ready (00), recalibrate (01), request sense (03), format drive (04),
-verify (05), format track (06), format bad track (07), read (08), write (0A),
-seek (0B), initialize drive characteristics (0C), read ECC burst length (0D),
-read/write sector buffer (0E/0F), diagnostics (E0, E3, E4), the WD
-"dynamic configuration" variants. Exact list, status/sense codes and the
-handshake (REQ, C/D, I/O phases) come from the ROM disassembly (ground truth:
-it is the code that has to run) and are cross-checked with:
+**Status (321h)**:
 
-- MartyPC's Xebec controller (`devices/hdc/xebec.rs`, MIT) - also a timing
-  reference;
-- 86Box `hdc_xta.c` (WD XTA drives incl. the WDXT-150) and `hdc_st506_xt.c`
-  (Xebec, WD1002A-WX1/-27X; GPL);
-- WD's WD1002S-WX2 / WDXT-GEN documentation if it can be found.
+| Bit | Name | Meaning |
+|---|---|---|
+| 0 | REQ | a byte may move |
+| 1 | I/O | 1 = drive to host |
+| 2 | C/D | 1 = command/status, 0 = data |
+| 3 | BSY | busy |
+| 4 | DRQ | DMA requested |
+| 5 | IRQ | interrupt pending |
+| 7-6 | | 0 |
 
-## 3. Design
+The phases, as the BIOS checks them:
 
-- `rtl/hdc/xta_card.sv`: the motherboard host side + the drive's embedded
-  controller as one card on the board's card bus (doc/architecture.md section
-  3): register decode at 320h-323h (JMP208 = enable, a menu setting), the
-  command/status state machine with the bus phases, a 512-byte sector buffer
-  (`hdc_secbuf.sv` from the XTIDE work), DMA requests on DRQ3 (the 8237 path
-  the floppy uses on DRQ2), IRQ5.
-- The drive: geometry of the original 20 MB drive (to find: cylinders x heads
-  x 17 sectors; the WX2 tables in the ROM name it), plus the WD "dynamic
-  configuration" for other sizes if the BIOS supports it. Timing modelled on
-  a real drive: 3600 rpm, 17 sectors per track, interleave 3 (the format
-  default), step/seek times, the controller's command overhead - so disk
-  benchmarks of the era give period numbers, as the floppy does.
-- Backend: the image on the SD card through the existing sector engine port
-  (as `pc_fdd_sd.vhd` does for the floppies; doc/hdc.md section 8 describes
-  the XTIDE plan for the same port). A raw image (cylinders x heads x 17 x
-  512, no header); the shell's file browser picks it, the menu shows it.
-- Writes go back to the SD card (write-through, as the floppies).
-- The drive LED shows its activity (the MEGA65 drive LED; colour to agree).
-- The existing XTIDE card (`rtl/hdc`) stays in the repository; it is not the
-  machine's own disk and is not wired into the shell.
+| Phase | Status (bits 3-0) |
+|---|---|
+| idle (bus free), during a reset | 0000 |
+| selected, waiting for a CCB byte | BSY C/D REQ = 1101 (0Dh) |
+| command executing | BSY C/D = 1100 |
+| data out (host to drive): drive parameters, sector data | BSY REQ = 1001 |
+| data in (drive to host) | BSY I/O REQ = 1011 |
+| status: the completion byte is ready | BSY C/D I/O REQ = 1111 (0Fh), plus bit 5 when interrupts are enabled |
 
-## 4. Steps
+**Configuration (322h)**, as BIOS 4.41 decodes it:
 
-1. Disassemble the ROM's disk BIOS (F8000-F9FFF) and the WX2 format program
-   (FA00:5): ports, handshake, every command and parameter it uses, the drive
-   table, what JMP208 changes (how "Hard disk not found" is decided).
-2. Collect the references (MartyPC, 86Box, WD documents) and write the
-   register/command specification here, with the timing.
-3. `xta_card.sv` + a unit testbench against a command-level model; mutants.
-4. tb/sys: the Commodore BIOS finds the drive ("Hard disk not found" gone),
-   the WX2 low-level format runs, FDISK/FORMAT from a DOS floppy, then a boot
-   from C:. A blank image and a prepared image.
-5. Shell: menu (image, JMP208 on/off), SD backend, LED, settings signature.
+| Bits | Meaning |
+|---|---|
+| 1-0 | drive 0's type: the index into the drive table (0-3) |
+| 3-2 | drive 1's type |
+| 5-4 | 11: 17 sectors, table 1 (MFM-style drives, translate mode); 01: 27 sectors, table 2 (RLL, physical mode); 10: "dynamic configuration" (the geometry is read from the disk's sector 0, section 5.4); 00: table 2 with the cylinders scaled by 1.529 (26/17) |
+| 6 | 1 = IRQ5 (INT 0Dh), 0 = IRQ2 (INT 0Ah) |
+| 7 | 1 = PC/XT. 0 = AT: the BIOS then also programs the AT's second 8237 (port D6h = C0h, port D4h = 00h: cascade mode for channel 4). This is the D4h/D6h access seen in the ROM |
+
+The drive tables have 16 bytes per type: cylinders, heads, reduced write
+current cylinder, precompensation cylinder, ECC burst length (11), control
+byte, landing zone. Their geometries:
+
+| Type | Table 1 (bits 5-4 = 11), control byte 05 | Table 2 (otherwise), control byte 07 |
+|---|---|---|
+| 0 | 612 / 4 | 820 / 4 |
+| 1 | 306 / 4 | 615 / 4 |
+| 2 | 977 / 5 (WD93044-X translated) | 782 / 4 (WD93044-X physical) |
+| 3 | **615 / 4 (WD93024-X translated)** | 782 / 2 (WD93024-X physical) |
+
+**The PC20-III's drive: 322h = FFh** (translate mode, type 3, IRQ5, XT;
+bits 3-2 unused). kobolt found the same value necessary with BIOS 4.38. An
+empty CN202, or JMP208 in position A, also reads FFh. What tells the BIOS
+that nothing is there is the status register: FFh has DRQ and IRQ set
+(section 6).
+
+**Mask (323h)**: bit 0 lets the drive request DMA (DRQ3), bit 1 lets it
+interrupt (IRQ5 and status bit 5). The BIOS writes:
+- 02h for commands without data;
+- 03h for DMA commands;
+- FCh (both off) for PIO commands, and before it reads the completion byte.
+
+## 5. Commands
+
+### 5.1 The handshake
+
+1. (Optional) the mask to 323h. Then a write to 322h selects the drive. The
+   BIOS repeats the select until the status shows BSY C/D REQ (up to
+   10 x 65536 tries).
+2. Six CCB bytes to 320h, each sent after REQ, with BSY and C/D set and I/O
+   clear.
+3. Then, depending on the command: the drive parameters (8 bytes out, PIO),
+   sector data (DMA when the mask's bit 0 is set, or PIO byte by byte after
+   REQ), or nothing.
+4. Completion is the status phase (0Fh). The BIOS waits for it in one of
+   two ways:
+   - PIO commands: it polls REQ and the phase;
+   - with the interrupt enabled: it polls status bit 5 (IRQ). It also
+     unmasks IRQ5 in the PIC. Its INT 0Dh handler only sends EOI, masks DMA
+     channel 3 and masks IRQ5 again.
+5. The BIOS writes FCh to 323h, reads the completion byte from 320h, and
+   expects BSY to drop within 100 polls of 321h. That is about 0.7 ms on a
+   4.77 MHz 8088, so the drive must free the bus quickly after the
+   completion byte.
+
+A write to 321h resets the controller at any time. A write to 322h restarts
+the command phase.
+
+### 5.2 Command control block (6 bytes)
+
+| Byte | Bits |
+|---|---|
+| 0 | opcode |
+| 1 | bit 5 drive (0/1), bits 4-0 head |
+| 2 | bits 7-6 = cylinder bits 9-8; bits 5-0 = sector, **0-based** (the BIOS subtracts 1 from INT 13h's CL) |
+| 3 | cylinder bits 7-0 |
+| 4 | block count (sectors), or the interleave for the format commands |
+| 5 | control: bits 2-0 step option (the BIOS sends 5 from table 1, 7 from table 2), bit 7 no retries, bit 6 no ECC retries (the BIOS uses neither) |
+
+### 5.3 Opcodes and what BIOS 4.41 does with them
+
+INT 13h AH=01 (status) runs request sense. AH=08, 15h and 16h answer from
+the tables and send no command.
+
+| Op | Command | INT 13h AH (BIOS) | Data | Mask |
+|---|---|---|---|---|
+| 00 | test drive ready | 10h | - | 02 |
+| 01 | recalibrate | 11h; also inside the reset sequence | - | 02 (none at detection) |
+| 03 | request sense | 01; after every error | 4 bytes in, PIO | FC |
+| 04 | format drive (CCB byte 4 = interleave) | 07 | the sector buffer's data is written to every sector | 02; the BIOS waits forever |
+| 05 | verify | 04 | - | 02 |
+| 06 | format track | 05 | as 04 | 02 |
+| 07 | format bad track | 06 | as 04 | 02 |
+| 08 | read | 02; PIO for sector 0 (section 5.4) | n x 512 bytes in | 03 (DMA), FC (PIO) |
+| 0A | write | 03 | n x 512 bytes out | 03 |
+| 0B | seek | 0Ch | - | 02 |
+| 0C | initialize drive characteristics | 00, 09, 0Dh (resets) | 8 bytes out, PIO | FC |
+| 0D | read ECC burst length | after sense 98h | 1 byte in, PIO | FC |
+| 0E | read sector buffer | 0Eh | 512 bytes in, DMA | 03 |
+| 0F | write sector buffer | 0Fh (the formatter, before 04) | 512 bytes out, DMA | 03 |
+| E0 | RAM diagnostic | 12h | - | 02 |
+| E3 | drive diagnostic | 13h | - | 02 |
+| E4 | controller diagnostic | 14h (detection) | - | 02 |
+| E5 | read long (512 + 4 ECC bytes) | 0Ah | 516 bytes in, DMA | 03 |
+| E6 | write long | 0Bh | 516 bytes out, DMA | 03 |
+
+**Initialize drive characteristics (0C)**: after the CCB come, in data-out
+phase, the cylinders (high, low), the heads, the reduced write current
+cylinder (high, low), the precompensation cylinder (high, low) and the ECC
+burst length. For the PC20-III that is 02 67 04 02 68 02 68 0B. (The BIOS
+sends the landing zone as the cylinder count; the table has 615 there.)
+- The BIOS sends 0C for drive 0 **and for drive 1** in every reset (INT 13h
+  AH=00, 09, 0Dh) and returns drive 1's result. So **0C must succeed for
+  drive 1 too**; otherwise the reset fails and the disk is "not found".
+- A translate-mode drive ignores the values, because its geometry is fixed.
+  kobolt's and 86Box's models accept them without checking.
+
+**DMA** (as the BIOS programs it):
+- channel 3, mode 47h for reads (single transfer, increment, write to
+  memory) or 4Bh for writes;
+- address through port 06h, page through 82h, count through 07h =
+  n x 512 - 1 (516 per sector for the long commands);
+- a transfer that would cross 64 KB returns AH=09 without touching the
+  drive;
+- the channel is unmasked (0Ah = 03h) only after the CCB has been sent.
+
+The drive gets no TC: it ends the data phase after its own byte count.
+
+### 5.4 Completion byte, sense bytes, errors
+
+The completion byte has bit 1 = error and bit 5 = drive. Reading it clears
+the interrupt (MartyPC, 86Box). After an error the BIOS sends request sense
+and reads four bytes:
+
+| Byte | |
+|---|---|
+| 0 | bit 7 address valid, bits 5-0 error code |
+| 1 | bit 5 drive, bits 4-0 head |
+| 2 | cylinder bits 9-8 in bits 7-6, sector in bits 5-0 |
+| 3 | cylinder bits 7-0 |
+
+How BIOS 4.41 turns the error code into the INT 13h status (AH):
+
+| Sense | Meaning (Xebec / IBM) | AH |
+|---|---|---|
+| 00 | no error | 00 |
+| 01 | no index | 20h (controller failure) |
+| 02 | no seek complete | 40h (seek failed) |
+| 03 | write fault | 20h |
+| 04 | drive not ready | 80h (timeout) |
+| 06 | no track 0 | 20h |
+| 08 | seek in progress | 40h |
+| 10h | ID field ECC error | 10h |
+| 11h | uncorrectable data error | 10h |
+| 12h | address mark not found | 02 |
+| 14h | sector not found | 04 |
+| 15h | seek error | 40h |
+| 18h (98h) | corrected ECC error: the BIOS then reads the burst length (0D) and returns AH=11h, AL = burst | 11h |
+| 19h | bad track | 0Bh |
+| 20h | invalid command | 01 |
+| 21h | illegal disk address | 02 |
+| 30h-32h | RAM / ROM / ECC generator diagnostics | 20h, 20h, 10h |
+| others | | BBh |
+| (no answer) | a timeout in the handshake | 80h; a failed sense gives FFh |
+
+**Sector 0 is special** in this BIOS. Before every INT 13h write of one
+sector to C0/H0/S1 (an MBR), the BIOS reads the disk's sector 0 by PIO
+(read command, mask FC, the sector byte by byte after REQ). If that sector
+ends with 55AA or AABB, the BIOS copies its bytes 1ADh-1B7h into the new
+MBR, unless the new MBR already carries AABB. (Those bytes are WD's
+"dynamic configuration" parameters: cylinders, heads, RWC, WPC, ECC/control,
+landing zone.) So PIO reads must work even on a DMA machine.
+
+## 6. Detection: how "Hard disk not found" is decided
+
+The main BIOS scans C8000-C9FFF for option ROMs. Only if it found none
+there does it scan F8000-F9FFF, the WD code (55 AA, 8 KB, entry at +3, the
+formatter at +5); a controller card with its own BIOS at C800 therefore
+replaces the built-in disk BIOS. On a cold boot it first waits until
+6 s after the timer started ("Waiting for hard disk spin up..."). The WD
+code then does this:
+
+1. It installs INT 0Dh (as 322h bit 6 says), moves the old INT 13h to INT
+   40h, installs its own INT 13h, INT 19h (boot) and INT 41h (the table that
+   322h bits 5-4 select), presets the BIOS tick counter (0 on a cold boot,
+   178 ticks on a warm one) and unmasks the timer.
+2. It writes 321h (reset), waits about 5 ms and reads 321h. **Bit 4 or 5 set
+   means no drive** (an empty bus reads FFh).
+3. It selects the drive and sends a recalibrate (opcode 01; the mask is not
+   written, so no interrupt), polls for the status phase (up to ~30 s) and
+   reads the completion byte without checking it.
+4. It selects again until the drive answers with BSY C/D REQ. Then INT 13h
+   AH=14h (controller diagnostic, E4): a failure means no drive.
+5. For DL = 80h:
+   - INT 13h AH=10h (test ready, opcode 00), repeated until it succeeds or
+     the tick counter reaches 446. That is 24.5 s after step 1 on a cold
+     boot and 14.7 s on a warm one: the **spin-up wait**.
+   - Then AH=00 (reset: controller reset, recalibrate drives 0 and 1,
+     initialize drives 0 and 1). A failure means no drive.
+   - Then AH=11h (recalibrate). Success counts one more drive.
+6. The same for DL = 81h, with the tick counter set to 357 on a cold boot.
+   If test ready fails for drive 1, the absent second drive costs the rest
+   of the wait: **4.9 s cold, up to ~14 s warm**.
+7. With a drive count of 0 it prints "Hard disk not found".
+
+So the drive must:
+- show 00h in 321h shortly after a reset (no DRQ, no IRQ);
+- accept a select;
+- finish recalibrate, E4, test ready and initialize (for both drives);
+- recalibrate drive 0 without an error;
+- fail either test ready or recalibrate on drive 1.
+
+INT 13h AH=08 then reports 613 as the last cylinder (the BIOS keeps the
+last cylinder, 614, for diagnostics), 4 heads, 17 sectors and 1 drive. DOS
+sees 614 x 4 x 17 = 41,752 sectors (21.4 MB).
+
+## 7. The formatter (IDE SuperBIOS)
+
+In BIOS 4.41 the formatter is started with **`G=F800:5`** in DEBUG. It needs
+DOS, because it prints through INT 21h. The manual's `G=FA00:5` and its
+banner "WX2 Format Revision 1.08 (C) 1986" belong to an older ROM; in 4.41,
+FA00:5 points into the middle of other code. The banner here is "IDE
+Superbios Rev. 1.0 (C) Copyright Western Digital Corp. 1988".
+
+The dialogue:
+- current drive C: (RETURN keeps it);
+- current interleave: **default 4** in translate mode, 5 otherwise
+  (1-16 or 1-25 allowed);
+- "Are you dynamically configuring the drive": N for the Commodore drive,
+  as the manual says;
+- "Are you virtually configuring the drive" (a split into C: and D:): N;
+- "Do you want to format bad tracks": a list of cylinder/head pairs, each
+  formatted with INT 13h AH=06;
+- "Press "y" to begin formatting drive C with interleave 04".
+
+Then it:
+- fills the controller's buffer (AH=0Fh, write sector buffer);
+- formats the whole drive (AH=07, opcode 04, CCB byte 4 = interleave) and
+  waits without a timeout;
+- writes an MBR with AABB, but only for dynamic or virtual configurations;
+- prints "Format Successful" and "System will now restart", waits for a
+  key and jumps to FFFF:0000.
+
+## 8. Timing (what the real drive does; the plan for the model)
+
+| Item | Value | Source |
+|---|---|---|
+| Revolution | 60 / 3329 s = 18.023 ms (516,124 clk at 28.63636 MHz) | WD |
+| Sector slot | 1/27 revolution = 667.5 us (512 data bytes take 546 us at 0.938 MB/s; the rest is ID, ECC and gaps) | WD (data rate, 27 sectors) |
+| Track-to-track seek | 5 ms | WD |
+| Seek over d cylinders | 5 + 2.24 x (sqrt(d) - 1) ms: 5 ms (d = 1), 39 ms (d = 261 = 1/3 stroke), 65 ms (d = 781) | a fit to WD's 5/39/63 ms |
+| Head switch | within the track's gap (no extra time) | assumption |
+| Command overhead | a few hundred us per command (CAL: not published) | assumption |
+| Buffer | one sector: a sector that was read goes to the host before the next one is read; a sector to write is taken from the host before its slot comes | WD's interleave statement (3:1 with single-transfer DMA, 2:1 in demand mode) |
+| Interleave | the physical order of the 27 sectors on a track, from the last format (factory: 3) | WD |
+| Spin-up | unknown (the BIOS allows 24.5 s) | |
+
+Checking the interleave: a single-transfer DMA of 512 bytes on a 4.77 MHz
+XT takes about 1 ms (one byte per DMA cycle, plus the CPU's cycle between
+them). So after a sector has been read (one slot), the next one can come at
+the earliest about 2.5 slots later, which means interleave 3. With demand
+mode (~0.5 ms), 2 is enough. That is what WD states, so the model uses a
+one-sector buffer. Sequential reads at 3:1 give 9 sectors per revolution =
+256 KB/s at most; at the formatter's default of 4, 192 KB/s.
+
+## 9. Design (step 2, not started)
+
+- `rtl/hdc/xta_card.sv` holds two parts:
+  - the CN202 host side: the decode of 320h-323h with AEN, and JMP208 as
+    the `enable` input (off = the ports read FFh, no DRQ, no IRQ);
+  - the drive's embedded controller: the registers and bus phases of
+    sections 4 and 5, the CCB, the commands of section 5.3, completion and
+    sense, DRQ3/DACK3 (no TC), IRQ5 and the one-sector buffer.
+- The drive model:
+  - the spindle: its angle advances with real time; the sector under the
+    head = (time mod 18.023 ms) / 667.5 us;
+  - the physical sector order of the last format (interleave);
+  - the head position, with the seek times of section 8;
+  - the translation of section 3;
+  - commands with drive bit 1 answer "not ready", except 0C, 0E/0F, E0/E4
+    and 03 (a parameter: see section 11).
+- Storage: the translated image, 615 x 4 x 17 x 512 = 21,411,840 bytes, raw
+  (the format of kobolt's emulator). The sector port is `hdc_secbuf`'s (LBA,
+  write-through), so the shell can serve it from the SD card as in the
+  XTIDE plan (doc/hdc.md section 8). Formatting writes the buffer's data to
+  every sector of the range.
+- `pc_system`: the card sits behind a parameter, default off, so every
+  existing gate stays bit-identical. tb/sys gets an option (e.g. `-A img`)
+  to attach the image.
+- Tests:
+  - tb/xta: a unit bench against a command-level model, with mutants;
+  - tb/sys with BIOS 4.41 (`make FE=1`, `sys_run -d 5D`): the drive is
+    found, the formatter runs, INT 13h reads and writes work, C: boots.
+  - tb/sys needs a key-injection option for the formatter's questions; it
+    has none yet.
+
+## 10. Steps
+
+1. Disassembly, references, this specification: **done** (2026-10-25).
+2. `xta_card.sv` with the drive model, the `pc_system` parameter, the tb/sys
+   option.
+3. tb/xta unit bench and mutants.
+4. tb/sys with the Commodore BIOS: detection, formatter, INT 13h, boot.
+5. Shell: menu (image, JMP208), SD backend, LED, settings signature.
 6. Build, hardware test.
 
-## 5. Open questions
+## 11. Open questions
 
-- The exact drive model of the PC20-III and its geometry.
-- Whether the PC10-III's CN202 host logic adds anything beyond the standard
-  XT controller ports (the schematics in the manual's chapter 9 show the
-  motherboard: check CN202's signals).
-- Which BIOS the user runs without the Commodore ROM: GLaBIOS has no disk
-  BIOS; the WD BIOS is part of Commodore's ROM. A free option ROM for this
-  interface (if any) would be needed for GLaBIOS users.
+- **Drive 1 on a single drive.** Does the WD93024-X answer test ready for
+  drive 1 with "not ready", or with success?
+  - "Not ready": the BIOS waits 4.9 s on every cold boot and up to ~14 s on
+    Ctrl-Alt-Del.
+  - Success: only the recalibrate fails, and there is no wait. That is
+    kobolt's model; MartyPC does the same for the IBM BIOS to avoid a 25 s
+    wait.
+  - Either way, initialize (0C) must succeed for drive 1. This stays a
+    parameter until someone can watch a real PC20-III boot.
+- The configuration register's bits 7 and 3-2 on the real drive. FFh fits
+  everything the BIOS does; WD documents only bit 6, and that J8 sets it.
+  Where the demand-mode jumper shows up is unknown (BIOS 4.41 never uses
+  it).
+- The drive's translation (assumed linear), and how the drive applies the
+  format interleave to its 27-sector tracks; whether format writes the
+  buffer's data or a fixed pattern.
+- Command overhead, spin-up time, reset time (MartyPC holds 200 ms after a
+  reset; this BIOS waits only ~5 ms and then retries the select), and the
+  exact REQ timing per PIO byte.
+- An unformatted (blank) drive. The plan stores only data, so a new image
+  counts as formatted with zeros. Reads of a track that was never formatted
+  (ID not found, sense 12h/14h) would need a per-track flag.
+- -HDCS's decoded range and the CN203 pin.
+- GLaBIOS has no disk BIOS. Without the Commodore ROM the drive needs an
+  option ROM; a WDXT-150 BIOS would work, but it is WD's code.

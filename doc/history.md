@@ -1461,3 +1461,37 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
 - Not verified: the hardware (the MEGA65 drive's step rate limit, TRK0 delay
   and /DSKCHG behaviour), the firmware's settings-file path beyond the two
   callbacks (the Shell's load/save around them), Vivado (synthesis, timing).
+
+## 2026-10-25 - The PC20-III's hard disk: the specification (branch `xta`, step 1)
+
+- **What:** doc/xta.md, the plan's guesses replaced by facts: the
+  disassembly of the disk BIOS in Commodore BIOS 4.41 (WD "IDE SuperBIOS
+  Rev. 1.0", F8000-F9FFF; listings in `~/pcxt-work/xta/`, not in the
+  repository), the PC10-III schematic of CN202 (sheet "FDD_HDD_BIOS"), WD's
+  WD93024/34/44-X technical reference (via the PC-DISK database), kobolt's
+  PC 20-III emulator (MIT), 86Box `hdc_xta.c`, MartyPC `xebec.rs`.
+- **Findings:**
+  - the drive is a WD93024-X (Commodore 312711-01): 782/2/27 physical (RLL),
+    **615/4/17 in translate mode**, **3329 rpm**, seek 5/39/63 ms, one-sector
+    buffer (WD: 3:1 interleave with single-transfer DMA, 2:1 in demand mode);
+  - CN202 is only buffered I/O channel lines (SA0-1, IOR, IOW, DACK3,
+    -HDCS, RESET, D0-7, IRQ via JMP206, DRQ via JMP207); **JMP208 gates the
+    data buffer** (position A: the ports read FFh, the BIOS's "Hard disk not
+    found" of today);
+  - port 322h is the drive's configuration register: **FFh** for the
+    PC20-III (translate, type 3 = 615/4, IRQ5, XT); bits 5-4 pick one of two
+    4-entry drive tables, bit 7 = 0 would make the BIOS program the AT's
+    second 8237 (the D4h/D6h accesses);
+  - the BIOS's handshake, CCB (0-based sectors), all opcodes it uses, the
+    sense-code mapping, DMA channel 3 (47h/4Bh, no TC to the drive), the
+    status-bit-5 polling, and the detection sequence: reset, recalibrate,
+    E4, test ready with a spin-up wait to tick 446, reset (initialize must
+    succeed for drive 1 too), recalibrate;
+  - the formatter is **`G=F800:5`** in 4.41 (the manual's FA00:5 and "WX2
+    1.08" are an older ROM's), default interleave 4.
+- **Open:** whether drive 1's test ready fails (4.9 s cold / ~14 s warm
+  boot wait) or succeeds (kobolt); the real drive's command overhead,
+  spin-up and reset times; the translation and interleave on 27-sector
+  tracks (doc/xta.md section 11).
+- Steps 2-4 (RTL, unit bench, tb/sys) not started (priority moved to the
+  Paradise PVC4).
