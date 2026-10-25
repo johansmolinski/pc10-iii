@@ -446,8 +446,8 @@ with an extent map) would only matter for a turbo or a 286.
   is on the SD card;
 - write protection per drive from the menu (the backend refuses, the card
   reports DF ERR ABRT);
-- the drive LED: `hd_active` (red/orange next to the floppy's green), or
-  the M2M drive LED with a second colour.
+- the drive LED: `hd_active` (red/orange next to the floppy's yellow, as in
+  Megamiga), or the M2M drive LED with a second colour.
 
 **Menu** (config.vhd; the QNICE firmware has ~960 words free, so the mount
 code goes into a code bank, Megamiga exception 16):

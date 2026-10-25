@@ -43,6 +43,9 @@ module pc_system_flat #(
     input  logic [11:0] img_spt,
     output logic [1:0]  drv_motor,
     output logic        fdc_active,
+    output logic [1:0]  drv_select,
+    output logic        drv_step,
+    output logic        drv_step_in,
     output logic        sp_req,
     output logic        sp_write,
     output logic        sp_drive,
@@ -83,7 +86,7 @@ pc_system #(.RAM_KB(RAM_KB)) u_pc (
     .ucl_we, .ucl_addr, .ucl_data,
     .drv_80trk, .img_present, .img_wp,
     .img_tracks(tracks), .img_heads(heads), .img_spt(spt),
-    .drv_motor, .fdc_active,
+    .drv_motor, .fdc_active, .drv_select, .drv_step, .drv_step_in,
     .sp_req, .sp_write, .sp_drive, .sp_cyl, .sp_head, .sp_sector, .sp_lba,
     .sp_rd_valid, .sp_rd_data, .sp_wr_valid, .sp_wr_data, .sp_wr_ready, .sp_done, .sp_err,
     // the hard disk card is not wired into the shell yet (doc/hdc.md section 8):

@@ -206,7 +206,7 @@ fdc_card u_fdc (
     .isa_ready(fdc_ready), .isa_irq(fdc_irq), .isa_drq(fdc_drq),
     .isa_dack_n, .isa_tc,           // TC active high!
     .drv_80trk, .img_present, .img_wp, .img_tracks, .img_heads, .img_spt,
-    .drv_motor, .fdc_active,
+    .drv_motor, .fdc_active, .drv_select, .drv_step, .drv_step_in,
     .sp_req, .sp_write, .sp_drive, .sp_cyl, .sp_head, .sp_sector, .sp_lba,
     .sp_rd_valid, .sp_rd_data, .sp_wr_valid, .sp_wr_data, .sp_wr_ready,
     .sp_done, .sp_err);
@@ -227,6 +227,14 @@ fdc_card u_fdc (
 - Ports for `pc_system`: the drive inputs, `drv_motor`/`fdc_active` (LEDs) and
   the sector port, unchanged, so the MEGA65 glue can serve them from HyperRAM
   or the SD card (ADF-style buffering is not needed: the card buffers).
+- For the drive LED and the drive sound (2026-10-25, `CORE/vhdl/pc_drvsnd.vhd`,
+  doc/m2m-shell.md section 4): `drv_select` (drive n selected = the DOR selects
+  it and its motor bit is set: the drive's select line, which lights a
+  PC10-III drive's LED), `drv_step` (one clk: the selected drive's head moved a
+  cylinder, the clk after the 765's step pulse; a pulse at a stop - track 0,
+  or 41 / 83 - moves nothing and gives none) and `drv_step_in` (its direction,
+  1 = inward). tb/fdc follows the heads from them (a seek to 50 on the 40-track
+  A: moves the head 41 cylinders, the recalibrate 41 back).
 
 ## 7. Later: AT controller, 1.2M / 1.44M
 

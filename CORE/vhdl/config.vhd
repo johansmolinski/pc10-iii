@@ -192,34 +192,40 @@ constant OPTM_S_SAVING     : string := "<Saving>";
 --     3  B:%s                     floppy image of B: (manual ROM load 1)
 --     4  A: write protected       C_MENU_WP_A
 --     5  B: write protected       C_MENU_WP_B
---     6  ----
---     7  Memory: %s               submenu
---     8    Memory size            headline
---     9    ----
---    10    640 KB                 C_MENU_MEM_640 (default)
---    11    512 KB                 C_MENU_MEM_512
---    12    256 KB                 C_MENU_MEM_256
---    13    128 KB                 C_MENU_MEM_128
---    14    ----
---    15    Back to main menu
---    16  HDMI: %s                 submenu
---    17    HDMI mode              headline
---    18    ----
---    19    720p 60 Hz 16:9        C_MENU_HDMI_720P (default)
---    20    480p 59.94 Hz 4:3      C_MENU_HDMI_480P
---    21    ----
---    22    Back to main menu
---    23  CGA: thin font           C_MENU_CGA_THIN (jumper P3)
---    24  Analog: 15 kHz RGB       C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
---    25  Analog: CSYNC            C_MENU_ANALOG_CSYNC
---    26  ----
---    27  Help
---    28  Reset the PC             C_MENU_RESET (momentary: the firmware resets and clears it)
---    29  ----
---    30  Close Menu
-constant OPTM_SIZE         : natural := 31;
+--     6  Drive sound (int. drive) C_MENU_DRV_SOUND (default on; pc_drvsnd.vhd)
+--     7  ----
+--     8  Memory: %s               submenu
+--     9    Memory size            headline
+--    10    ----
+--    11    640 KB                 C_MENU_MEM_640 (default)
+--    12    512 KB                 C_MENU_MEM_512
+--    13    256 KB                 C_MENU_MEM_256
+--    14    128 KB                 C_MENU_MEM_128
+--    15    ----
+--    16    Back to main menu
+--    17  HDMI: %s                 submenu
+--    18    HDMI mode              headline
+--    19    ----
+--    20    720p 60 Hz 16:9        C_MENU_HDMI_720P (default)
+--    21    480p 59.94 Hz 4:3      C_MENU_HDMI_480P
+--    22    ----
+--    23    Back to main menu
+--    24  CGA: thin font           C_MENU_CGA_THIN (jumper P3)
+--    25  Analog: 15 kHz RGB       C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
+--    26  Analog: CSYNC            C_MENU_ANALOG_CSYNC
+--    27  ----
+--    28  Help
+--    29  Reset the PC             C_MENU_RESET (momentary: the firmware resets and clears it)
+--    30  ----
+--    31  Close Menu
+--
+-- The settings file keeps one byte per line, so the layout is part of its format: the
+-- firmware's CFG_SIGCHECK accepts only a file whose text carries this menu's signature
+-- (m2m-rom.asm, CFG_SIG_VAL; change it with every layout change), any other file is reset to
+-- the defaults.
+constant OPTM_SIZE         : natural := 32;
 constant OPTM_DX           : natural := 28;
-constant OPTM_DY           : natural := 17;   -- the visible main menu (lines 0-7, 16, 23-30)
+constant OPTM_DY           : natural := 18;   -- the visible main menu (lines 0-8, 17, 24-31)
 
 constant OPTM_ITEMS        : string :=
    " PC10-III\n"              &
@@ -228,6 +234,7 @@ constant OPTM_ITEMS        : string :=
    " B:%s\n"                  &
    " A: write protected\n"    &
    " B: write protected\n"    &
+   " Drive sound (int. drive)\n" &
    "\n"                       &
    " Memory: %s\n"            &
    " Memory size\n"           &
@@ -265,6 +272,7 @@ constant OPTM_G_THIN       : integer := 7;
 constant OPTM_G_15KHZ      : integer := 8;
 constant OPTM_G_CSYNC      : integer := 9;
 constant OPTM_G_RESET      : integer := 10;
+constant OPTM_G_DRVSND     : integer := 11;
 
 type OPTM_GTYPE is array (0 to OPTM_SIZE - 1) of integer range 0 to 2**OPTM_GTC- 1;
 
@@ -274,31 +282,32 @@ constant OPTM_GROUPS       : OPTM_GTYPE := ( OPTM_G_TEXT + OPTM_G_HEADLINE,     
                                              OPTM_G_FDB + OPTM_G_LOAD_ROM,             --  3 B:%s
                                              OPTM_G_WPA + OPTM_G_SINGLESEL,            --  4 A: write protected
                                              OPTM_G_WPB + OPTM_G_SINGLESEL,            --  5 B: write protected
-                                             OPTM_G_LINE,                              --  6
-                                             OPTM_G_SUBMENU,                           --  7 Memory: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            --  8 Memory size
-                                             OPTM_G_LINE,                              --  9
-                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 10 640 KB
-                                             OPTM_G_MEM,                               -- 11 512 KB
-                                             OPTM_G_MEM,                               -- 12 256 KB
-                                             OPTM_G_MEM,                               -- 13 128 KB
-                                             OPTM_G_LINE,                              -- 14
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 15 Back
-                                             OPTM_G_SUBMENU,                           -- 16 HDMI: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 17 HDMI mode
-                                             OPTM_G_LINE,                              -- 18
-                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 19 720p 60 Hz
-                                             OPTM_G_HDMI,                              -- 20 480p 59.94 Hz
-                                             OPTM_G_LINE,                              -- 21
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 22 Back
-                                             OPTM_G_THIN + OPTM_G_SINGLESEL,           -- 23 CGA: thin font
-                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 24 Analog: 15 kHz
-                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 25 Analog: CSYNC
-                                             OPTM_G_LINE,                              -- 26
-                                             OPTM_G_HELP,                              -- 27 Help
-                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 28 Reset the PC
-                                             OPTM_G_LINE,                              -- 29
-                                             OPTM_G_CLOSE                              -- 30 Close Menu
+                                             OPTM_G_DRVSND + OPTM_G_SINGLESEL + OPTM_G_STDSEL, --  6 Drive sound
+                                             OPTM_G_LINE,                              --  7
+                                             OPTM_G_SUBMENU,                           --  8 Memory: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            --  9 Memory size
+                                             OPTM_G_LINE,                              -- 10
+                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 11 640 KB
+                                             OPTM_G_MEM,                               -- 12 512 KB
+                                             OPTM_G_MEM,                               -- 13 256 KB
+                                             OPTM_G_MEM,                               -- 14 128 KB
+                                             OPTM_G_LINE,                              -- 15
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 16 Back
+                                             OPTM_G_SUBMENU,                           -- 17 HDMI: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 18 HDMI mode
+                                             OPTM_G_LINE,                              -- 19
+                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 20 720p 60 Hz
+                                             OPTM_G_HDMI,                              -- 21 480p 59.94 Hz
+                                             OPTM_G_LINE,                              -- 22
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 23 Back
+                                             OPTM_G_THIN + OPTM_G_SINGLESEL,           -- 24 CGA: thin font
+                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 25 Analog: 15 kHz
+                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 26 Analog: CSYNC
+                                             OPTM_G_LINE,                              -- 27
+                                             OPTM_G_HELP,                              -- 28 Help
+                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 29 Reset the PC
+                                             OPTM_G_LINE,                              -- 30
+                                             OPTM_G_CLOSE                              -- 31 Close Menu
                                            );
 
 begin

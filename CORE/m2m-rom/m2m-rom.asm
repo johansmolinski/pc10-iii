@@ -562,14 +562,46 @@ CUSTOM_MSG      XOR     R8, R8
 ; background work; nothing yet. Must preserve all registers.
 HANDLE_CORE_IO  RET
 
-; CFG_SIGCHECK (M2M-UPSTREAM cfg-strings): C=1 = the settings file R8 belongs
-; to this menu. The PC core keeps no signature: every file of the right size
-; is accepted (the Shell checks the size). Registers preserved.
-CFG_SIGCHECK    OR      0x0004, SR
+; CFG_SIGCHECK (M2M-UPSTREAM cfg-strings): C=1 = the settings file R8 (open,
+; its text loaded by CFGS_LOAD) belongs to this menu: its text has the line
+; "menu=" CFG_SIG_VAL. The file holds one byte per menu line, so a file of
+; another layout would set the wrong options (the Shell even loads a shorter
+; file, as one from a menu that grew at its end); for C=0 the Shell uses the
+; defaults and calls CFG_SIGSET, and the next save writes the file in this
+; layout. Registers preserved.
+CFG_SIGCHECK    SYSCALL(enter, 1)
+                SUB     4, SP                   ; SP: the file's value
+                MOVE    CFG_SIG_KEY, R8
+                MOVE    SP, R9
+                MOVE    4, R10
+                RSUB    CFGS_GET, 1
+                MOVE    SP, R8
+                MOVE    CFG_SIG_VAL, R9
+                SYSCALL(strcmp, 1)
+                ADD     4, SP
+                CMP     0, R10
+                RBRA    _CFGSC_OK, Z
+                SYSCALL(leave, 1)
+                AND     0xFFFB, SR              ; C=0
+                RET
+_CFGSC_OK       SYSCALL(leave, 1)
+                OR      0x0004, SR              ; C=1
                 RET
 
-; CFG_SIGSET: a new settings file was created; nothing to add.
-CFG_SIGSET      RET
+; CFG_SIGSET: a new (or reset) settings file: its text gets this menu's
+; signature (CFGS_DIRTY: the next save writes it). Registers preserved.
+CFG_SIGSET      SYSCALL(enter, 1)
+                MOVE    CFG_SIG_KEY, R8
+                MOVE    CFG_SIG_VAL, R9
+                RSUB    CFGS_SET, 1
+                SYSCALL(leave, 1)
+                RET
+
+; The menu's layout version (config.vhd): change it with every change of the
+; menu lines. No signature: the 31-line menu up to 2026-10-25. "2": 32 lines,
+; "Drive sound" at line 6. At most 3 characters (CFG_SIGCHECK's buffer).
+CFG_SIG_KEY     .ASCII_W "menu"
+CFG_SIG_VAL     .ASCII_W "2"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings

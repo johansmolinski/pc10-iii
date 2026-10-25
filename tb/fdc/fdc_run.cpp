@@ -74,6 +74,10 @@ struct Sim {
     bool cpu_busy = false;      // a CPU bus cycle is running
     std::vector<uint64_t> drq_rise;
     bool drq_prev = false;
+    // the drive LED / drive sound exports: the selected drive's head movements
+    int mcyl[2] = { 0, 0 };     // the heads, followed from drv_step
+    int steps_in = 0, steps_out = 0;
+    int bad_step = 0;           // a step with no drive (or two) selected, or past a stop
 
     // backend
     struct {
@@ -120,6 +124,17 @@ struct Sim {
         bool drq = (t->isa_drq >> 1) & 1;
         if (drq && !drq_prev) drq_rise.push_back(cyc);
         drq_prev = drq;
+        if (t->reset) mcyl[0] = mcyl[1] = 0;
+        else if (t->drv_step) {
+            int sel = t->drv_select;
+            if (sel != 1 && sel != 2) bad_step++;
+            else {
+                int d = sel == 2;
+                mcyl[d] += t->drv_step_in ? 1 : -1;
+                (t->drv_step_in ? steps_in : steps_out)++;
+                if (mcyl[d] < 0 || mcyl[d] > (((t->drv_80trk >> d) & 1) ? 83 : 41)) bad_step++;
+            }
+        }
     }
     void run_us(double us) { uint64_t e = cyc + us2clk(us); while (cyc < e) tick(); }
     bool irq() const { return (t->isa_irq >> 4) & 1; }
@@ -418,6 +433,8 @@ int main(int argc, char **argv) {
     CHECK(dt > 79.5 && dt < 80.5, "10 steps at SRT C: %.3f ms, expected 80", dt);
     CHECK(s.msr() == 0x81, "MSR after seek end: %02X", s.msr());
     expect_res(s.sense_int(), { 0x20, 10 }, "SEEK 10");
+    CHECK(s.mcyl[0] == 10 && s.steps_in == 10 && s.steps_out == 0,
+          "drv_step after SEEK 10: head %d, %d in, %d out", s.mcyl[0], s.steps_in, s.steps_out);
     s.run_us(15);
     CHECK(s.msr() == 0x80, "MSR after SIS: %02X", s.msr());
     CHECK(!s.irq(), "IRQ after SIS");
@@ -598,6 +615,7 @@ int main(int argc, char **argv) {
     s.cmd({ 0x0F, 0x01, 79 });
     CHECK(s.wait_irq(1000), "no IRQ after SEEK 79");
     expect_res(s.sense_int(), { 0x21, 79 }, "SEEK B 79");
+    CHECK(s.mcyl[1] == 79, "drv_step: B's head at %d after SEEK 79", s.mcyl[1]);
     res = rw(s, 0xE6, 1, 79, 1, 9, 9, 1, 0x90000, 512);
     expect_res(res, { 0x05, 0x00, 0x00, 80, 0, 1, 2 }, "READ B C79 H1 R9");
     CHECK(cmp_mem(s, 0x90000, s.img[1].sec(79, 1, 9), 512) == 0, "drive B data");
@@ -607,9 +625,11 @@ int main(int argc, char **argv) {
     dt = clk2us(s.cyc - t0) / 1000;
     CHECK(dt > 615.5 && dt < 616.5, "77 steps: %.3f ms", dt);
     expect_res(s.sense_int(), { 0x71, 0 }, "RECAL from 79: EC after 77 steps");
+    CHECK(s.mcyl[1] == 2, "drv_step: B's head at %d after 77 steps out", s.mcyl[1]);
     s.cmd({ 0x07, 0x01 });
     CHECK(s.wait_irq(1000), "no IRQ after 2nd RECAL");
     expect_res(s.sense_int(), { 0x21, 0 }, "second RECAL");
+    CHECK(s.mcyl[1] == 0, "drv_step: B's head at %d after the second RECAL", s.mcyl[1]);
     s.fdc_out(0x04); s.fdc_out(0x01);
     expect_res(s.results(1), { 0x39 }, "SENSE DRIVE STATUS B at track 0");
 
@@ -691,6 +711,49 @@ int main(int argc, char **argv) {
         int ec = c, eh = h, rr = er + 1;
         if (er == 9) { rr = 1; if (h == 0) eh = 1; else { ec = c + 1; eh = 0; } }
         expect_res(res, { h << 2, 0, 0, ec, eh, rr, 2 }, wr ? "random write" : "random read");
+    }
+
+    // ======================================================== drive LED, step export
+    printf("== drive select and step exports (%.0f ms)\n", clk2us(s.cyc) / 1000);
+    {
+        const struct { int dor, sel; } dt[] = {
+            { 0x1C, 1 }, { 0x2D, 2 }, { 0x1D, 0 }, { 0x2C, 0 }, { 0x0C, 0 }, { 0x3C, 1 },
+            { 0x3D, 2 }, { 0x3E, 0 }, { 0x14, 1 } };
+        for (auto &e : dt) {
+            s.io_write(0x3F2, e.dor);
+            s.run_us(2);
+            CHECK((int)s.t->drv_select == e.sel, "DOR %02X: drv_select %d, expected %d",
+                  e.dor, (int)s.t->drv_select, e.sel);
+        }
+        // A: is a 40-track drive: a seek to 50 (the PC10-III BIOS's 80-track probe) moves its
+        // head to the stop (41) and the recalibrate back from there
+        s.io_write(0x3F2, 0x1C);
+        s.cmd({ 0x07, 0x00 });
+        CHECK(s.wait_irq(1000), "no IRQ after RECAL A");
+        s.sense_int();
+        CHECK(s.mcyl[0] == 0, "drv_step: A's head at %d after RECAL", s.mcyl[0]);
+        int i0 = s.steps_in, o0 = s.steps_out;
+        s.cmd({ 0x0F, 0x00, 50 });
+        CHECK(s.wait_irq(1000), "no IRQ after SEEK A 50");
+        expect_res(s.sense_int(), { 0x20, 50 }, "SEEK A 50 (40-track drive)");
+        CHECK(s.mcyl[0] == 41 && s.steps_in - i0 == 41, "SEEK 50 on 40 tracks: head %d, %d steps",
+              s.mcyl[0], s.steps_in - i0);
+        s.cmd({ 0x07, 0x00 });
+        CHECK(s.wait_irq(1000), "no IRQ after RECAL from the stop");
+        expect_res(s.sense_int(), { 0x20, 0 }, "RECAL A from the stop");
+        CHECK(s.mcyl[0] == 0 && s.steps_out - o0 == 41, "RECAL from the stop: head %d, %d steps",
+              s.mcyl[0], s.steps_out - o0);
+        // the motor off: the drive is not selected, a seek moves nothing
+        s.io_write(0x3F2, 0x0C);
+        i0 = s.steps_in;
+        s.cmd({ 0x0F, 0x00, 5 });
+        CHECK(s.wait_irq(1000), "no IRQ after SEEK with the motor off");
+        s.sense_int();
+        CHECK(s.steps_in == i0 && s.mcyl[0] == 0, "steps with the motor off: %d", s.steps_in - i0);
+        s.cmd({ 0x07, 0x00 });
+        s.wait_irq(1000);
+        s.sense_int();
+        CHECK(s.bad_step == 0, "%d steps without one selected drive or past a stop", s.bad_step);
     }
 
     // ======================================================== done

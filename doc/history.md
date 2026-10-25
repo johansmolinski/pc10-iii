@@ -1409,3 +1409,55 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   R6 part, 34.921 ns, no exceptions): **WNS +15.498 ns**, WHS +0.070 ns, 0
   failing endpoints; 8,690 LUTs, 4,284 FFs, 206 BRAM tiles. Worst path:
   biu88 `qlen` -> `address_latch` CE, 19 levels, 19.0 ns.
+
+## 2026-10-25 - Drive LED and drive sound (branch `drvsnd`)
+
+- **Drive LED** (`CORE/vhdl/pc_drvsnd.vhd`): yellow (`FFFF00`, Megamiga's
+  floppy colour) while drive A: or B: is selected = the DOR selects it and its
+  motor bit is set, the select line that lights a PC10-III drive's LED (so it
+  stays on during the BIOS's motor run-on and is off while only the other
+  drive's motor runs). Before: green while a motor ran or the FDC executed,
+  yellow while a block moved to/from the SD card. Power LED unchanged.
+- **Drive sound**, Megamiga 0.7's "Virtual Drive Sound" with its disk guard
+  (90f1e9b) ported: the MEGA65's internal drive runs its motor while A:'s or
+  B:'s motor bit is set and takes one step per cylinder the selected drive's
+  head moves (one per 765 step pulse; the 765's pulses past the 40-track
+  drive's stop, e.g. the BIOS's seek to 50, move nothing there and give no
+  step here, so the real head stays with the emulated one). The real head is
+  followed in 0..79 (no step past 79, none out at 0 or at TRK0, resync to 0 at
+  TRK0 only after an outward step); new against Megamiga: the head is homed
+  (6 ms steps to TRK0, at most 85) before the first step, because its
+  position after power-up is unknown, and a step leaves only after the 36 us
+  settle time, so the guard has read /DSKCHG first. Guard: /DSKCHG high while
+  selected = a real disk: no motor, no steps, a 286 us probe every 0.586 s.
+  Pulses 8 us direction setup, 8 us low, 8 us hold. Constants recomputed for
+  28.63636 MHz (doc/m2m-shell.md section 4). Write gate/data, side, density
+  inactive.
+- **FDC exports** (`fdc_card.sv`, through `pc_system`, `pc_system_flat`,
+  `main.vhd`, the stub, tb/sys, the OOC top): `drv_select[1:0]`, `drv_step`,
+  `drv_step_in` (registered, nothing else in the card changed).
+- **Menu:** `Drive sound (int. drive)` at line 6 (default on; Megamiga's
+  "Noclick" does not apply to a PC: no select without the motor); the menu is
+  32 lines, every C_MENU_* from 6 on moved by one, OPTM_DY 18, menu heap
+  demand 663 of 1024. **Settings file:** the Shell would load a 31-byte
+  `/pc10/pc10cfg` as a file from a menu that grew at its end, shifting every
+  option from line 6; `CFG_SIGCHECK` now requires the text line `menu=2`
+  (`CFG_SIG_VAL`, the layout version), otherwise the defaults are used and
+  `CFG_SIGSET` adds the signature at the next save. Firmware ROM 32037 of
+  32768 words (31991 before), RAM layout unchanged.
+- **Tests:** `tb/shell/tb_drvsnd.vhd` (ghdl, a drive model with stops, a late
+  TRK0 and the change latch) PASS; `tb/shell/run_cfgsig.sh` (the two firmware
+  callbacks with M2M's cfgstr.asm on the QNICE emulator's batch mode) PASS;
+  `tb/shell/mut.py`: pc_drvsnd 27 of 27 mutants killed, firmware 5 of 5;
+  `tb/shell/run.sh` PASS. tb/fdc follows the heads from the exports: 232
+  checks (208 before), PASS, including DOR -> `drv_select` for 9 values, the
+  seek to 50 on the 40-track A: (41 steps, the recalibrate 41 back) and no
+  steps with the motor off.
+- **Floppy boot gate** (fedora, `sys_run -b GLABIOS_0.4.2_8X.ROM -a
+  hello360.img -s 10 -C 40`, `~/pcxt-work/drvsnd/`): this branch and main
+  (b94261c) give the same log line for line but the wall time: C0 H0 S1/S2 at
+  9,005.376/9,005.394 ms, "Booted from floppy A:", the CGA oracle 134 reads
+  and 14,147 writes, 0 differ.
+- Not verified: the hardware (the MEGA65 drive's step rate limit, TRK0 delay
+  and /DSKCHG behaviour), the firmware's settings-file path beyond the two
+  callbacks (the Shell's load/save around them), Vivado (synthesis, timing).

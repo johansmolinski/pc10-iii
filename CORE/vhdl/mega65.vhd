@@ -15,8 +15,11 @@
 --   device C_DEV_PC_UCODE, copied into the CPU's tables; the PC stays in reset until then
 -- * pc_fdd_sd.vhd: floppy A: and B: from image files on the SD card (QNICE devices
 --   C_DEV_PC_FDA/FDB, the SD host's engine port)
--- * the OSM settings (config.vhd): floppy images and write protection, memory size, CGA thin
---   font, HDMI mode (60 Hz only: the CGA is a 59.92 Hz source), analog 15 kHz / CSYNC, reset
+-- * pc_drvsnd.vhd: the drive LED (yellow while A: or B: is selected) and the drive sound (the
+--   MEGA65's internal drive follows the motors and head steps of A: and B:)
+-- * the OSM settings (config.vhd): floppy images and write protection, drive sound, memory
+--   size, CGA thin font, HDMI mode (60 Hz only: the CGA is a 59.92 Hz source), analog
+--   15 kHz / CSYNC, reset
 --
 -- The entity is the Megamiga fork's MEGA65_Core (M2M-UPSTREAM exceptions: floppy, SDRAM,
 -- PMOD, Ethernet pins and the SD engine port are routed into the core); everything the PC
@@ -336,16 +339,17 @@ architecture synthesis of MEGA65_Core is
 
 constant C_MENU_WP_A          : natural := 4;
 constant C_MENU_WP_B          : natural := 5;
-constant C_MENU_MEM_640       : natural := 10;
-constant C_MENU_MEM_512       : natural := 11;
-constant C_MENU_MEM_256       : natural := 12;
-constant C_MENU_MEM_128       : natural := 13;
-constant C_MENU_CGA_THIN      : natural := 23;
-constant C_MENU_HDMI_720P     : natural := 19;
-constant C_MENU_HDMI_480P     : natural := 20;
-constant C_MENU_ANALOG_15KHZ  : natural := 24;
-constant C_MENU_ANALOG_CSYNC  : natural := 25;
-constant C_MENU_RESET         : natural := 28;
+constant C_MENU_DRV_SOUND     : natural := 6;
+constant C_MENU_MEM_640       : natural := 11;
+constant C_MENU_MEM_512       : natural := 12;
+constant C_MENU_MEM_256       : natural := 13;
+constant C_MENU_MEM_128       : natural := 14;
+constant C_MENU_CGA_THIN      : natural := 24;
+constant C_MENU_HDMI_720P     : natural := 20;
+constant C_MENU_HDMI_480P     : natural := 21;
+constant C_MENU_ANALOG_15KHZ  : natural := 25;
+constant C_MENU_ANALOG_CSYNC  : natural := 26;
+constant C_MENU_RESET         : natural := 29;
 
 -- SW1 of the 5160 as the 8255 reads it (bit = 1: switch off): bit 0 = 1 normal POST (no
 -- test loop), bit 1 = 0 no 8087, bits 3..2 = 11 all four planar banks, bits 5..4 = 10 CGA
@@ -415,8 +419,9 @@ signal main_img_tracks        : std_logic_vector(15 downto 0);
 signal main_img_heads         : std_logic_vector(3 downto 0);
 signal main_img_spt           : std_logic_vector(11 downto 0);
 signal main_drv_motor         : std_logic_vector(1 downto 0);
-signal main_fdc_active        : std_logic;
-signal main_fdd_busy          : std_logic;
+signal main_drv_select        : std_logic_vector(1 downto 0);
+signal main_drv_step          : std_logic;
+signal main_drv_step_in       : std_logic;
 signal main_sp_req            : std_logic;
 signal main_sp_write          : std_logic;
 signal main_sp_drive          : std_logic;
@@ -473,14 +478,12 @@ begin
    iec_srq_en_o         <= '0';
    iec_srq_n_o          <= '1';
 
-   -- M2M-UPSTREAM floppy-pins: the internal drive is not used (yet), all outputs inactive
+   -- M2M-UPSTREAM floppy-pins: the internal drive plays the drive sound (pc_drvsnd.vhd: motor,
+   -- select, direction, step); write gate, write data, side and density stay inactive (the
+   -- DD-safe density level): nothing on a disk in it is touched
    f_wdata_o            <= '1';
    f_wgate_o            <= '1';
-   f_motora_o           <= '1';
-   f_selecta_o          <= '1';
    f_side1_o            <= '1';
-   f_stepdir_o          <= '1';
-   f_step_o             <= '1';
    f_density_o          <= '1';
 
    -- M2M-UPSTREAM sdram-pins: SDRAM idle (the PC keeps everything in block RAM; R3 has none)
@@ -575,12 +578,32 @@ begin
    -- main_clk
    ---------------------------------------------------------------------------------------------
 
-   -- Power LED: green; blue while the reset button is held long. Drive LED: on while a drive
-   -- motor runs or the FDC transfers (green), yellow while a sector moves to/from the SD card.
+   -- Power LED: green; blue while the reset button is held long. Drive LED (pc_drvsnd.vhd):
+   -- yellow while drive A: or B: is selected (DOR select + its motor bit, the drive's own LED).
    main_power_led_o     <= '1';
    main_power_led_col_o <= x"0000FF" when main_reset_m2m_i else x"00FF00";
-   main_drive_led_o     <= main_drv_motor(0) or main_drv_motor(1) or main_fdc_active or main_fdd_busy;
-   main_drive_led_col_o <= x"FFC000" when main_fdd_busy = '1' else x"00FF00";
+
+   i_pc_drvsnd : entity work.pc_drvsnd
+      port map (
+         clk_i                => main_clk,
+         rst_i                => main_rst,
+         sound_i              => main_osm_control_i(C_MENU_DRV_SOUND),
+         drv_motor_i          => main_drv_motor,
+         drv_select_i         => main_drv_select,
+         drv_step_i           => main_drv_step,
+         drv_step_in_i        => main_drv_step_in,
+         led_o                => main_drive_led_o,
+         led_col_o            => main_drive_led_col_o,
+         f_motora_o           => f_motora_o,
+         f_selecta_o          => f_selecta_o,
+         f_stepdir_o          => f_stepdir_o,
+         f_step_o             => f_step_o,
+         f_track0_i           => f_track0_i,
+         f_diskchanged_i      => f_diskchanged_i,
+         cyl_o                => open,
+         known_o              => open,
+         disk_o               => open
+      ); -- i_pc_drvsnd
 
    -- Every reset source, registered (pc_system wants a synchronous reset): the MMCM lock,
    -- the M2M resets (reset button short/long, the Shell's CSR reset, i.e. the OSM's "Reset
@@ -647,7 +670,10 @@ begin
          img_heads_i          => main_img_heads,
          img_spt_i            => main_img_spt,
          drv_motor_o          => main_drv_motor,
-         fdc_active_o         => main_fdc_active,
+         fdc_active_o         => open,
+         drv_select_o         => main_drv_select,
+         drv_step_o           => main_drv_step,
+         drv_step_in_o        => main_drv_step_in,
          sp_req_o             => main_sp_req,
          sp_write_o           => main_sp_write,
          sp_drive_o           => main_sp_drive,
@@ -824,7 +850,7 @@ begin
          sp_wr_ready_o        => main_sp_wr_ready,
          sp_done_o            => main_sp_done,
          sp_err_o             => main_sp_err,
-         main_busy_o          => main_fdd_busy
+         main_busy_o          => open
       ); -- i_pc_fdd_sd
 
    -- write protection: the menu (main clock domain; the FDC card reads WP for its status)

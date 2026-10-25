@@ -221,6 +221,8 @@ module pc_system #(
     input  logic [1:0][5:0]  img_spt,
     output logic [1:0]       drv_motor,
     output logic             fdc_active,
+    output logic [1:0]       drv_select,   // drive LED / drive sound (doc/fdc.md section 6)
+    output logic             drv_step, drv_step_in,
     output logic        sp_req, sp_write, sp_drive,
     output logic [7:0]  sp_cyl,  output logic sp_head,  output logic [7:0] sp_sector,
     output logic [15:0] sp_lba,
