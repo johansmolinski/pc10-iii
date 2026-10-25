@@ -255,8 +255,8 @@ struct Sim {
         }
         b.prev_req = req;
         switch (b.state) {
-        case 1:
-            if (b.wr || cyc >= b.when) b.state = 2;
+        case 1:                         // the latency (a write's before it takes the bytes)
+            if (cyc >= b.when) b.state = 2;
             break;
         case 2:
             if (!b.wr) {
@@ -269,7 +269,7 @@ struct Sim {
             } else if (t->sp_wr_valid && rnd(0, b.byte_gap_max) == 0) {
                 t->sp_wr_ready = 1;
                 b.wbuf.push_back(t->sp_wr_data);
-                if (b.wbuf.size() == 512) { b.state = 3; b.when = cyc + us2clk(lat); }
+                if (b.wbuf.size() == 512) { b.state = 3; b.when = cyc + us2clk(2); }
             }
             break;
         case 3:
@@ -397,7 +397,7 @@ struct Sim {
     // mode: 0 PIO, no interrupt (mask FC); 1 interrupt, no data or PIO data (mask 02);
     // 2 DMA + interrupt (mask 03)
     Out command(const uint8_t *ccb, int mode, size_t din_len, const std::vector<uint8_t> &dout,
-                double max_ms = 200, bool no_mask = false) {
+                double max_ms = 200, bool no_mask = false, bool keep_irq = false) {
         Out o;
         if (!no_mask) io_write(PORT + 3, mode == 2 ? 0x03 : mode == 1 ? 0x02 : 0xFC);
         int st = 0;
@@ -456,6 +456,13 @@ struct Sim {
                 o.t_stat = irq_rise;
                 st = status();
                 CHECK(st == (IRQ | BSY | CD | IO | REQ), "status phase with interrupt: %02X", st);
+                if (keep_irq) {
+                    // the completion byte with the interrupt still enabled: it clears it
+                    o.comp = io_read(PORT, 0);
+                    do { st = status(); o.polls++; } while ((st & BSY) && o.polls < 1000);
+                    CHECK(st == 0 && !irq(), "completion byte read with mask 02: status %02X, IRQ5 %d", st, irq());
+                    return o;
+                }
                 io_write(PORT + 3, 0xFC);
             }
             st = status();
@@ -687,6 +694,8 @@ static void t_detect(Sim &s) {
     mk_ccb(c, 0x00, 0, 0, 0, 0, 0);
     o = s.command(c, 0, 0, {});
     CHECK(!s.irq(), "no IRQ with mask FC");
+    o = s.command(c, 1, 0, {}, 200, false, true);
+    CHECK(o.comp == 0, "test ready, completion read with the interrupt enabled: %02X", o.comp);
 }
 
 static void t_spinup(Sim &s) {
@@ -860,6 +869,10 @@ static void t_format(Sim &s) {
     check_image(s, "format track");
     // interleave 1: with a one-sector buffer every sector costs a revolution
     rd(s, 100 * 68 + 2 * 17 + 5, 6, 2, "read at interleave 1");
+    mk_ccb(c, 0x06, 0, 100, 2, 0, 2);
+    run(s, c, 1, {}, "format track again, interleave 2", 400);
+    s_cyl = (100 * 68 + 2 * 17 + 16) / 54;
+    rd(s, 100 * 68 + 2 * 17, 8, 2, "read at interleave 2 (single-transfer DMA is too slow for it)");
     mk_ccb(c, 0x06, 0, 100, 2, 0, 5);
     run(s, c, 1, {}, "format track again, interleave 5", 400);
     s_cyl = (100 * 68 + 2 * 17 + 16) / 54;
@@ -960,8 +973,8 @@ static void t_errors(Sim &s) {
     // a slow backend (3 ms per sector): slower than the drive, still right
     s.be.lat_us_min = s.be.lat_us_max = 3000;
     rd(s, 15000, 6, 2, "read with a slow backend", 0x08, false);
-    wr(s, 15100, 6, 2, 13, "write with a slow backend", 0x0A, false);
-    rd(s, 15100, 6, 2, "read back with a slow backend", 0x08, false);
+    wr(s, 15100, 24, 2, 13, "write with a slow backend", 0x0A, false);
+    rd(s, 15100, 24, 2, "read back with a slow backend", 0x08, false);
     recal(s); s_cyl = 0;
     s.be.lat_us_min = 20; s.be.lat_us_max = 300;
     check_image(s, "slow backend");
