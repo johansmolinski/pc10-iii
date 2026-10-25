@@ -683,13 +683,23 @@ always @(posedge clk) if (ce) begin
     end
 end
 
-// prefix handling
+// prefix handling. pc10-iii: as F1 below, the override is also cleared at the
+// start (SC) of an instruction that follows a non-prefix one. z8086 cleared it
+// only at RNI, and an SC in the clock of the previous instruction's RNI (NX
+// overlap) took priority, so the override leaked into the next instruction:
+// the Commodore PC BIOS 4.41 (F000:F18F) does MOV AL,CS:[BX+d16] then
+// MOV [0065h],AL, which stored to F000:0065 and left the CGA disabled.
 always @(posedge clk) if (ce) begin
     if (!reset_n) begin
         BPE <= 1'b0;
         BPL <= 1'b0;
         BPH <= 1'b0;
     end else if (SC) begin
+        if (prev_np) begin
+            BPE <= 1'b0;
+            BPL <= 1'b0;
+            BPH <= 1'b0;
+        end
         if (g_prefix & ~IR[7]) begin
             BPE <= 1'b1;
             case ({IR[4:3]})

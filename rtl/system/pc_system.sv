@@ -280,6 +280,7 @@ assign vid_vblank = !CGA_FIT || cga_vb;
 logic [7:0] mda_din, mda_din_c;
 logic       mda_dsel, mda_ready, mda_dsel_c, mda_ready_c;
 logic       mda_ce_c, mda_v_c, mda_i_c, mda_hs_c, mda_vs_c, mda_hb_c, mda_vb_c;
+wire        mda_on = MDA_FIT != 0;
 
 mda_card #(.HERC(MDA_FIT == 2)) u_mda (
     .clk        (clk),
@@ -288,10 +289,10 @@ mda_card #(.HERC(MDA_FIT == 2)) u_mda (
     .isa_dout   (isa_dout),
     .isa_din    (mda_din_c),
     .isa_dsel   (mda_dsel_c),
-    .isa_memr_n (isa_memr_n),
-    .isa_memw_n (isa_memw_n),
-    .isa_ior_n  (isa_ior_n),
-    .isa_iow_n  (isa_iow_n),
+    .isa_memr_n (isa_memr_n | !mda_on),     // an unfitted card sees no strobes (its
+    .isa_memw_n (isa_memw_n | !mda_on),     // write-lost check would fire on a BIOS
+    .isa_ior_n  (isa_ior_n  | !mda_on),     // probing B0000 with nobody answering)
+    .isa_iow_n  (isa_iow_n  | !mda_on),
     .isa_aen    (isa_aen),
     .isa_ready  (mda_ready_c),
     .cga_fitted (CGA_FIT),
@@ -307,7 +308,6 @@ mda_card #(.HERC(MDA_FIT == 2)) u_mda (
     .vid_vblank (mda_vb_c)
 );
 
-wire mda_on = MDA_FIT != 0;
 assign mda_din    = mda_on ? mda_din_c : 8'h00;
 assign mda_dsel   = mda_on && mda_dsel_c;
 assign mda_ready  = !mda_on || mda_ready_c;
