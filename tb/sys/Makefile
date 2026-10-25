@@ -8,6 +8,8 @@
 #                   differ from the 5160's: sys_run -d 5D (80x25 colour, 2 drives)
 #   make FE=1 PVC4=1 OBJ=obj_pvc4   the PC10-III: FE2010A and the onboard PVC4 video
 #                   instead of the IBM CGA (doc/pvc4.md); sys_run -P/-m/-o
+#   make FE=1 PVC4=1 XTA=1 OBJ=obj_xta   the PC20-III: also the hard disk on CN202
+#                   (doc/xta.md); sys_run -A image [-jmp208 A|B] [-WA out.img]
 
 # The 8088's microcode bundle (tools/mkucode.py, not in the repository) is
 # read at run time: $$PC10_UCODE, else Z86_UCODE compiled in.
@@ -27,7 +29,7 @@ SRC  = $(CPUSRC) $(RTL)/cpu/cpu8088.sv \
        $(wildcard $(KF)/KF8255/*.sv) $(wildcard $(KF)/KF8259/*.sv) \
        $(RTL)/system/pc_clocks.sv $(RTL)/system/xt_board.sv $(RTL)/system/pc_system.sv \
        $(CGA) $(MDASRC) $(RTL)/fdc/upd765.sv $(RTL)/fdc/fdc_secbuf.sv $(RTL)/fdc/fdc_card.sv \
-       $(RTL)/hdc/hdc_secbuf.sv $(RTL)/hdc/ata_dev.sv $(RTL)/hdc/xtide_card.sv tb_sys.sv
+       $(RTL)/hdc/hdc_secbuf.sv $(RTL)/hdc/ata_dev.sv $(RTL)/hdc/xtide_card.sv $(RTL)/hdc/xta_card.sv tb_sys.sv
 INC  = -I$(KF)/KF8237 -I$(KF)/KF8253 -I$(KF)/KF8255 -I$(KF)/KF8259
 ifeq ($(MDA),1)
 OBJ ?= obj_mda
@@ -41,10 +43,11 @@ RAM_KB ?= 640
 DRQ0_SKEW ?= 0
 FE ?= 0
 PVC4 ?= 0
+XTA ?= 0
 
 $(OBJ)/sys_run: $(SRC) sys_run.cpp
 	verilator --cc --exe --build -O3 -j $(VJ) -Wno-fatal -Wno-lint -Wno-style \
 	    --public-flat-rw --Mdir $(OBJ) --top-module tb_sys $(INC) \
-	    -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) -GFE2010A=$(FE) -GPVC4=$(PVC4) -CFLAGS -DPVC4_BUILD=$(PVC4) $(CPUDEF) \
+	    -GRAM_KB=$(RAM_KB) -GDRQ0_SKEW=$(DRQ0_SKEW) -GMDA_FIT=$(MDA) -GFE2010A=$(FE) -GPVC4=$(PVC4) -GXTA=$(XTA) -CFLAGS -DPVC4_BUILD=$(PVC4) $(CPUDEF) \
 	    $(SRC) sys_run.cpp -o sys_run -CFLAGS -O2
 	@true

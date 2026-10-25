@@ -28,7 +28,8 @@ module pc_system #(
     parameter bit CGA_FIT = 1'b1,
     parameter int MDA_FIT = 0,
     parameter bit FE2010A = 1'b0,
-    parameter bit PVC4_FIT = 1'b0
+    parameter bit PVC4_FIT = 1'b0,
+    parameter bit XTA_FIT = 1'b0
 ) (
     input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high
@@ -111,6 +112,19 @@ module pc_system #(
     input  logic        hd_sp_wr_ready,
     input  logic        hd_sp_done,
     input  logic        hd_sp_err,
+    input  logic        xta_enable,
+    input  logic        xta_present,
+    output logic        xta_active,
+    output logic        xta_sp_req,
+    output logic        xta_sp_write,
+    output logic [27:0] xta_sp_lba,
+    input  logic        xta_sp_rd_valid,
+    input  logic [7:0]  xta_sp_rd_data,
+    output logic        xta_sp_wr_valid,
+    output logic [7:0]  xta_sp_wr_data,
+    input  logic        xta_sp_wr_ready,
+    input  logic        xta_sp_done,
+    input  logic        xta_sp_err,
 
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
@@ -210,6 +224,9 @@ module pc_system #(
     assign hdc_rom_addr = '0;
     assign {hd_active, hd_sp_req, hd_sp_write, hd_sp_drive, hd_sp_wr_valid} = '0;
     assign {hd_sp_lba, hd_sp_wr_data} = '0;
+    // nor the PC20-III's hard disk
+    assign {xta_active, xta_sp_req, xta_sp_write, xta_sp_wr_valid} = '0;
+    assign {xta_sp_lba, xta_sp_wr_data} = '0;
 
     function automatic logic [7:0] hexc(input logic [3:0] n);
         hexc = (n < 4'd10) ? (8'h30 + {4'h0, n}) : (8'h37 + {4'h0, n});

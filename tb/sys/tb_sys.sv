@@ -2,14 +2,17 @@
 // simulation (sys_run.cpp). The ROM image comes from +rom=<hex file> (one
 // byte per line, 64 KB, F0000-FFFFF), the XTIDE card's option ROM from
 // +xub=<hex file> (16 KB, C8000-CBFFF; 0xFF without one). MDA_FIT: 0 none,
-// 1 MDA, 2 Hercules.
+// 1 MDA, 2 Hercules. XTA: the PC20-III's hard disk (doc/xta.md); +xtalog
+// prints its commands. +warm: the BIOS's warm-boot flag (0472h = 1234h) in
+// the RAM at power-on (skips the memory test).
 
 module tb_sys #(
     parameter int RAM_KB = 640,
     parameter int DRQ0_SKEW = 0,
     parameter int MDA_FIT = 0,
     parameter bit FE2010A = 1'b0,
-    parameter bit PVC4 = 1'b0           // the PC10-III's onboard video (doc/pvc4.md)
+    parameter bit PVC4 = 1'b0,          // the PC10-III's onboard video (doc/pvc4.md)
+    parameter bit XTA = 1'b0            // the PC20-III's hard disk (doc/xta.md)
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -103,7 +106,22 @@ module tb_sys #(
     output logic [7:0]  hd_sp_wr_data,
     input  logic        hd_sp_wr_ready,
     input  logic        hd_sp_done,
-    input  logic        hd_sp_err
+    input  logic        hd_sp_err,
+
+    // the PC20-III's hard disk (XTA): JMP208, the medium, the sector port
+    input  logic        xta_enable,
+    input  logic        xta_present,
+    output logic        xta_active,
+    output logic        xta_sp_req,
+    output logic        xta_sp_write,
+    output logic [27:0] xta_sp_lba,
+    input  logic        xta_sp_rd_valid,
+    input  logic [7:0]  xta_sp_rd_data,
+    output logic        xta_sp_wr_valid,
+    output logic [7:0]  xta_sp_wr_data,
+    input  logic        xta_sp_wr_ready,
+    input  logic        xta_sp_done,
+    input  logic        xta_sp_err
 );
 
 logic [7:0]  ram [1048576];
@@ -130,7 +148,10 @@ logic [15:0] ack_sh = '0;
 logic [7:0]  rd_sh [16];
 logic [7:0]  rd_q;
 initial if ($value$plusargs("ramlat=%d", ram_lat)) ;
+bit warm = 1'b0;
+initial if ($test$plusargs("warm")) warm = 1'b1;
 always_ff @(posedge clk) begin
+    if (warm && reset) begin ram[20'h00472] <= 8'h34; ram[20'h00473] <= 8'h12; end
     if (ram_en && ram_we) ram[ram_addr] <= ram_wdata;
     if (ram_en) rd_q = ram[ram_addr];
     ack_sh <= {ack_sh[14:0], ram_en};
@@ -143,7 +164,7 @@ assign ram_ack   = ack_sh[ram_lat - 1];
 assign ram_rdata = rd_sh[ram_lat - 1];
 
 pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4), .MDA_FIT(MDA_FIT),
-            .PVC4_FIT(PVC4)) u_pc (
+            .PVC4_FIT(PVC4), .XTA_FIT(XTA)) u_pc (
     .clk        (clk),
     .reset      (reset),
     .fe2010a    (FE2010A),                   // make FE=1: the PC10-III's chipset
@@ -226,6 +247,19 @@ pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4), .MDA_FIT(MD
     .hd_sp_wr_ready(hd_sp_wr_ready),
     .hd_sp_done    (hd_sp_done),
     .hd_sp_err     (hd_sp_err),
+    .xta_enable     (xta_enable),
+    .xta_present    (xta_present),
+    .xta_active     (xta_active),
+    .xta_sp_req     (xta_sp_req),
+    .xta_sp_write   (xta_sp_write),
+    .xta_sp_lba     (xta_sp_lba),
+    .xta_sp_rd_valid(xta_sp_rd_valid),
+    .xta_sp_rd_data (xta_sp_rd_data),
+    .xta_sp_wr_valid(xta_sp_wr_valid),
+    .xta_sp_wr_data (xta_sp_wr_data),
+    .xta_sp_wr_ready(xta_sp_wr_ready),
+    .xta_sp_done    (xta_sp_done),
+    .xta_sp_err     (xta_sp_err),
     .kbd_code   (kbd_code),
     .kbd_valid  (kbd_valid),
     .kbd_busy   (kbd_busy),
@@ -292,6 +326,31 @@ generate if (FE2010A) begin : g_felog
             $display("[step %0d] FE cfg %02h sw %02h", zsteps, u_pc.u_board.fe_cfg, u_pc.u_board.fe_sw);
         if (ram_en && ram_we && (ram_addr == 20'h00410 || ram_addr == 20'h00411) && ram[ram_addr] != ram_wdata)
             $display("[step %0d] equipment %05h <= %02h", zsteps, ram_addr, ram_wdata);
+    end
+end endgenerate
+
+// XTA: +xtalog prints each command (the CCB when the drive starts it), its
+// completion byte, and the controller resets, with the time in ms
+generate if (XTA) begin : g_xtalog
+    bit xlog = 1'b0;
+    initial if ($test$plusargs("xtalog")) xlog = 1'b1;
+    longint unsigned cyc = 0;
+    logic [2:0] ph_q = 3'd0;
+    always_ff @(posedge clk) begin
+        cyc  <= cyc + 1;
+        ph_q <= u_pc.g_xta.u_xta.phase;
+        if (xlog && !reset && u_pc.g_xta.u_xta.phase != ph_q) begin
+            if (u_pc.g_xta.u_xta.phase == 3'd3)         // P_EXEC
+                $display("[%10.3f ms] XTA command %02h %02h %02h %02h %02h %02h  (%04h:%04h)",
+                         real'(cyc) / 28636.36364, u_pc.g_xta.u_xta.ccb[0], u_pc.g_xta.u_xta.ccb[1],
+                         u_pc.g_xta.u_xta.ccb[2], u_pc.g_xta.u_xta.ccb[3], u_pc.g_xta.u_xta.ccb[4],
+                         u_pc.g_xta.u_xta.ccb[5], u_pc.u_cpu.dbg_cs, u_pc.u_cpu.dbg_ip);
+            if (u_pc.g_xta.u_xta.phase == 3'd6)         // P_STAT
+                $display("[%10.3f ms] XTA completion %02h (sense %02h)", real'(cyc) / 28636.36364,
+                         u_pc.g_xta.u_xta.din_q, {u_pc.g_xta.u_xta.sn_av, 1'b0, u_pc.g_xta.u_xta.sn_code});
+            if (u_pc.g_xta.u_xta.phase == 3'd1)         // P_RESET
+                $display("[%10.3f ms] XTA reset", real'(cyc) / 28636.36364);
+        end
     end
 end endgenerate
 
