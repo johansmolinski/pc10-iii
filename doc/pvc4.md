@@ -447,17 +447,16 @@ with an expansion CGA.
   with its outputs gated; its `$fatal` write checks fired once the PVC4 ended
   strobes before the CGA's slot).
 - `CORE/sv/pc_system_flat.sv`: the PC10-III = FE2010A + PVC4, no CGA.
-- `CORE/vhdl/main.vhd`: `G_CBM_DIP` (default "01": switch 1 off, switch 2
-  on = colour, matching `dip_sw1` 5Dh in mega65.vhd) and `G_MONO_TINT` (0
-  green, 1 amber, 2 white). In the mono personality the dot becomes black,
+- `CORE/vhdl/main.vhd`: inputs `cbm_dip_i` and `mono_tint_i` (0 green, 1
+  amber, 2 white), from the menu's "Display" (doc/m2m-shell.md section 8,
+  `pc_chipset.vhd`: colour = "01", 5Dh/6Dh; mono = "11", 7Dh; a change
+  restarts the PC). In the mono personality the dot becomes black,
   dim (intensity alone), normal or bright in that tint; colour RGBI as
   before. The font loader stays the 8 KB IBM layout (`font_cbm` = 0).
-- **For the menu (not done here, the user's sequencing):** DIP switch 1
-  (character set) and 2 (mono/colour) as menu items driving `cbm_dip`
-  together with `dip_sw1` bits 5-4 (switches 3/4); the mono tint; a 32 KB
-  Commodore character ROM file (pc_font.vhd: 15-bit address, `font_cbm`).
-  The PVC4 latches the straps at reset, so a switch change needs a reset (as
-  on the real machine, which is switched off for it).
+- **The menu** (2026-10-25): "Display" = DIP switch 2 with switches 3/4 and
+  the mono tint, done (doc/m2m-shell.md section 8). Still open: DIP switch 1
+  (character set) and a 32 KB Commodore character ROM file (pc_font.vhd:
+  15-bit address, `font_cbm`); switch 1 matters only with that ROM.
 
 ### 8.1 The video path through M2M
 
@@ -472,7 +471,7 @@ with an expansion CGA.
   nothing new: ascal re-measures after the switch. Its input limit IHRES 1024
   is not reached. The frame rate is 49.8 Hz against the 60 Hz HDMI modes:
   ascal repeats about every fifth frame (no triple buffer: possible tearing).
-  A 50 Hz HDMI mode would be the clean answer (as Megamiga's PAL modes).
+  The menu's 720p 50 Hz HDMI mode (2026-10-25) is the clean answer.
 - **Mono personality, analog**: the 5151-class monitor is an 18.4 kHz TTL
   monitor; M2M's analog path cannot pass it: the VGA line doubler needs the
   video clock at least twice the pixel rate (28.64 / 16.26 = 1.76), and its

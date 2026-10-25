@@ -105,7 +105,8 @@ copies it into `pc_system`'s font port, one byte per clock:
 - `/pc10/cga.rom` (optional auto-load ROM) overwrites the image; `PREP_START`
   (`FONT_START`) checks the size (2 KB = 8x8 only, copied to 0x1800 and as the
   thin font to 0x1000; 8 KB = the whole ROM) and asks for a new copy;
-- `CGA: thin font` in the menu is the card's jumper P3 (`font_thin`).
+- the IBM CGA's jumper P3 (`font_thin`, the thin font) is tied off in the shell
+  since the PVC4 replaced the CGA (2026-10-25): the PVC4 has no such jumper.
 
 **The 8088's microcode** (`pc_ucode.vhd`, 2026-10-22): the CPU (z8086's EU,
 doc/z8086.md) runs Intel's microcode, which is neither in the repository nor
@@ -245,22 +246,23 @@ brown. The CGA's visible window is MartyPC's "Full" aperture, 768 x 245
   now, as in Megamiga); the analog OSM's 2x enable is every video clock.
   Menu options: "Analog: 15 kHz RGB" (scandoubler off, `retro15kHz`) and
   "Analog: CSYNC".
-- **HDMI:** the CGA is a 59.92 Hz source, so only 60 Hz modes are offered:
-  720p 60 Hz (default) and 720 x 480 59.94 Hz (`C_VIDEO_HDMI_720_5994`), as
-  Megamiga's `ntsc` branch does for its 60 Hz Amiga. ascal scales from the
+- **HDMI:** the CGA (and the PVC4's colour personality) is a 59.92 Hz
+  source: 720p 60 Hz (default) and 720 x 480 59.94 Hz
+  (`C_VIDEO_HDMI_720_5994`), as Megamiga's `ntsc` branch does for its 60 Hz
+  Amiga; and 720p 50 Hz (`C_VIDEO_HDMI_16_9_50`) for the PVC4's 49.8 Hz mono
+  personality. ascal scales from the
   15 kHz input; nearest neighbour, no polyphase filter, no triple buffer.
 - **The PVC4** (since 2026-10-25, doc/pvc4.md section 8): `pc_system_flat`
   builds the PC10-III's onboard video instead of the IBM CGA. Its colour
   personality is the CGA's raster (everything above holds). Its mono
-  personality (DIP switch 2 off: `G_CBM_DIP` in `main.vhd`, default "01" =
-  colour) gives 16.257 MHz dots on a 1-2 clock `vid_ce`, 882 x 370 dots,
-  18.43 kHz, 49.8 Hz; `main.vhd` shows (MONO, IT) as four levels of
-  `G_MONO_TINT` (green, amber, white). HDMI: ascal measures the new window
-  (738 x 354) itself; 49.8 Hz into 60 Hz repeats a frame about every fifth.
-  Analog: not usable in the mono personality (the line doubler needs 2
-  video clocks per dot, and 36.9 kHz / 50 Hz is no VGA timing); doc/pvc4.md
-  8.1 lists the options. Menu items for DIP switches 1-2 and the tint are
-  for the menu's owner (doc/pvc4.md section 8).
+  personality (DIP switch 2 off: the menu's "Display", section 8) gives
+  16.257 MHz dots on a 1-2 clock `vid_ce`, 882 x 370 dots, 18.43 kHz,
+  49.8 Hz; `main.vhd` shows (MONO, IT) as four levels of the menu's phosphor
+  (`mono_tint_i`: green, amber, white). HDMI: ascal measures the new window
+  (738 x 354) itself; 49.8 Hz into 60 Hz repeats a frame about every fifth,
+  the 720p 50 Hz mode avoids that. Analog: not usable in the mono
+  personality (the line doubler needs 2 video clocks per dot, and
+  36.9 kHz / 50 Hz is no VGA timing); doc/pvc4.md 8.1 lists the options.
 - **OSM canvas:** `VGA_DX x VGA_DY` = 640 x 400 = 40 x 25 characters, the
   picture after the scandoubler. The HDMI overlay shift `H_PIXELS - VGA_DX`
   stays positive for both modes (Megamiga pins 720 because of its 576p mode).
@@ -304,8 +306,9 @@ Menu (`config.vhd`, bits = line numbers, `C_MENU_*` in `mega65.vhd`):
  Drive sound (int. drive)  the internal drive plays A:/B:'s sounds (default on, section 4)
  Chipset: %s         PC10-III (FE2010A) (default) / IBM XT (8255); a change restarts the PC
  Memory: %s          640 KB / 512 KB / 256 KB / 128 KB
- HDMI: %s            720p 60 Hz 16:9 / 480p 59.94 Hz 4:3
- CGA: thin font      jumper P3
+ HDMI: %s            720p 60 Hz 16:9 / 480p 59.94 Hz 4:3 / 720p 50 Hz 16:9
+ Display: %s         Colour (default) / Monochrome, green / amber / white;
+                     colour <-> mono restarts the PC
  Analog: 15 kHz RGB
  Analog: CSYNC
  Help
@@ -316,10 +319,11 @@ Menu (`config.vhd`, bits = line numbers, `C_MENU_*` in `mega65.vhd`):
 Settings file `/pc10/pc10cfg` (the Shell creates it), start folder `/pc10`.
 It holds one byte per menu line, so its layout is the menu's: since
 2026-10-25 the firmware's `CFG_SIGCHECK` accepts a file only when its text
-(M2M-UPSTREAM cfg-strings, behind the menu bytes) has the line `menu=3`
+(M2M-UPSTREAM cfg-strings, behind the menu bytes) has the line `menu=4`
 (`CFG_SIG_VAL` in `m2m-rom.asm`, the layout version: change it with every
 change of the menu's lines; `2` was the 32-line menu with the drive sound,
-`3` the 39-line one with the chipset submenu). Any other file (the 31-line
+`3` the 39-line one with the chipset submenu, `4` the 48-line one with the
+Display submenu and 720p 50 Hz). Any other file (the 31-line
 files before the drive sound line had none; the Shell would even load a
 shorter file as one from a menu that grew at its end, shifting every option
 behind the new lines) gets the defaults, and `CFG_SIGSET` writes the
@@ -334,6 +338,16 @@ chipset (5D FE2010A, 6D 8255, see below). A change of the menu item holds the
 PC in reset for 2^16 clocks (2.3 ms) from the clock the menu bit changes, so it
 restarts the PC with the new chipset and switches (the memory size, in
 contrast, acts at once: `pc_ram.vhd` limits the RAM live).
+
+**Display** (2026-10-25, `pc_chipset.vhd` too): the PC10-III's CONFIG switch
+2 (onboard video mono/colour: the PVC4's straps, 230h bit 7) together with
+switches 3 and 4 (DIP SW1 bits 5-4: 11 = both off = mono, so 7D on either
+chipset; colour keeps 5D/6D). Colour (default) or mono in a green, amber or
+white phosphor (only `main.vhd`'s colouring: changing the phosphor does not
+restart the PC). A change between colour and mono restarts the PC as a
+chipset change does: the PVC4 takes its straps in reset, and the real machine
+is switched off to move a DIP switch. Switch 1 (the character set) stays off
+(USA/Europe) until a Commodore character ROM can be loaded.
 
 The firmware (`m2m-rom.asm`) is the Shell plus the callbacks (`PREP_START`:
 BIOS check, alignment and gate, CGA font; `PREP_LOAD_IMAGE`: the floppy

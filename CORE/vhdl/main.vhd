@@ -9,7 +9,8 @@
 -- Video: pc_system gives RGBI on the 14.31818 MHz enable (vid_ce = ce_14m, every second clock).
 -- The PC10-III's PVC4 (doc/pvc4.md) gives that in its colour personality; in its mono
 -- personality (MDA/Hercules timing) vid_ce is its 16.257 MHz dot (1 or 2 clocks apart),
--- 18.4 kHz / 50 Hz, and the dot is (MONO, IT), shown as four levels of G_MONO_TINT.
+-- 18.4 kHz / 50 Hz, and the dot is (MONO, IT), shown as four levels of the menu's phosphor
+-- (mono_tint_i).
 -- The PC and M2M's video pipeline run on the one 28.63636 MHz clock (clk.vhd, video_clk =
 -- main_clk), so the pixel, the syncs, the blanks and the enable are registered together and
 -- handed over as they are: one pixel per video_ce. RGBI becomes 8-bit RGB with the IBM 5153's
@@ -27,19 +28,17 @@ use ieee.numeric_std.all;
 
 entity main is
    generic (
-      G_RAM_KB                : natural := 640;
-      -- the PC10-III's CONFIG switches 1 and 2 that the PVC4 board wires (1 = off): bit 0 =
-      -- switch 1 (1 = USA/Europe character set), bit 1 = switch 2 (1 = onboard video mono).
-      -- Must agree with DIP SW1 bits 5-4 in mega65.vhd (0x5D: 80 x 25 colour). A menu item
-      -- later (doc/pvc4.md section 8).
-      G_CBM_DIP               : std_logic_vector(1 downto 0) := "01";
-      -- the mono personality's phosphor: 0 green, 1 amber, 2 white
-      G_MONO_TINT             : natural := 0
+      G_RAM_KB                : natural := 640
    );
    port (
       clk_main_i              : in  std_logic;     -- 28.63636 MHz, also M2M's video clock
       reset_i                 : in  std_logic;     -- synchronous, high active (all reset sources)
       fe2010a_i               : in  std_logic;     -- chipset: 1 = PC10-III (FE2010A), 0 = IBM XT (8255)
+      -- the PC10-III's CONFIG switches 1 and 2 that the PVC4 board wires (1 = off): bit 0 =
+      -- switch 1 (1 = USA/Europe character set), bit 1 = switch 2 (1 = onboard video mono);
+      -- they agree with dip_sw1_i bits 5-4 (pc_chipset.vhd)
+      cbm_dip_i               : in  std_logic_vector(1 downto 0);
+      mono_tint_i             : in  std_logic_vector(1 downto 0);   -- the mono phosphor: 0 green, 1 amber, 2 white
 
       -- Video output (on clk_main_i with video_ce_o)
       video_ce_o              : out std_logic;
@@ -234,6 +233,17 @@ architecture synthesis of main is
       return std_logic_vector(to_unsigned((l * MUL(tint, ch)) / 256, 8));
    end function mono_lvl;
 
+   -- the tint chosen at run time: constant tables per tint, so no multiplier
+   function mono_tint(v, i : std_logic; tint : std_logic_vector(1 downto 0); ch : natural)
+      return std_logic_vector is
+   begin
+      case tint is
+         when "00"   => return mono_lvl(v, i, 0, ch);
+         when "01"   => return mono_lvl(v, i, 1, ch);
+         when others => return mono_lvl(v, i, 2, ch);
+      end case;
+   end function mono_tint;
+
 begin
 
    i_pc_system : pc_system_flat
@@ -268,7 +278,7 @@ begin
          font_thin   => font_thin_i,
          font_addr_hi => "00",              -- the shell loads an 8 KB IBM image (pc_font.vhd)
          font_cbm    => '0',
-         cbm_dip     => G_CBM_DIP,
+         cbm_dip     => cbm_dip_i,
          vid_mono    => vid_mono,
          vid_monomode => vid_mm,
          ucl_we      => ucl_we_i,
@@ -335,11 +345,11 @@ begin
    video_ce_ovl_o <= '1';
 
    -- colour: RGBI, colour 6 brown; mono (the PVC4's mono personality): (MONO, IT) as black,
-   -- dim (intensity without video), normal and bright in the G_MONO_TINT phosphor
-   video_red_o    <= mono_lvl(v_mono, v_rgbi(3), G_MONO_TINT, 0) when v_mm = '1' else chan(v_rgbi(2), v_rgbi(3));
-   video_green_o  <= mono_lvl(v_mono, v_rgbi(3), G_MONO_TINT, 1) when v_mm = '1' else
+   -- dim (intensity without video), normal and bright in the menu's phosphor
+   video_red_o    <= mono_tint(v_mono, v_rgbi(3), mono_tint_i, 0) when v_mm = '1' else chan(v_rgbi(2), v_rgbi(3));
+   video_green_o  <= mono_tint(v_mono, v_rgbi(3), mono_tint_i, 1) when v_mm = '1' else
                      x"55" when v_rgbi = "0110" else chan(v_rgbi(1), v_rgbi(3));
-   video_blue_o   <= mono_lvl(v_mono, v_rgbi(3), G_MONO_TINT, 2) when v_mm = '1' else chan(v_rgbi(0), v_rgbi(3));
+   video_blue_o   <= mono_tint(v_mono, v_rgbi(3), mono_tint_i, 2) when v_mm = '1' else chan(v_rgbi(0), v_rgbi(3));
    video_hs_o     <= v_hs;
    video_vs_o     <= v_vs;
    video_hblank_o <= v_hb;

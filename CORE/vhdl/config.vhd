@@ -215,24 +215,34 @@ constant OPTM_S_SAVING     : string := "<Saving>";
 --    26    ----
 --    27    720p 60 Hz 16:9       C_MENU_HDMI_720P (default)
 --    28    480p 59.94 Hz 4:3     C_MENU_HDMI_480P
---    29    ----
---    30    Back to main menu
---    31  CGA: thin font          C_MENU_CGA_THIN (jumper P3)
---    32  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
---    33  Analog: CSYNC           C_MENU_ANALOG_CSYNC
---    34  ----
---    35  Help
---    36  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
---    37  ----
---    38  Close Menu
+--    29    720p 50 Hz 16:9       C_MENU_HDMI_720P50 (the PVC4's mono personality is 49.8 Hz)
+--    30    ----
+--    31    Back to main menu
+--    32  Display: %s             submenu: the PVC4's CONFIG switch 2 + switches 3/4 (a change
+--                                between colour and mono restarts the PC, pc_chipset.vhd)
+--    33    Display               headline
+--    34    ----
+--    35    Colour                (default; 80 x 25 colour)
+--    36    Monochrome, green     C_MENU_DISP_GREEN (mono; the phosphor only in main.vhd)
+--    37    Monochrome, amber     C_MENU_DISP_AMBER
+--    38    Monochrome, white     C_MENU_DISP_WHITE
+--    39    ----
+--    40    Back to main menu
+--    41  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
+--    42  Analog: CSYNC           C_MENU_ANALOG_CSYNC
+--    43  ----
+--    44  Help
+--    45  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
+--    46  ----
+--    47  Close Menu
 --
 -- The settings file keeps one byte per line, so the layout is part of its format: the
 -- firmware's CFG_SIGCHECK accepts only a file whose text carries this menu's signature
 -- (m2m-rom.asm, CFG_SIG_VAL; change it with every layout change), any other file is reset to
 -- the defaults.
-constant OPTM_SIZE         : natural := 39;
+constant OPTM_SIZE         : natural := 48;
 constant OPTM_DX           : natural := 28;
-constant OPTM_DY           : natural := 19;   -- the visible main menu (lines 0-8, 15, 24, 31-38)
+constant OPTM_DY           : natural := 19;   -- the visible main menu (lines 0-8, 15, 24, 32, 41-47)
 
 constant OPTM_ITEMS        : string :=
    " PC10-III\n"              &
@@ -264,9 +274,18 @@ constant OPTM_ITEMS        : string :=
    "\n"                       &
    " 720p 60 Hz 16:9\n"       &
    " 480p 59.94 Hz 4:3\n"     &
+   " 720p 50 Hz 16:9\n"       &
    "\n"                       &
    " Back to main menu\n"     &
-   " CGA: thin font\n"        &
+   " Display: %s\n"           &
+   " Display\n"               &
+   "\n"                       &
+   " Colour\n"                &
+   " Monochrome, green\n"     &
+   " Monochrome, amber\n"     &
+   " Monochrome, white\n"     &
+   "\n"                       &
+   " Back to main menu\n"     &
    " Analog: 15 kHz RGB\n"    &
    " Analog: CSYNC\n"         &
    "\n"                       &
@@ -282,7 +301,7 @@ constant OPTM_G_WPA        : integer := 3;
 constant OPTM_G_WPB        : integer := 4;
 constant OPTM_G_MEM        : integer := 5;
 constant OPTM_G_HDMI       : integer := 6;
-constant OPTM_G_THIN       : integer := 7;
+constant OPTM_G_DISP       : integer := 7;
 constant OPTM_G_15KHZ      : integer := 8;
 constant OPTM_G_CSYNC      : integer := 9;
 constant OPTM_G_RESET      : integer := 10;
@@ -320,16 +339,25 @@ constant OPTM_GROUPS       : OPTM_GTYPE := ( OPTM_G_TEXT + OPTM_G_HEADLINE,     
                                              OPTM_G_LINE,                              -- 26
                                              OPTM_G_HDMI + OPTM_G_STDSEL,              -- 27 720p 60 Hz
                                              OPTM_G_HDMI,                              -- 28 480p 59.94 Hz
-                                             OPTM_G_LINE,                              -- 29
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 30 Back
-                                             OPTM_G_THIN + OPTM_G_SINGLESEL,           -- 31 CGA: thin font
-                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 32 Analog: 15 kHz
-                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 33 Analog: CSYNC
+                                             OPTM_G_HDMI,                              -- 29 720p 50 Hz
+                                             OPTM_G_LINE,                              -- 30
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 31 Back
+                                             OPTM_G_SUBMENU,                           -- 32 Display: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 33 Display
                                              OPTM_G_LINE,                              -- 34
-                                             OPTM_G_HELP,                              -- 35 Help
-                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 36 Reset the PC
-                                             OPTM_G_LINE,                              -- 37
-                                             OPTM_G_CLOSE                              -- 38 Close Menu
+                                             OPTM_G_DISP + OPTM_G_STDSEL,              -- 35 Colour
+                                             OPTM_G_DISP,                              -- 36 Monochrome, green
+                                             OPTM_G_DISP,                              -- 37 Monochrome, amber
+                                             OPTM_G_DISP,                              -- 38 Monochrome, white
+                                             OPTM_G_LINE,                              -- 39
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 40 Back
+                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 41 Analog: 15 kHz
+                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 42 Analog: CSYNC
+                                             OPTM_G_LINE,                              -- 43
+                                             OPTM_G_HELP,                              -- 44 Help
+                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 45 Reset the PC
+                                             OPTM_G_LINE,                              -- 46
+                                             OPTM_G_CLOSE                              -- 47 Close Menu
                                            );
 
 begin

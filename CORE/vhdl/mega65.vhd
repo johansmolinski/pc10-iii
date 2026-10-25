@@ -20,8 +20,9 @@
 --   MEGA65's internal drive follows the motors and head steps of A: and B:)
 -- * the OSM settings (config.vhd): floppy images and write protection, drive sound, chipset
 --   (PC10-III's FE2010A or IBM XT's 8255, with its switches; a change restarts the PC),
---   memory size, CGA thin font, HDMI mode (60 Hz only: the CGA is a 59.92 Hz source), analog
---   15 kHz / CSYNC, reset
+--   memory size, display (colour or mono in three phosphors: the PVC4's CONFIG switch 2 with
+--   switches 3/4; a change restarts the PC), HDMI mode (60 Hz for colour, 50 Hz for mono),
+--   analog 15 kHz / CSYNC, reset
 --
 -- The entity is the Megamiga fork's MEGA65_Core (M2M-UPSTREAM exceptions: floppy, SDRAM,
 -- PMOD, Ethernet pins and the SD engine port are routed into the core); everything the PC
@@ -348,12 +349,15 @@ constant C_MENU_MEM_640       : natural := 18;
 constant C_MENU_MEM_512       : natural := 19;
 constant C_MENU_MEM_256       : natural := 20;
 constant C_MENU_MEM_128       : natural := 21;
-constant C_MENU_CGA_THIN      : natural := 31;
+constant C_MENU_DISP_GREEN    : natural := 36;
+constant C_MENU_DISP_AMBER    : natural := 37;
+constant C_MENU_DISP_WHITE    : natural := 38;
 constant C_MENU_HDMI_720P     : natural := 27;
 constant C_MENU_HDMI_480P     : natural := 28;
-constant C_MENU_ANALOG_15KHZ  : natural := 32;
-constant C_MENU_ANALOG_CSYNC  : natural := 33;
-constant C_MENU_RESET         : natural := 36;
+constant C_MENU_HDMI_720P50   : natural := 29;
+constant C_MENU_ANALOG_15KHZ  : natural := 41;
+constant C_MENU_ANALOG_CSYNC  : natural := 42;
+constant C_MENU_RESET         : natural := 45;
 
 -- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
 -- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
@@ -386,6 +390,9 @@ signal main_mem_size          : std_logic_vector(1 downto 0);
 signal main_fe2010a           : std_logic;             -- the chipset: 1 = PC10-III (FE2010A)
 signal main_chip_rst          : std_logic;
 signal main_dip_sw1           : std_logic_vector(7 downto 0);
+signal main_cbm_dip           : std_logic_vector(1 downto 0);   -- CONFIG switches 2 and 1
+signal main_mono              : std_logic;             -- the menu's display: mono
+signal main_mono_tint         : std_logic_vector(1 downto 0);
 
 ---------------------------------------------------------------------------------------------
 -- PC memory ports
@@ -639,10 +646,20 @@ begin
       port map (
          clk_i                => main_clk,
          xt_i                 => main_osm_control_i(C_MENU_CHIP_XT),
+         mono_i               => main_mono,
          fe2010a_o            => main_fe2010a,
          dip_sw1_o            => main_dip_sw1,
+         cbm_dip_o            => main_cbm_dip,
          rst_o                => main_chip_rst
       ); -- i_pc_chipset
+
+   -- the menu's display: colour, or mono in one of three phosphors (the PVC4's mono
+   -- personality; main.vhd)
+   main_mono      <= main_osm_control_i(C_MENU_DISP_GREEN) or main_osm_control_i(C_MENU_DISP_AMBER) or
+                     main_osm_control_i(C_MENU_DISP_WHITE);
+   main_mono_tint <= "01" when main_osm_control_i(C_MENU_DISP_AMBER) = '1' else
+                     "10" when main_osm_control_i(C_MENU_DISP_WHITE) = '1' else
+                     "00";
 
    main_mem_size <= "01" when main_osm_control_i(C_MENU_MEM_512) = '1' else
                     "10" when main_osm_control_i(C_MENU_MEM_256) = '1' else
@@ -687,7 +704,9 @@ begin
          font_we_i            => main_font_we,
          font_addr_i          => main_font_addr,
          font_data_i          => main_font_data,
-         font_thin_i          => main_osm_control_i(C_MENU_CGA_THIN),
+         font_thin_i          => '0',          -- the IBM CGA's jumper P3; the PVC4 has none
+         cbm_dip_i            => main_cbm_dip,
+         mono_tint_i          => main_mono_tint,
          ucl_we_i             => main_ucl_we,
          ucl_addr_i           => main_ucl_addr,
          ucl_data_i           => main_ucl_data,
@@ -734,8 +753,11 @@ begin
    -- Audio and video settings (QNICE clock domain)
    ---------------------------------------------------------------------------------------------
 
-   -- The CGA is a 59.92 Hz source: only 60 Hz HDMI modes. Default 720p 60 Hz.
+   -- The PVC4's colour personality is a 59.92 Hz source, its mono personality 49.8 Hz: 720p
+   -- 60 Hz (default) or 480p 59.94 Hz for colour, 720p 50 Hz for mono (one source frame per
+   -- output frame, nearly; at 60 Hz every fifth frame repeats).
    qnice_video_mode_o <= C_VIDEO_HDMI_720_5994 when qnice_osm_control_i(C_MENU_HDMI_480P) = '1' else
+                         C_VIDEO_HDMI_16_9_50 when qnice_osm_control_i(C_MENU_HDMI_720P50) = '1' else
                          C_VIDEO_HDMI_16_9_60;
 
    qnice_dvi_o                <= '0';                                         -- HDMI with sound

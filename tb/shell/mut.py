@@ -51,16 +51,26 @@ MUT = [
 CS = os.path.join(R, 'CORE', 'vhdl', 'pc_chipset.vhd')
 CS_TB = os.path.join(H, 'tb_chipset.vhd')
 CS_MUT = [
-    ('cs_no_restart', "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe else '0';",
+    ('cs_no_restart', "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe or mono_i /= mono else '0';",
                       "   rst_o     <= '0';"),
-    ('cs_no_stretch', "            cnt <= (others => '1');", "            cnt <= (others => '0');"),
-    ('cs_late',       "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe else '0';",
+    ('cs_no_stretch', "            cnt  <= (others => '1');", "            cnt  <= (others => '0');"),
+    ('cs_late',       "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe or mono_i /= mono else '0';",
                       "   rst_o     <= '1' when cnt /= 0 else '0';"),
-    ('cs_sw_swapped', "   dip_sw1_o <= G_SW1_FE when fe = '1' else G_SW1_XT;",
-                      "   dip_sw1_o <= G_SW1_XT when fe = '1' else G_SW1_FE;"),
-    ('cs_sw_fixed',   "   dip_sw1_o <= G_SW1_FE when fe = '1' else G_SW1_XT;", "   dip_sw1_o <= G_SW1_FE;"),
+    ('cs_late_mono',  "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe or mono_i /= mono else '0';",
+                      "   rst_o     <= '1' when cnt /= 0 or (not xt_i) /= fe else '0';"),
+    ('cs_sw_swapped', "                G_SW1_FE when fe = '1' else G_SW1_XT;",
+                      "                G_SW1_XT when fe = '1' else G_SW1_FE;"),
+    ('cs_sw_fixed',   "                G_SW1_FE when fe = '1' else G_SW1_XT;", "                G_SW1_FE;"),
     ('cs_default_xt', "   signal fe   : std_logic := '1';", "   signal fe   : std_logic := '0';"),
     ('cs_count_once', "         elsif cnt /= 0 then", "         elsif cnt = 1 then"),
+    ('cs_mono_norst', "         if (not xt_i) /= fe or mono_i /= mono then", "         if (not xt_i) /= fe then"),
+    ('cs_mono_dip',   "   cbm_dip_o <= mono & '1';", "   cbm_dip_o <= '0' & '1';"),
+    ('cs_mono_set',   "   cbm_dip_o <= mono & '1';", "   cbm_dip_o <= mono & '0';"),
+    ('cs_mono_live',  "   cbm_dip_o <= mono & '1';", "   cbm_dip_o <= mono_i & '1';"),
+    ('cs_mono_sw_fe', "   dip_sw1_o <= (G_SW1_FE(7 downto 6) & \"11\" & G_SW1_FE(3 downto 0)) when fe = '1' and mono = '1' else",
+                      "   dip_sw1_o <= (G_SW1_FE(7 downto 6) & \"01\" & G_SW1_FE(3 downto 0)) when fe = '1' and mono = '1' else"),
+    ('cs_mono_sw_xt', "                (G_SW1_XT(7 downto 6) & \"11\" & G_SW1_XT(3 downto 0)) when mono = '1' else",
+                      "                (G_SW1_XT(7 downto 6) & \"10\" & G_SW1_XT(3 downto 0)) when mono = '1' else"),
 ]
 
 

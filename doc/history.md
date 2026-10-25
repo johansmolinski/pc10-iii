@@ -1601,3 +1601,23 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   RAMB36: 64 KB video RAM, 32 KB character ROM), the CPU access timing of a
   real PVC4 (doc/pvc4.md section 4), ALPHA132, the mono personality on the
   analog output (doc/pvc4.md 8.1), the user's Commodore character ROMs.
+
+## 2026-10-25 - The menu's Display (colour / mono, the phosphor) and 720p 50 Hz
+
+- **What:** the PVC4 merge (2896c09) left DIP switch 2 and the mono tint as
+  generics. The menu's "Display: %s" submenu (lines 32-40): Colour (default),
+  Monochrome green / amber / white. `pc_chipset.vhd` now also takes the
+  display: mono sets CONFIG switch 2 off (`cbm_dip` 11: the PVC4's straps,
+  230h bit 7) and switches 3/4 off (DIP SW1 bits 5-4 = 11, 7Dh on both
+  chipsets); a change between colour and mono restarts the PC like a chipset
+  change (the straps are taken in reset). The phosphor is `main.vhd`'s
+  `mono_tint_i` (constant tables per tint, no multiplier) and changes live.
+  The HDMI submenu gained 720p 50 Hz (`C_VIDEO_HDMI_16_9_50`) for the mono
+  personality's 49.8 Hz. "CGA: thin font" is gone (the PVC4 has no jumper
+  P3; `font_thin` tied 0). Menu 48 lines, `MENU_HEAP_SIZE` demand 990 of
+  1024, settings signature `menu=4`.
+- **Tests:** tb/shell PASS (tb_chipset: mono on both chipsets, the switches
+  change with the register, one restart per change); mut.py: pc_chipset 14 of
+  14 (5 new mono mutants), pc_drvsnd 27 of 27, signature 5 of 5 killed. ghdl
+  analysis of config/main/mega65.vhd clean.
+- Not verified: Vivado, hardware.
