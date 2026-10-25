@@ -46,7 +46,7 @@ module xta_card #(
     parameter int         US_NUM    = 11,
     parameter int         US_DEN    = 315,
     parameter int         REV_CLK   = 516124,   // 60 / 3329 s at 28.63636 MHz
-    parameter int         BYTE_CLK  = 31,       // min. clk from a data byte's strobe end to the next REQ/DRQ (>= 2) [A]
+    parameter int         BYTE_CLK  = 31,       // min. clk from a data byte's strobe start to the next REQ/DRQ: 0.938 MB/s (WD)
     parameter int         CCB_US    = 12,       // REQ low after each CCB byte [A]
     parameter int         CMD_US    = 300,      // the command's overhead after the CCB [A]
     parameter int         FREE_US   = 2,        // completion byte read -> BSY low [A]
@@ -94,7 +94,7 @@ module xta_card #(
 localparam int LCYL = 615, LHEAD = 4, LSPT = 17;
 localparam int LMAX = LCYL * LHEAD * LSPT;     // 41,820 logical sectors
 localparam int PSPT = 27, PTRK = 782 * 2;      // physical sectors per track, tracks
-localparam int GAP0 = BYTE_CLK < 2 ? 2 : BYTE_CLK;
+localparam int BYTE_C = BYTE_CLK > 63 ? 63 : BYTE_CLK;
 
 // sense codes (doc/xta.md section 5.4)
 localparam logic [5:0] E_NOTRDY = 6'h04, E_DATA = 6'h11, E_ILLCMD = 6'h20, E_ILLADDR = 6'h21,
@@ -165,7 +165,9 @@ wire drive_ready = present && spun;
 // ------------------------------------------------------------ bus strobes
 logic       ior_d, iow_d;
 logic [7:0] wdat_q;
-wire        dack     = enable && !isa_dack_n[DMA];
+// a DMA cycle: DACK3 with AEN. DACK can outlast AEN by a few clk, into the
+// start of the CPU's next I/O cycle, which is not the DMA's.
+wire        dack     = enable && !isa_dack_n[DMA] && isa_aen;
 wire        sel_io   = enable && !isa_aen && isa_addr[9:2] == IO_BASE[9:2];
 wire [1:0]  rsel     = isa_addr[1:0];
 wire        ior_fall = !isa_ior_n && ior_d;
@@ -455,7 +457,7 @@ logic        h_act, h_in, h_dma, h_strobe, g_run;
 hsrc_t       h_src;
 logic [9:0]  h_len, h_cnt;
 logic [1:0]  h_slot;
-logic [5:0]  gap;
+logic [5:0]  gap, rate;               // rate: clk until the next byte may be offered
 logic [7:0]  din_q;
 // CPU / DMA cycles in progress (decoded at the strobe's start)
 logic        r_cyc, r_take, w_cyc, w_take, d_rd, d_take;
@@ -567,7 +569,7 @@ always_ff @(posedge clk) begin
         tmr   <= 22'(RESET_US);
         st    <= S_IDLE;
         req   <= 1'b0;  irq_l <= 1'b0;  mask <= 2'b00;
-        h_act <= 1'b0;  g_run <= 1'b0;  h_strobe <= 1'b0;
+        h_act <= 1'b0;  g_run <= 1'b0;  h_strobe <= 1'b0;  rate <= 6'd0;
         r_cyc <= 1'b0;  w_cyc <= 1'b0;  d_rd <= 1'b0;  r_take <= 1'b0;  w_take <= 1'b0;  d_take <= 1'b0;
         rd_en <= 1'b0;  w_lim <= 16'd0;  buf_slot <= 2'd0;  ring0 <= 2'd0;
         sn_code <= 6'd0;  sn_av <= 1'b0;  sn_drv <= 1'b0;  sn_c <= 10'd0;  sn_h <= 5'd0;  sn_s <= 6'd0;
@@ -576,6 +578,7 @@ always_ff @(posedge clk) begin
     end else begin
         // ---------------------------------------------- timers
         if (us_tick && tmr != 22'd0) tmr <= tmr - 22'd1;
+        if (rate != 6'd0) rate <= rate - 6'd1;
 
         // ---------------------------------------------- CPU and DMA strobes
         if (ior_fall) begin
@@ -589,13 +592,13 @@ always_ff @(posedge clk) begin
                 d_rd    <= 1'b1;
                 isa_din <= din_q;
                 if (req && h_act && h_dma && h_in && phase == P_DIN) begin
-                    d_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;
+                    d_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;  rate <= 6'(BYTE_C);
                 end
             end else if (sel_io) case (rsel)
                 2'd0: begin
                     isa_din <= din_q;
                     if (req && ((phase == P_DIN && h_act) || phase == P_STAT)) begin
-                        r_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;
+                        r_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;  rate <= 6'(BYTE_C);
                     end
                 end
                 2'd1: isa_din <= status;
@@ -609,7 +612,7 @@ always_ff @(posedge clk) begin
             w_take <= 1'b0;
             if (((dack && h_act && h_dma) || (sel_io && rsel == 2'd0)) && req &&
                 ((phase == P_DOUT && h_act && !h_in) || (phase == P_CMD && !dack))) begin
-                w_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;
+                w_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;  rate <= 6'(BYTE_C);
             end
         end
 
@@ -643,7 +646,7 @@ always_ff @(posedge clk) begin
                     h_act <= 1'b0;
                 else begin
                     g_run <= 1'b1;
-                    gap   <= 6'(GAP0);
+                    gap   <= rate > 6'd2 ? rate : 6'd2;   // >= 2: the RAM's read
                     if (h_in) a_addr <= {h_slot, h_cnt[8:0] + 9'd1};
                 end
             end

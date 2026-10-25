@@ -28,6 +28,7 @@ MUTANTS = [
     ('CCB REQ at once', X, "tmr   <= 22'(CCB_US);", "tmr   <= 22'd0;"),
     ('data in without I/O', X, "P_DIN:           st_io  = 1'b1;", "P_DIN:           ;"),
     ('IRQ not masked', X, "wire irq_o  = enable && irq_l && mask[1];", "wire irq_o  = enable && irq_l;"),
+    ('DMA cycle without AEN', X, "!isa_dack_n[DMA] && isa_aen;", "!isa_dack_n[DMA];"),
     ('DRQ not masked', X, "req && mask[0] && (phase", "req && (phase"),
     ('DRQ over the strobe', X, "d_take <= 1'b1;  req <= 1'b0;", "d_take <= 1'b1;"),
     ('completion keeps IRQ', X, "irq_l <= 1'b0;\n                phase <= P_FREE;", "phase <= P_FREE;"),

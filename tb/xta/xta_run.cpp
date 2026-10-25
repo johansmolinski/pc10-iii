@@ -193,7 +193,8 @@ struct Sim {
         size_t pos = 0, count = 0;
         int st = 0;
         uint64_t when = 0;
-        std::vector<uint64_t> first, last;  // per byte: DRQ rise, strobe end
+        std::vector<uint64_t> first, start, last;  // per byte: DRQ rise, strobe start and end
+        bool fast = false;              // a DMA faster than the drive (~0.5 us per byte)
         bool drq_d = false;
         int double_req = 0;
     } dma;
@@ -288,7 +289,7 @@ struct Sim {
     void dma_start(bool to_mem, const std::vector<uint8_t> &src, size_t count) {
         dma.on = true; dma.to_mem = to_mem; dma.pos = 0; dma.count = count; dma.st = 0;
         dma.buf = src; dma.buf.resize(count);
-        dma.first.assign(count + 1, 0); dma.last.assign(count + 1, 0);
+        dma.first.assign(count + 1, 0); dma.start.assign(count + 1, 0); dma.last.assign(count + 1, 0);
         dma.drq_d = drq();
         if (drq()) dma.first[0] = cyc;
     }
@@ -296,20 +297,21 @@ struct Sim {
         auto &d = dma;
         switch (d.st) {
         case 0:
-            if (d.on && d.pos < d.count && drq() && !cpu_cycle) { d.st = 1; d.when = cyc + 3 * C; }
+            if (d.on && d.pos < d.count && drq() && !cpu_cycle) { d.st = 1; d.when = cyc + (d.fast ? 1 : 3 * C); }
             break;
         case 1:     // HLDA: AEN, DACK3, the address
             if (cyc >= d.when) {
                 CHECK(drq(), "DMA: DRQ3 dropped before DACK3 (byte %zu)", d.pos);
                 t->isa_aen = 1; t->isa_dack_n = 0x7; t->isa_addr = 0x20000 + d.pos;
-                d.st = 2; d.when = cyc + C;
+                d.st = 2; d.when = cyc + (d.fast ? 2 : C);
             }
             break;
         case 2:     // the strobes
             if (cyc >= d.when) {
                 if (d.to_mem) t->isa_ior_n = 0;
                 else { t->isa_iow_n = 0; t->isa_dout = d.buf[d.pos]; }
-                d.st = 3; d.when = cyc + 2 * C;
+                d.start[d.pos] = cyc;
+                d.st = 3; d.when = cyc + (d.fast ? 6 : 2 * C);
             }
             break;
         case 3:
@@ -319,21 +321,29 @@ struct Sim {
                 else t->isa_iow_n = 1;
                 d.last[d.pos] = cyc;
                 d.pos++;
-                d.st = 4; d.when = cyc + C;
+                d.st = 4; d.when = cyc + (d.fast ? 2 : C);
             }
             break;
-        case 4:
+        case 4:     // AEN falls; DACK3 stays low into the CPU's next cycle (the
+                    // board's DACK can outlast AEN; exaggerated here)
             if (cyc >= d.when) {
-                t->isa_aen = 0; t->isa_dack_n = 0xF;
-                d.st = 5; d.when = cyc + 4 * C;    // the CPU's bus cycle in between
+                t->isa_aen = 0;
+                d.st = 5; d.when = cyc + (d.fast ? 2 : 2 * C);
             }
             break;
         case 5:
+            if (cyc >= d.when) {
+                t->isa_dack_n = 0xF;
+                d.st = 6; d.when = cyc + (d.fast ? 1 : 2 * C);    // the CPU's bus cycle in between
+            }
+            break;
+        case 6:
             if (cyc >= d.when) d.st = 0;
             break;
         }
     }
-    void dma_idle() { while (dma.st != 0) tick(); }
+    // the CPU may start a cycle once AEN is low
+    void dma_idle() { while (dma.st != 0 && dma.st < 5) tick(); }
 
     // ---------------------------------------------------- CPU I/O cycles
     void io_write(int port, int val, int gap = 2 * C) {
@@ -525,21 +535,23 @@ static std::vector<uint8_t> pattern(size_t n, int salt) {
 //           passed after max(seek done, the host sent sector i)
 // The seek to sector i's cylinder starts at the end of sector i-1's slot, for
 // sector 0 at the end of the command overhead.
+// within a transfer, DRQ comes back no earlier than BYTE_CLK after the start
+// of the previous byte's strobe (the drive's 0.938 MB/s), and only after its end
+static bool check_rate(Sim &s, size_t n, const char *what) {
+    for (size_t k = 1; k < n; k++)
+        if (s.dma.first[k] && (s.dma.first[k] < s.dma.start[k - 1] + BYTE_CLK || s.dma.first[k] <= s.dma.last[k - 1])) {
+            CHECK(false, "%s: byte %zu: DRQ %.2f us after the previous strobe's start", what, k,
+                  clk2us(s.dma.first[k] - s.dma.start[k - 1]));
+            return true;
+        }
+    return false;
+}
 struct Tm { int cyl_before; int ilv; };
 static int check_timing(Sim &s, const Sim::Out &o, int l0, int n, bool wr, int len, const Tm &tm, const char *what) {
     std::vector<int> lay = layout(tm.ilv);
     const uint64_t tol = us2clk(3);
     uint64_t start = o.t_ccb + us2clk(CMD_US);
-    // within a sector, DRQ comes back BYTE_CLK after a byte's strobe
-    for (int i = 0; i < n; i++)
-        for (int b = 1; b < len; b++) {
-            size_t k = (size_t)i * len + b;
-            if (s.dma.first[k] < s.dma.last[k - 1] + BYTE_CLK) {
-                CHECK(false, "%s: byte %zu: DRQ %.2f us after the previous strobe", what, k,
-                      clk2us(s.dma.first[k] - s.dma.last[k - 1]));
-                return -1;
-            }
-        }
+    if (check_rate(s, (size_t)n * len, what)) return -1;
     int cur = tm.cyl_before;
     uint64_t seek_from = start;
     for (int i = 0; i < n; i++) {
@@ -830,6 +842,21 @@ static void t_buffer(Sim &s) {
     run(s, c, 2, d, "write sector buffer (DMA)");
     mk_ccb(c, 0x0E, 0, 0, 0, 0, 0);
     run(s, c, 2, {}, "read sector buffer (DMA)");
+    // a DMA faster than the drive: the drive's byte rate decides
+    s.dma.fast = true;
+    d = pattern(512, 78);
+    mk_ccb(c, 0x0F, 0, 0, 0, 0, 0);
+    Sim::Out o = run(s, c, 2, d, "write sector buffer (fast DMA)");
+    check_rate(s, 512, "write sector buffer (fast DMA)");
+    double us = clk2us(s.dma.last[511] - s.dma.start[0]);
+    CHECK(us > 511 * BYTE_CLK / 28.636 && us < 511 * (BYTE_CLK + 10) / 28.636, "fast DMA: 512 bytes in %.1f us", us);
+    mk_ccb(c, 0x0E, 0, 0, 0, 0, 0);
+    o = run(s, c, 2, {}, "read sector buffer (fast DMA)");
+    check_rate(s, 512, "read sector buffer (fast DMA)");
+    rd(s, 3000, 5, 2, "read 5 with a fast DMA");
+    wr(s, 3100, 5, 2, 21, "write 5 with a fast DMA");
+    s.dma.fast = false;
+    (void)o;
     d = pattern(512, 99);
     mk_ccb(c, 0x0F, 0, 0, 0, 0, 0);
     run(s, c, 0, d, "write sector buffer (PIO)");
