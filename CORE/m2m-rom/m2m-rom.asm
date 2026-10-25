@@ -328,7 +328,7 @@ _PCPS_OK        MOVE    R1, R2                  ; right-align the image (pc_bios
                 RBRA    _PCPS_AL, !Z            ; 64 KB: already in place
                 MOVE    @R1, R8                 ; R8: size (PC_BIOS_SIZELO = 0)
                 RSUB    BIOS_ALIGN, 1
-_PCPS_AL        RSUB    FONT_START, 1           ; the CGA font (optional)
+_PCPS_AL        RSUB    FONT_START, 1           ; the character ROM (optional)
                 CMP     0, R8
                 RBRA    _PCPS_RET, !Z
                 RSUB    UCODE_START, 1          ; the 8088's microcode
@@ -401,9 +401,9 @@ _BA_ADDR        MOVE    R8, R5
                 ADD     M2M$RAMROM_DATA, R8
                 RET
 
-; FONT_START: if /pc10/cga.rom was loaded (pc_font.vhd's size is not 0), check
-; it (2 KB or 8 KB) and have it copied into the CGA card; without it the free
-; default font stays.
+; FONT_START: if /pc10/char.rom was loaded (pc_font.vhd's size is not 0),
+; check it (2 KB or 8 KB: IBM; 16 KB or 32 KB: Commodore 318086-xx) and have it
+; copied into the video; without it the free default font stays.
 ; Output: R8/R9: 0 = OK, else the fatal message / code (own register bank)
 FONT_START      INCRB
                 MOVE    M2M$RAMROM_DEV, R0
@@ -414,7 +414,7 @@ FONT_START      INCRB
                 MOVE    @R1, R2                 ; R2: size
                 CMP     0, R2
                 RBRA    _FTST_OK, Z             ; not loaded: the default
-                MOVE    R1, R3                  ; larger than 8 KB?
+                MOVE    R1, R3                  ; larger than 32 KB?
                 ADD     1, R3
                 MOVE    @R3, R3
                 AND     1, R3
@@ -422,6 +422,10 @@ FONT_START      INCRB
                 CMP     0x0800, R2
                 RBRA    _FTST_GO, Z
                 CMP     0x2000, R2
+                RBRA    _FTST_GO, Z
+                CMP     0x4000, R2
+                RBRA    _FTST_GO, Z
+                CMP     0x8000, R2
                 RBRA    _FTST_BAD, !Z
 _FTST_GO        MOVE    R1, R3                  ; copy it into the card
                 ADD     2, R3
@@ -434,7 +438,7 @@ _FTST_BAD       MOVE    ERR_FONT, R8
 _FTST_RET       DECRB
                 RET
 
-ERR_FONT        .ASCII_W "/pc10/cga.rom must be 2 KB or 8 KB"
+ERR_FONT        .ASCII_W "/pc10/char.rom must be 2, 8, 16 or 32 KB"
 
 ; UCODE_START: check the 8088 microcode bundle that the Shell loaded into
 ; pc_ucode.vhd (/pc10/ucode.bin, made by tools/mkucode.py, format in its
@@ -602,7 +606,7 @@ CFG_SIGSET      SYSCALL(enter, 1)
 ; "Drive sound" at line 6. "3": 39 lines, the "Chipset" submenu at lines 8-14.
 ; At most 3 characters (CFG_SIGCHECK's buffer).
 CFG_SIG_KEY     .ASCII_W "menu"
-CFG_SIG_VAL     .ASCII_W "4"
+CFG_SIG_VAL     .ASCII_W "5"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings
@@ -633,7 +637,7 @@ END_OF_ROM      .DW 0
 #include "../../M2M/rom/shell_vars.asm"
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
-; for this 48-line menu the demand is 990 words, the Shell checks it at boot
+; for this 49-line menu the demand is 1017 words, the Shell checks it at boot
 ; (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
 MENU_HEAP_SIZE  .EQU 1024
 

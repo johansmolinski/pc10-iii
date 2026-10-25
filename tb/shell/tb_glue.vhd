@@ -4,7 +4,8 @@
 --                 while the gate is closed
 --   pc_ram.vhd:   2-clock read latency with ack, the size limit (0xFF above it)
 --   pc_font.vhd:  the default font copied into the font port after the reset, a 2 KB font
---                 loaded by QNICE and copied to 0x1800 and 0x1000
+--                 loaded by QNICE and copied to 0x1800 and 0x1000; a 16 KB Commodore ROM
+--                 copied into both 16 KB halves, a 32 KB one 1:1 (font_cbm), the overflow bit
 --   pc_ucode.vhd: a 6 KB bundle loaded by QNICE, read back, copied byte for byte into the
 --                 CPU's load port on GO; valid only after the copy, cleared by forget
 library ieee;
@@ -52,9 +53,10 @@ architecture sim of tb_glue is
    signal fqdout    : std_logic_vector(15 downto 0);
    signal fqce, fqwe : std_logic := '0';
    signal font_we   : std_logic;
-   signal font_addr : std_logic_vector(12 downto 0);
+   signal font_addr : std_logic_vector(14 downto 0);
+   signal font_cbm  : std_logic;
    signal font_data : std_logic_vector(7 downto 0);
-   type t_font is array (0 to 8191) of std_logic_vector(7 downto 0);
+   type t_font is array (0 to 32767) of std_logic_vector(7 downto 0);
    signal font      : t_font := (others => x"EE");
    signal font_wr   : natural := 0;
 
@@ -121,7 +123,8 @@ begin
       port map (qnice_clk_i => qclk, qnice_rst_i => '0', qnice_addr_i => fqaddr, qnice_data_i => fqdin,
                 qnice_data_o => fqdout, qnice_ce_i => fqce, qnice_we_i => fqwe,
                 main_clk_i => clk, main_rst_i => mrst,
-                font_we_o => font_we, font_addr_o => font_addr, font_data_o => font_data);
+                font_we_o => font_we, font_addr_o => font_addr, font_data_o => font_data,
+                font_cbm_o => font_cbm);
 
    i_ucode : entity work.pc_ucode
       port map (qnice_clk_i => qclk, qnice_rst_i => '0', qnice_addr_i => uqaddr, qnice_data_i => uqdin,
@@ -156,6 +159,39 @@ begin
    end process;
 
    p_test : process
+      -- a Commodore test image: byte i
+      impure function cimg(i : natural) return std_logic_vector is
+      begin
+         return std_logic_vector(to_unsigned((i * 13 + i / 4096 + 5) mod 256, 8));
+      end function;
+      -- write image bytes lo..hi through the font device's windows
+      procedure fload(lo, hi : natural) is
+      begin
+         for i in lo to hi loop
+            wait until rising_edge(qclk);
+            fqaddr <= std_logic_vector(to_unsigned(i / 4096, 16)) & std_logic_vector(to_unsigned(i mod 4096, 12));
+            fqdin  <= x"00" & cimg(i);
+            fqce <= '1'; fqwe <= '1';
+            wait until rising_edge(qclk);
+            fqce <= '0'; fqwe <= '0';
+         end loop;
+      end procedure;
+      procedure fgo is
+      begin
+         wait until rising_edge(qclk);
+         fqaddr <= x"0100" & x"002"; fqce <= '1'; fqwe <= '1';
+         wait until rising_edge(qclk);
+         fqce <= '0'; fqwe <= '0';
+      end procedure;
+      procedure freg(ofs : natural; v : std_logic_vector(15 downto 0); what : string) is
+      begin
+         wait until rising_edge(qclk);
+         fqaddr <= x"0100" & std_logic_vector(to_unsigned(ofs, 12)); fqce <= '1';
+         wait until rising_edge(qclk);
+         assert fqdout = v report what & " " & to_hstring(fqdout) severity failure;
+         fqce <= '0';
+      end procedure;
+      variable n0 : natural;
       procedure qwrite(win : natural; ofs : natural; d : natural) is
       begin
          wait until rising_edge(qclk);
@@ -257,6 +293,7 @@ begin
       assert font(16#1800# + 16#41# * 8 + 1) = x"78" and font(16#1000# + 16#41# * 8 + 1) = x"40" and
              font(16#1800# + 16#C1# * 8 + 1) = x"00" and font(0) = x"00"
          report "default font content" severity failure;
+      assert font_cbm = '0' report "default font: font_cbm" severity failure;
       -- a 2 KB font from QNICE, then GO
       for i in 0 to 2047 loop
          wait until rising_edge(qclk);
@@ -280,6 +317,38 @@ begin
                 font(16#1000# + i) = (std_logic_vector(to_unsigned(i mod 256, 8)) xor x"3C")
             report "2 KB font byte " & integer'image(i) severity failure;
       end loop;
+      assert font_cbm = '0' report "2 KB font: font_cbm" severity failure;
+
+      -- a 16 KB Commodore ROM (one national set): both halves, font_cbm
+      fload(0, 16383);
+      freg(0, x"4000", "16 KB size");
+      n0 := font_wr;
+      fgo;
+      wait for 1500 us;
+      assert font_wr - n0 = 32768 report "16 KB ROM: " & integer'image(font_wr - n0) & " writes" severity failure;
+      assert font_cbm = '1' report "16 KB ROM: font_cbm" severity failure;
+      for i in 0 to 32767 loop
+         assert font(i) = cimg(i mod 16384) report "16 KB ROM byte " & integer'image(i) severity failure;
+      end loop;
+      -- grown to 32 KB: 1:1
+      fload(16384, 32767);
+      freg(0, x"8000", "32 KB size");
+      freg(1, x"0000", "32 KB overflow");
+      n0 := font_wr;
+      fgo;
+      wait for 1500 us;
+      assert font_wr - n0 = 32768 report "32 KB ROM: " & integer'image(font_wr - n0) & " writes" severity failure;
+      assert font_cbm = '1' report "32 KB ROM: font_cbm" severity failure;
+      for i in 0 to 32767 loop
+         assert font(i) = cimg(i) report "32 KB ROM byte " & integer'image(i) severity failure;
+      end loop;
+      -- one byte beyond: the overflow bit
+      wait until rising_edge(qclk);
+      fqaddr <= x"0008" & x"000"; fqdin <= x"0055"; fqce <= '1'; fqwe <= '1';
+      wait until rising_edge(qclk);
+      fqce <= '0'; fqwe <= '0';
+      freg(1, x"0001", "overflow after 32 KB");
+      freg(0, x"8000", "size after the overflow");
 
       -- microcode bundle: 6144 bytes (byte i = i * 7 mod 256), read back, GO
       for i in 0 to 6143 loop
@@ -316,7 +385,7 @@ begin
       wait for 7 us;
       assert uvalid = '0' report "bundle still valid after forget" severity failure;
 
-      report "PASS: keyboard, BIOS alignment, RAM latency and size, CGA font, microcode bundle";
+      report "PASS: keyboard, BIOS alignment, RAM latency and size, character ROM (IBM 2 KB, Commodore 16 and 32 KB), microcode bundle";
       done <= true;
       wait;
    end process;

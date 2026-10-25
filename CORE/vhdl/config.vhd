@@ -76,7 +76,7 @@ constant SCR_WELCOME : string :=
 constant HELP_1 : string :=
    "\n PC10-III for MEGA65 " & CORE_VERSION & "\n\n" &
    " /pc10/bios.rom  BIOS, 8-64 KB\n" &
-   " /pc10/cga.rom   CGA font (optional)\n" &
+   " /pc10/char.rom  character ROM (optional)\n" &
    " A: B:  160K-720K disk images\n\n" &
    " Keys (XT keyboard):\n" &
    " " & CHR_LINE_10 & CHR_LINE_10 & CHR_LINE_10 & "\n" &
@@ -228,21 +228,23 @@ constant OPTM_S_SAVING     : string := "<Saving>";
 --    38    Monochrome, white     C_MENU_DISP_WHITE
 --    39    ----
 --    40    Back to main menu
---    41  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
---    42  Analog: CSYNC           C_MENU_ANALOG_CSYNC
---    43  ----
---    44  Help
---    45  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
---    46  ----
---    47  Close Menu
+--    41  Scandinavian charset    C_MENU_CHARSET_SCAN (CONFIG switch 1 on: the Commodore character
+--                                ROM's A14 = 0, live as on the board; default off = USA/Europe)
+--    42  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
+--    43  Analog: CSYNC           C_MENU_ANALOG_CSYNC
+--    44  ----
+--    45  Help
+--    46  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
+--    47  ----
+--    48  Close Menu
 --
 -- The settings file keeps one byte per line, so the layout is part of its format: the
 -- firmware's CFG_SIGCHECK accepts only a file whose text carries this menu's signature
 -- (m2m-rom.asm, CFG_SIG_VAL; change it with every layout change), any other file is reset to
 -- the defaults.
-constant OPTM_SIZE         : natural := 48;
+constant OPTM_SIZE         : natural := 49;
 constant OPTM_DX           : natural := 28;
-constant OPTM_DY           : natural := 19;   -- the visible main menu (lines 0-8, 15, 24, 32, 41-47)
+constant OPTM_DY           : natural := 20;   -- the visible main menu (lines 0-8, 15, 24, 32, 41-48)
 
 constant OPTM_ITEMS        : string :=
    " PC10-III\n"              &
@@ -286,6 +288,7 @@ constant OPTM_ITEMS        : string :=
    " Monochrome, white\n"     &
    "\n"                       &
    " Back to main menu\n"     &
+   " Scandinavian charset\n"  &
    " Analog: 15 kHz RGB\n"    &
    " Analog: CSYNC\n"         &
    "\n"                       &
@@ -307,6 +310,7 @@ constant OPTM_G_CSYNC      : integer := 9;
 constant OPTM_G_RESET      : integer := 10;
 constant OPTM_G_DRVSND     : integer := 11;
 constant OPTM_G_CHIP       : integer := 12;
+constant OPTM_G_CHARSET    : integer := 13;
 
 type OPTM_GTYPE is array (0 to OPTM_SIZE - 1) of integer range 0 to 2**OPTM_GTC- 1;
 
@@ -351,13 +355,14 @@ constant OPTM_GROUPS       : OPTM_GTYPE := ( OPTM_G_TEXT + OPTM_G_HEADLINE,     
                                              OPTM_G_DISP,                              -- 38 Monochrome, white
                                              OPTM_G_LINE,                              -- 39
                                              OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 40 Back
-                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 41 Analog: 15 kHz
-                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 42 Analog: CSYNC
-                                             OPTM_G_LINE,                              -- 43
-                                             OPTM_G_HELP,                              -- 44 Help
-                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 45 Reset the PC
-                                             OPTM_G_LINE,                              -- 46
-                                             OPTM_G_CLOSE                              -- 47 Close Menu
+                                             OPTM_G_CHARSET + OPTM_G_SINGLESEL,        -- 41 Scandinavian charset
+                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 42 Analog: 15 kHz
+                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 43 Analog: CSYNC
+                                             OPTM_G_LINE,                              -- 44
+                                             OPTM_G_HELP,                              -- 45 Help
+                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 46 Reset the PC
+                                             OPTM_G_LINE,                              -- 47
+                                             OPTM_G_CLOSE                              -- 48 Close Menu
                                            );
 
 begin

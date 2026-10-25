@@ -1625,3 +1625,27 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   of 365 tiles, was 234): the Commodore BIOS 4.41 in colour without snow, and
   in mono (Display: Monochrome, green) over HDMI, confirmed by the user
   2026-10-25.
+
+## 2026-10-25 - The Commodore character ROM and the character set (CONFIG switch 1)
+
+- **What:** the user pointed to zimmers.net's PC10 firmware; the character
+  ROMs 318086-01 (16 KB), -02, -03 (32 KB), an unnumbered 32 KB one and the
+  PC10-SD's (kept in `~/pcxt-work/roms/zimmers/pc10/`, never in the repo)
+  confirm doc/pvc4.md section 5's wiring: A12 = character bit 7, A10-A4 =
+  bits 6-0, A3-A0 = row; the 9x14 mono font where A13 = A11, the 8x8 colour
+  font where they differ (CA13 swaps them); A14 = 1 the USA/Europe set
+  (slashed zero, cent, yen, Pts), A14 = 0 the Scandinavian set (manual 2-3:
+  switch 1 on; ae, AE, o-slash, O-slash and four more glyphs differ).
+- `pc_font.vhd`: a 32 KB image (8 RAMB36, was 2): 2 KB and 8 KB files are
+  IBM images as before, 16 KB and 32 KB ones Commodore ROMs (`font_cbm_o`,
+  32 KB copied 1:1, 16 KB into both halves); the copy's mode is taken when
+  it starts. The auto-load file is now `/pc10/char.rom` (was `cga.rom`: the
+  machine has no CGA); `FONT_START` accepts 2/8/16/32 KB. `main.vhd` passes
+  the 15-bit font address and `font_cbm` to `pc_system`.
+- Menu line 41 "Scandinavian charset" (CONFIG switch 1 on): `cbm_dip[0]`,
+  live (on the board A14 is wired to the switch). 49 lines, menu heap demand
+  1017 of 1024, settings signature `menu=5`.
+- **Tests:** tb/shell PASS; tb_glue loads a 16 KB image (32768 font writes,
+  each byte = image byte mod 16384, `font_cbm` = 1), grows it to 32 KB (1:1)
+  and checks the overflow bit; it caught the copy's GO bit left at the old
+  CDC index (main_ctl(14) after the word grew to 17 bits).

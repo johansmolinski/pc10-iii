@@ -452,11 +452,13 @@ with an expansion CGA.
   `pc_chipset.vhd`: colour = "01", 5Dh/6Dh; mono = "11", 7Dh; a change
   restarts the PC). In the mono personality the dot becomes black,
   dim (intensity alone), normal or bright in that tint; colour RGBI as
-  before. The font loader stays the 8 KB IBM layout (`font_cbm` = 0).
+  before. `font_cbm` comes from `pc_font.vhd` (a 16 or 32 KB
+  `/pc10/char.rom`).
 - **The menu** (2026-10-25): "Display" = DIP switch 2 with switches 3/4 and
-  the mono tint, done (doc/m2m-shell.md section 8). Still open: DIP switch 1
-  (character set) and a 32 KB Commodore character ROM file (pc_font.vhd:
-  15-bit address, `font_cbm`); switch 1 matters only with that ROM.
+  the mono tint; "Scandinavian charset" = DIP switch 1 (doc/m2m-shell.md
+  section 8). The Commodore ROMs on zimmers.net confirm section 5's wiring:
+  318086-02/-03 hold USA/Europe at A14 = 1, Scandinavian at A14 = 0, and
+  the 9x14 mono font where A13 = A11 (8x8 colour where they differ).
 
 ### 8.1 The video path through M2M
 

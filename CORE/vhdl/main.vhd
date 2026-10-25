@@ -3,7 +3,7 @@
 --
 -- Wrapper for the PC: pc_system (rtl/system/pc_system.sv, through CORE/sv/pc_system_flat.sv;
 -- the shell-only stand-in CORE/stub/pc_system.sv has the same ports) plus what it needs from
--- the MEGA65: keyboard, video into M2M, audio. RAM, BIOS ROM, CGA font loader and the floppy
+-- the MEGA65: keyboard, video into M2M, audio. RAM, BIOS ROM, character ROM loader and the floppy
 -- backend are owned by mega65.vhd.
 --
 -- Video: pc_system gives RGBI on the 14.31818 MHz enable (vid_ce = ce_14m, every second clock).
@@ -71,11 +71,12 @@ entity main is
       rom_addr_o              : out std_logic_vector(15 downto 0);
       rom_rdata_i             : in  std_logic_vector(7 downto 0);
 
-      -- CGA character ROM load port (pc_font.vhd)
+      -- character ROM load port (pc_font.vhd)
       font_we_i               : in  std_logic;
-      font_addr_i             : in  std_logic_vector(12 downto 0);
+      font_addr_i             : in  std_logic_vector(14 downto 0);
       font_data_i             : in  std_logic_vector(7 downto 0);
       font_thin_i             : in  std_logic;
+      font_cbm_i              : in  std_logic;     -- the image is a Commodore character ROM
 
       -- The 8088's microcode bundle (pc_ucode.vhd): the file, one byte per clock, in reset
       ucl_we_i                : in  std_logic;
@@ -273,11 +274,11 @@ begin
          kbd_busy    => kbd_busy,
          speaker     => speaker,
          font_we     => font_we_i,
-         font_addr   => font_addr_i,
+         font_addr   => font_addr_i(12 downto 0),
          font_data   => font_data_i,
          font_thin   => font_thin_i,
-         font_addr_hi => "00",              -- the shell loads an 8 KB IBM image (pc_font.vhd)
-         font_cbm    => '0',
+         font_addr_hi => font_addr_i(14 downto 13),
+         font_cbm    => font_cbm_i,
          cbm_dip     => cbm_dip_i,
          vid_mono    => vid_mono,
          vid_monomode => vid_mm,

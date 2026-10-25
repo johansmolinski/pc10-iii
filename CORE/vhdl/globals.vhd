@@ -89,7 +89,7 @@ constant C_DEV_PC_BIOS        : std_logic_vector(15 downto 0) := x"0100";
 -- window 0xFFFF the CRT/ROM load CSR. Manual "ROM" loads in the menu (nothing is streamed).
 constant C_DEV_PC_FDA         : std_logic_vector(15 downto 0) := x"0101";
 constant C_DEV_PC_FDB         : std_logic_vector(15 downto 0) := x"0102";
--- The CGA character ROM (pc_font.vhd): windows 0..1 the 8 KB image, window 0x0100 control.
+-- The character ROM (pc_font.vhd): windows 0..7 the 32 KB image, window 0x0100 control.
 constant C_DEV_PC_FONT        : std_logic_vector(15 downto 0) := x"0103";
 -- The 8088's microcode bundle (pc_ucode.vhd): windows 0..1 the 6 KB image, window 0x0100 control.
 constant C_DEV_PC_UCODE       : std_logic_vector(15 downto 0) := x"0104";
@@ -131,14 +131,15 @@ constant C_CRTROMS_MAN           : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_
 -- Automatically loaded ROMs: the BIOS, mandatory. The Shell loads it into C_DEV_PC_BIOS before the
 -- PC leaves reset and goes fatal if the file is missing; PREP_START (m2m-rom.asm) then checks the
 -- size (8..64 KB) and releases the BIOS gate of pc_bios.vhd.
--- The CGA character ROM is optional: without /pc10/cga.rom the free default font of
--- pc_font.vhd stays (PREP_START copies a loaded one into the CGA card).
+-- The character ROM is optional: without /pc10/char.rom the free default font of pc_font.vhd
+-- stays (PREP_START copies a loaded one into the video: an IBM 5788005 image of 2 or 8 KB or
+-- a Commodore PC10-III ROM 318086-xx of 16 or 32 KB).
 -- The 8088's microcode is mandatory too (AGENTS.md rule 4: it is not in the bitstream): the
 -- bundle that tools/mkucode.py builds, /pc10/ucode.bin; PREP_START checks it (UCODE_START)
 -- and has pc_ucode.vhd copy it into the CPU, which releases the PC from reset.
 constant BIOS_ROM_NAME           : string := "/pc10/bios.rom" & ENDSTR;
 constant BIOS_ROM_NAME_START     : std_logic_vector(15 downto 0) := x"0000";
-constant FONT_ROM_NAME           : string := "/pc10/cga.rom" & ENDSTR;
+constant FONT_ROM_NAME           : string := "/pc10/char.rom" & ENDSTR;
 constant FONT_ROM_NAME_START     : std_logic_vector(15 downto 0) := std_logic_vector(to_unsigned(BIOS_ROM_NAME'length, 16));
 constant UCODE_ROM_NAME          : string := "/pc10/ucode.bin" & ENDSTR;
 constant UCODE_ROM_NAME_START    : std_logic_vector(15 downto 0) := std_logic_vector(to_unsigned(BIOS_ROM_NAME'length + FONT_ROM_NAME'length, 16));

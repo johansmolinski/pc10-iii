@@ -9,7 +9,7 @@
 -- * pc_bios.vhd: 64 KB BIOS ROM, QNICE device C_DEV_PC_BIOS, filled by the Shell's ROM
 --   auto-loader from /pc10/bios.rom; the PC stays in reset until the firmware has checked
 --   and released the image
--- * pc_font.vhd: the CGA character ROM (free default font, or /pc10/cga.rom), QNICE device
+-- * pc_font.vhd: the character ROM (free default font, or /pc10/char.rom), QNICE device
 --   C_DEV_PC_FONT, copied into pc_system's font port
 -- * pc_ucode.vhd: the 8088's microcode bundle (/pc10/ucode.bin, tools/mkucode.py), QNICE
 --   device C_DEV_PC_UCODE, copied into the CPU's tables; the PC stays in reset until then
@@ -21,7 +21,7 @@
 -- * the OSM settings (config.vhd): floppy images and write protection, drive sound, chipset
 --   (PC10-III's FE2010A or IBM XT's 8255, with its switches; a change restarts the PC),
 --   memory size, display (colour or mono in three phosphors: the PVC4's CONFIG switch 2 with
---   switches 3/4; a change restarts the PC), HDMI mode (60 Hz for colour, 50 Hz for mono),
+--   switches 3/4; a change restarts the PC), character set (CONFIG switch 1), HDMI mode (60 Hz for colour, 50 Hz for mono),
 --   analog 15 kHz / CSYNC, reset
 --
 -- The entity is the Megamiga fork's MEGA65_Core (M2M-UPSTREAM exceptions: floppy, SDRAM,
@@ -352,12 +352,13 @@ constant C_MENU_MEM_128       : natural := 21;
 constant C_MENU_DISP_GREEN    : natural := 36;
 constant C_MENU_DISP_AMBER    : natural := 37;
 constant C_MENU_DISP_WHITE    : natural := 38;
+constant C_MENU_CHARSET_SCAN  : natural := 41;
 constant C_MENU_HDMI_720P     : natural := 27;
 constant C_MENU_HDMI_480P     : natural := 28;
 constant C_MENU_HDMI_720P50   : natural := 29;
-constant C_MENU_ANALOG_15KHZ  : natural := 41;
-constant C_MENU_ANALOG_CSYNC  : natural := 42;
-constant C_MENU_RESET         : natural := 45;
+constant C_MENU_ANALOG_15KHZ  : natural := 42;
+constant C_MENU_ANALOG_CSYNC  : natural := 43;
+constant C_MENU_RESET         : natural := 46;
 
 -- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
 -- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
@@ -393,6 +394,7 @@ signal main_dip_sw1           : std_logic_vector(7 downto 0);
 signal main_cbm_dip           : std_logic_vector(1 downto 0);   -- CONFIG switches 2 and 1
 signal main_mono              : std_logic;             -- the menu's display: mono
 signal main_mono_tint         : std_logic_vector(1 downto 0);
+signal main_charset           : std_logic;             -- CONFIG switch 1: 1 = off = USA/Europe
 
 ---------------------------------------------------------------------------------------------
 -- PC memory ports
@@ -426,11 +428,12 @@ signal qnice_fdd_we           : std_logic;
 signal qnice_fdd_drive        : std_logic;
 
 ---------------------------------------------------------------------------------------------
--- CGA font port, floppy drives and the sector port (main clock)
+-- font port, floppy drives and the sector port (main clock)
 ---------------------------------------------------------------------------------------------
 
 signal main_font_we           : std_logic;
-signal main_font_addr         : std_logic_vector(12 downto 0);
+signal main_font_addr         : std_logic_vector(14 downto 0);
+signal main_font_cbm          : std_logic;             -- a Commodore character ROM (pc_font.vhd)
 signal main_font_data         : std_logic_vector(7 downto 0);
 signal main_drv_80trk         : std_logic_vector(1 downto 0);
 signal main_img_present       : std_logic_vector(1 downto 0);
@@ -657,6 +660,9 @@ begin
    -- personality; main.vhd)
    main_mono      <= main_osm_control_i(C_MENU_DISP_GREEN) or main_osm_control_i(C_MENU_DISP_AMBER) or
                      main_osm_control_i(C_MENU_DISP_WHITE);
+   -- CONFIG switch 1 (the character set) is the character ROM's A14, live as on the board
+   main_charset   <= not main_osm_control_i(C_MENU_CHARSET_SCAN);
+
    main_mono_tint <= "01" when main_osm_control_i(C_MENU_DISP_AMBER) = '1' else
                      "10" when main_osm_control_i(C_MENU_DISP_WHITE) = '1' else
                      "00";
@@ -704,8 +710,9 @@ begin
          font_we_i            => main_font_we,
          font_addr_i          => main_font_addr,
          font_data_i          => main_font_data,
+         font_cbm_i           => main_font_cbm,
          font_thin_i          => '0',          -- the IBM CGA's jumper P3; the PVC4 has none
-         cbm_dip_i            => main_cbm_dip,
+         cbm_dip_i            => main_cbm_dip(1) & main_charset,
          mono_tint_i          => main_mono_tint,
          ucl_we_i             => main_ucl_we,
          ucl_addr_i           => main_ucl_addr,
@@ -850,7 +857,8 @@ begin
          main_rst_i           => main_rst,
          font_we_o            => main_font_we,
          font_addr_o          => main_font_addr,
-         font_data_o          => main_font_data
+         font_data_o          => main_font_data,
+         font_cbm_o           => main_font_cbm
       ); -- i_pc_font
 
    i_pc_ucode : entity work.pc_ucode

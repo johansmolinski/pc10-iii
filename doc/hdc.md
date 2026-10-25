@@ -416,7 +416,7 @@ card off with `hdc_enable = 0`):
 **Option ROM**: `pc_xub.vhd`, a 16 KB dual-port block RAM (4 RAMB36; 2 for
 an 8 KB-only socket) like `pc_bios.vhd`: QNICE on port A, the PC on port B
 (`hdc_rom_addr`, 1 clk). Loaded from `/pc10/xub.rom` as an optional
-auto-load ROM (like `/pc10/cga.rom`), FFh where the file ends. Without a
+auto-load ROM (like `/pc10/char.rom`), FFh where the file ends. Without a
 file: either an empty socket (no hard disk) or a configured r638
 `ide_xt.bin` preloaded in the bitstream (allowed by the licence, section 6;
 the release then names the source).

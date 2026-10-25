@@ -1,9 +1,10 @@
 # The default CGA font
 
 `cga_default.hex` is the character ROM image the core uses until the user
-loads an IBM character ROM (`/pc10/cga.rom`, 8 KB 5788005 layout, or a 2 KB
-8x8 dump). `CORE/vhdl/pc_font.vhd` preloads its image RAM with it and copies
-it into the CGA card at power-up.
+loads a character ROM (`/pc10/char.rom`: an IBM one, 8 KB 5788005 layout or a
+2 KB 8x8 dump, or the PC10-III's own Commodore 318086-xx, 16 or 32 KB).
+`CORE/vhdl/pc_font.vhd` preloads its image RAM with it and copies it into the
+video at power-up.
 
 - Glyphs 00-7F: the 8x8 graphics character set of **GLaBIOS**
   (https://github.com/640-KB/GLaBIOS, commit `68c65a5`, GPL-3.0). The font
