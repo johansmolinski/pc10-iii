@@ -31,6 +31,7 @@ PC = (["../rtl/cpu/biu88.sv",
       + ["../rtl/system/pc_clocks.sv", "../rtl/system/xt_board.sv", "../rtl/system/pc_system.sv",
          "../rtl/video/cga/cga_crtc.sv", "../rtl/video/cga/cga_card.sv",
          "../rtl/video/mda/mda_card.sv",
+         "../rtl/video/pvc4/pvc4.sv", "../rtl/system/cbm_cfg230.sv",
          "../rtl/fdc/upd765.sv", "../rtl/fdc/fdc_secbuf.sv", "../rtl/fdc/fdc_card.sv",
          "../rtl/hdc/hdc_secbuf.sv", "../rtl/hdc/ata_dev.sv", "../rtl/hdc/xtide_card.sv"])
 STUB = ["stub/pc_system.sv"]

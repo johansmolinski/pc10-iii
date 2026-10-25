@@ -444,6 +444,12 @@ all equal.
 
 ## 10. For the integrator
 
+- **PC10-III:** the PC10-III has no CGA; its onboard Paradise PVC4
+  (doc/pvc4.md) replaces this card in the shell (`pc_system` `PVC4_FIT`,
+  `CGA_FIT` = 0). The PVC4's colour personality reuses this card's display
+  logic without the snow. With `CGA_FIT` = 0 the card sees no bus strobes
+  (since 2026-10-25).
+
 - **pc_system ports**: the instance in `pc_system.sv` must connect
   `font_we/font_addr/font_data/font_thin` (new `pc_system` ports for the
   glue, architecture.md section 4) and tie `lpen_trig`/`lpen_sw` to 0;

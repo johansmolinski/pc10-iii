@@ -30,6 +30,11 @@ module pc_system_flat #(
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
     input  logic        font_thin,
+    input  logic [1:0]  font_addr_hi,       // PVC4: a 32 KB Commodore character ROM (bits 14-13)
+    input  logic        font_cbm,           // PVC4: 1 = the font image is the Commodore layout
+    input  logic [1:0]  cbm_dip,            // PVC4: CONFIG switches 1 and 2 (1 = off)
+    output logic        vid_mono,           // PVC4: MONO
+    output logic        vid_monomode,       // PVC4: the mono personality (16.257 MHz dots)
 
     input  logic        ucl_we,
     input  logic [12:0] ucl_addr,
@@ -77,12 +82,15 @@ assign tracks = img_tracks;
 assign heads  = img_heads;
 assign spt    = img_spt;
 
-pc_system #(.RAM_KB(RAM_KB), .FE2010A(1'b1)) u_pc (     // the PC10-III's FE2010A port logic
+// the PC10-III: its FE2010A port logic and its onboard video, the Paradise PVC4
+// (doc/pvc4.md), instead of the IBM CGA; no expansion video card
+pc_system #(.RAM_KB(RAM_KB), .FE2010A(1'b1), .PVC4_FIT(1'b1), .CGA_FIT(1'b0)) u_pc (
     .clk, .reset,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,
     .vid_ce, .vid_rgbi, .vid_hsync, .vid_vsync, .vid_hblank, .vid_vblank,
-    .font_we, .font_addr, .font_data, .font_thin,
+    .font_we, .font_addr, .font_data, .font_thin, .font_addr_hi, .font_cbm, .cbm_dip,
+    .vid_mono, .vid_monomode,
     .ucl_we, .ucl_addr, .ucl_data,
     .drv_80trk, .img_present, .img_wp,
     .img_tracks(tracks), .img_heads(heads), .img_spt(spt),

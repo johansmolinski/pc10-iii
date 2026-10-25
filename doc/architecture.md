@@ -1,6 +1,6 @@
 # PC10-III core - architecture
 
-Status: 2026-10-23 (the PC on 28.63636 MHz, doc/clock-plan.md), the contract
+Status: 2026-10-25 (the PC on 28.63636 MHz, doc/clock-plan.md; the PVC4), the contract
 between the parallel work tracks (CPU, system board, CGA, floppy, hard disk,
 MEGA65 shell). Change it only together with every module it names.
 
@@ -62,6 +62,10 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
      +- BIOS ROM (F0000-FFFFF, behind the ROM port)
      +- cga_card    rtl/video/cga/cga_card.sv     (CGA_FIT)
      +- mda_card    rtl/video/mda/mda_card.sv     (MDA_FIT: MDA or Hercules)
+     +- pvc4        rtl/video/pvc4/pvc4.sv        (PVC4_FIT: the PC10-III's onboard
+     |               video, the Paradise PVC4, doc/pvc4.md)
+     +- cbm_cfg230  rtl/system/cbm_cfg230.sv      (PVC4_FIT: the Commodore
+     |               configuration register 230h, the 5720's)
      +- fdc_card    rtl/fdc/fdc_card.sv: the diskette adapter (765), doc/fdc.md
      +- xtide_card  rtl/hdc/xtide_card.sv: XTIDE hard disk card + option ROM socket, doc/hdc.md
      +- later: COM/LPT
@@ -93,7 +97,9 @@ The bus a card sees, all on `clk`. Signals are levels, valid for the many
 A card's read data must be valid within 2 `clk` of the strobe going low and
 held while it stays low.
 
-Memory map of the cards: CGA B8000-BBFFF (mirrored to BFFFF), the XTIDE
+Memory map of the cards: CGA B8000-BBFFF (mirrored to BFFFF); the PVC4
+B8000-BFFFF (colour) or B0000-B7FFF and, with 3BF bit 1, B8000-BFFFF
+(mono), I/O 3D0-3DF or 3B0-3BF, and 230h; the XTIDE
 card's option ROM C8000-CBFFF (16 KB; the BIOS's option ROM scan finds it).
 I/O: FDC 3F0-3F7, XTIDE 300-31F (variant 0) or 300-30F (variants 1/2).
 
@@ -159,7 +165,10 @@ the CGA depend on it):
 module pc_system #(
     parameter int RAM_KB  = 640,
     parameter bit CGA_FIT = 1'b1,     // the CGA is in the machine
-    parameter int MDA_FIT = 0         // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
+    parameter int MDA_FIT = 0,        // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
+    parameter int DRQ0_SKEW = 0,      // simulation only
+    parameter bit FE2010A = 1'b0,     // the PC10-III's FE2010A port logic (xt_board)
+    parameter bit PVC4_FIT = 1'b0     // the PC10-III's onboard PVC4 and 230h (doc/pvc4.md)
 ) (
     input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high, >= 1 CPU clock
@@ -212,6 +221,15 @@ module pc_system #(
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
     input  logic        font_thin,    // jumper P3: the thin font
+    // PVC4 (doc/pvc4.md section 8): a 32 KB Commodore character ROM image
+    // (font_addr_hi = bits 14-13, font_cbm = 1; the IBM cards take only
+    // font_addr_hi = 0), the CONFIG switches 1 and 2 (1 = off), MONO and the
+    // mono personality (vid_ce is then its 16.257 MHz dot)
+    input  logic [1:0]  font_addr_hi,
+    input  logic        font_cbm,
+    input  logic [1:0]  cbm_dip,
+    output logic        vid_mono,
+    output logic        vid_monomode,
 
     // Floppy drives A: and B: (rtl/fdc, doc/fdc.md sections 5-6): image
     // geometry per drive, LED outputs, the sector port to the image backend
@@ -296,6 +314,16 @@ Notes (2026-10-22, MDA):
   Hercules card never answers at B8000-BFFFF when `CGA_FIT` is set.
 - The floppy ports (`drv_*`, `img_*`, `sp_*`) are in `pc_system.sv`;
   doc/fdc.md.
+
+Notes (2026-10-25, PVC4):
+- With `PVC4_FIT` the PC10-III's onboard video replaces the CGA on `vid_*`
+  (`CGA_FIT`/`MDA_FIT` remain, as expansion cards; the shell's
+  `pc_system_flat` sets `PVC4_FIT` = 1, `CGA_FIT` = 0). In its colour
+  personality `vid_ce` = `ce_14m`; in its mono personality `vid_ce` is a
+  16.257 MHz dot from a fractional accumulator, as `mda_ce`.
+- A card that is not fitted sees no bus strobes (the CGA too since then).
+- The PVC4's power-up straps come from `cbm_dip[1]` (DIP switch 2) and are
+  sampled at `reset`.
 
 Not yet in the contract: serial/parallel, composite video, turbo. They get
 added here when their module exists.

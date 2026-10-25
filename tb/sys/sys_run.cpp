@@ -21,6 +21,13 @@
 //   -v  log the CPU's writes to 3B0-3BF and 3D0-3DF
 //   -o  with -m: the last MDA frame as <image>.ppm (the vid_hblank/vid_vblank
 //       window, green phosphor; tb/mda/topng.py makes a PNG)
+//   PVC4 builds (make FE=1 PVC4=1, doc/pvc4.md): -P n sets the PC10-III's CONFIG
+//       switches 1 and 2 (bit 0 = switch 1, bit 1 = switch 2, 1 = off; default 1:
+//       USA/Europe characters, colour), -m also sets switch 2 (monochrome); -F
+//       takes an 8 KB IBM image or a 32 KB Commodore character ROM; -o writes
+//       the last PVC4 frame (the vid_hblank/vid_vblank window: RGBI, or green
+//       for the mono personality); the text screen dump reads the PVC4's RAM;
+//       the CPU's wait states in the PVC4's memory are counted (histogram at the end)
 //   -f  floppy controller log: the CPU's 765 reads and writes (A0, data,
 //       CS:IP), DOR writes, DACK2 cycles, TC, IRQ6 edges, DRQ2 rises, with the
 //       CPU step number (the -t trace's first column)
@@ -40,6 +47,9 @@
 #include "Vtb_sys___024root.h"
 #include "verilated.h"
 #include "ucode_file.h"
+#ifndef PVC4_BUILD
+#define PVC4_BUILD 0
+#endif
 
 static const double CLK_HZ = 28636363.64;      // 315/11 MHz
 
@@ -78,8 +88,15 @@ static void dump_screen(Vtb_sys *tb, const char *title, bool mono = false) {
     for (int y = 0; y < 25; y++) {
         char line[81];
         for (int x = 0; x < 80; x++) {
+#if PVC4_BUILD
+            // the PVC4's RAM: B0000 + offset, banks by A14 (doc/pvc4.md 6.1)
+            unsigned o = (tb->vid_monomode ? 0x0000 : 0x8000) + (y * 80 + x) * 2;
+            unsigned char c = r->tb_sys__DOT__u_pc__DOT__g_pvc4__DOT__u_pvc4__DOT__vram0[((o >> 1) & 0x4000) | (o & 0x3FFF)];
+            (void)mono;
+#else
             unsigned char c = mono ? r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[(y * 80 + x) * 2]
                                    : r->tb_sys__DOT__u_pc__DOT__u_cga__DOT__vram[(y * 80 + x) * 2];
+#endif
             line[x] = (c >= 32 && c < 127) ? c : (c == 0 ? ' ' : '.');
         }
         line[80] = 0;
@@ -104,6 +121,7 @@ int main(int argc, char **argv) {
     int wmax = 20;
     int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 2)
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
+    unsigned cbm_dip = 1;    // PVC4: CONFIG switch 1 off (USA/Europe), switch 2 on (colour)
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-b") && i + 1 < argc) bios = argv[++i];
         else if (!strcmp(argv[i], "-s") && i + 1 < argc) secs = atof(argv[++i]);
@@ -112,6 +130,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-q")) quiet = true;
         else if (!strcmp(argv[i], "-f")) fdclog = true;
         else if (!strcmp(argv[i], "-m")) mono = true;
+        else if (!strcmp(argv[i], "-P") && i + 1 < argc) cbm_dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-v")) vidlog = true;
         else if (!strcmp(argv[i], "-F") && i + 1 < argc) fontfile = argv[++i];
         else if (!strcmp(argv[i], "-o") && i + 1 < argc) imgfile = argv[++i];
@@ -191,13 +210,26 @@ int main(int argc, char **argv) {
     unsigned long long itrace_cyc = (unsigned long long)(itrace_from * 1e-3 * CLK_HZ);
 
     if (mono) dip |= 0x30;               // SW1 5-6 off: monochrome 80x25
+    if (mono) cbm_dip |= 2;              // PVC4: CONFIG switch 2 off (onboard video mono)
     tb->dip_sw1 = dip;
+    tb->cbm_dip = cbm_dip;
     std::vector<unsigned char> font(8192, 0);
     if (fontfile) {
         FILE *ff = fopen(fontfile, "rb");
-        if (!ff || fread(font.data(), 1, 8192, ff) != 8192) { fprintf(stderr, "font %s?\n", fontfile); return 1; }
+        if (ff) { fseek(ff, 0, SEEK_END); font.resize(ftell(ff)); fseek(ff, 0, SEEK_SET); }
+        if (!ff || (font.size() != 8192 && !(PVC4_BUILD && font.size() == 32768)) ||
+            fread(font.data(), 1, font.size(), ff) != font.size()) { fprintf(stderr, "font %s?\n", fontfile); return 1; }
         fclose(ff);
     }
+    tb->font_cbm = font.size() == 32768;
+    // PVC4 dots: rgbi | mono << 4 | hsync << 5 | vsync << 6 | window << 7
+    std::vector<unsigned char> pring(PVC4_BUILD ? 1 << 21 : 1);
+    unsigned long long pdots = 0;
+    bool pmono_last = false;
+    // PVC4: wait states of the CPU's memory cycles in B0000-BFFFF
+    int pw_hist[2][32] = {};
+    bool pw_on = false, pw_wr = false, pw_dma = false;
+    int pw_tw = 0;
     // MDA dots: video | intensity << 1 | hsync << 2 | vsync << 3 | window << 4
     std::vector<unsigned char> mring(1 << 20);
     unsigned long long mdots = 0;
@@ -247,8 +279,8 @@ int main(int argc, char **argv) {
     tb->kbd_valid = 0;
     tb->reset = 1;
     for (int i = 0; i < 200; i++) { tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval(); }
-    for (int a = 0; fontfile && a < 8192; a++) {
-        tb->font_we = 1; tb->font_addr = a; tb->font_data = font[a];
+    for (int a = 0; fontfile && a < (int)font.size(); a++) {
+        tb->font_we = 1; tb->font_addr = a & 0x1FFF; tb->font_addr_hi = a >> 13; tb->font_data = font[a];
         tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval();
     }
     tb->font_we = 0;
@@ -335,6 +367,23 @@ int main(int argc, char **argv) {
         // sample before the edge (the BIU changes its pins on the edge)
         if (tb->cpu_step) {
             steps++;
+            if (PVC4_BUILD) {
+                auto *rp = tb->rootp;
+                unsigned bt = tb->bus_t & 7, ty = tb->bus_type & 7;
+                bool dmaw = rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__aen ||
+                            rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__dma_wait;
+                if (pw_on) {
+                    if (bt == 3 || bt == 4) { if (dmaw) pw_dma = true; if (bt == 4) pw_tw++; }
+                    else { if (!pw_dma && pw_tw < 32) pw_hist[pw_wr][pw_tw]++; pw_on = false; }
+                }
+                // the cycles the PVC4 answers: B8000-BFFFF (colour) or B0000-B7FFF
+                // (mono; Hercules page 2 not counted), the chip enabled (230h)
+                bool on = !rp->tb_sys__DOT__u_pc__DOT__venb_n &&
+                          (tb->bus_addr >> 15) == (tb->vid_monomode ? 0x16u : 0x17u);
+                if (bt == 2 && (ty == 4 || ty == 5 || ty == 6) && on) {
+                    pw_on = true; pw_wr = ty == 6; pw_dma = dmaw; pw_tw = 0;
+                }
+            }
             if (woracle) {
                 auto *rp = tb->rootp;
                 unsigned bt = tb->bus_t & 7, ty = tb->bus_type & 7;
@@ -407,7 +456,8 @@ int main(int argc, char **argv) {
         if (tb->io_wr) {
             if ((tb->io_addr & 0xFFFF) == 0x80 && !quiet)
                 printf("[%9.3f ms] POST %02X\n", cyc / CLK_HZ * 1e3, tb->io_data);
-            if (vidlog && ((tb->io_addr & 0x3F0) == 0x3B0 || (tb->io_addr & 0x3F0) == 0x3D0))
+            if (vidlog && ((tb->io_addr & 0x3F0) == 0x3B0 || (tb->io_addr & 0x3F0) == 0x3D0 ||
+                           (tb->io_addr & 0x3FF) == 0x230))
                 printf("[%9.3f ms] OUT %03X %02X\n", cyc / CLK_HZ * 1e3, tb->io_addr & 0x3FF, tb->io_data);
         }
         if (vidlog) {
@@ -426,6 +476,11 @@ int main(int argc, char **argv) {
                        cyc / CLK_HZ * 1e3, nmw, nwe, r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__mode,
                        r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA0], r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA1],
                        r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA2], r->tb_sys__DOT__u_pc__DOT__u_mda__DOT__vram[0xA3]);
+        }
+        if (PVC4_BUILD && tb->vid_ce) {
+            pring[pdots++ & (pring.size() - 1)] = tb->vid_rgbi | tb->vid_mono << 4 | tb->vid_hsync << 5 |
+                                                  tb->vid_vsync << 6 | (!tb->vid_hblank && !tb->vid_vblank) << 7;
+            pmono_last = tb->vid_monomode;
         }
         if (tb->mda_ce)
             mring[mdots++ & (mring.size() - 1)] = tb->mda_video | tb->mda_intens << 1 | tb->mda_hsync << 2 |
@@ -471,6 +526,45 @@ int main(int argc, char **argv) {
         printf("master image written to %s\n", hdout);
     }
 
+    // the last complete PVC4 frame (VSYNC start to VSYNC start), its window
+    if (PVC4_BUILD && imgfile) {
+        const size_t N = pring.size();
+        auto at = [&](unsigned long long k) { return pring[k & (N - 1)]; };
+        unsigned long long lo = pdots > N ? pdots - N + 1 : 1, e = 0, s = 0;
+        for (unsigned long long k = pdots - 1; k > lo; k--)
+            if ((at(k) & 0x40) && !(at(k - 1) & 0x40)) { if (!e) e = k; else { s = k; break; } }
+        if (!s) printf("no complete PVC4 frame recorded\n");
+        else {
+            static const unsigned char RGBI[16][3] = {
+                {0x00, 0x00, 0x00}, {0x00, 0x00, 0xAA}, {0x00, 0xAA, 0x00}, {0x00, 0xAA, 0xAA},
+                {0xAA, 0x00, 0x00}, {0xAA, 0x00, 0xAA}, {0xAA, 0x55, 0x00}, {0xAA, 0xAA, 0xAA},
+                {0x55, 0x55, 0x55}, {0x55, 0x55, 0xFF}, {0x55, 0xFF, 0x55}, {0x55, 0xFF, 0xFF},
+                {0xFF, 0x55, 0x55}, {0xFF, 0x55, 0xFF}, {0xFF, 0xFF, 0x55}, {0xFF, 0xFF, 0xFF}};
+            static const unsigned char GREEN[4][3] = {{0, 0, 0}, {0x10, 0x40, 0x10}, {0x20, 0xB0, 0x20}, {0x70, 0xFF, 0x70}};
+            std::vector<unsigned char> img, row;
+            int w = 0, h = 0;
+            for (unsigned long long k = s; k < e; k++) {
+                unsigned char d = at(k);
+                const unsigned char *c = pmono_last ? GREEN[((d >> 4) & 1) * 2 + ((d >> 3) & 1)] : RGBI[d & 15];
+                if (d & 0x80) row.insert(row.end(), c, c + 3);
+                else if (!row.empty()) { w = row.size() / 3; img.insert(img.end(), row.begin(), row.end()); row.clear(); h++; }
+            }
+            std::string fn = std::string(imgfile) + ".ppm";
+            FILE *pf = fopen(fn.c_str(), "wb");
+            fprintf(pf, "P6\n%d %d\n255\n", w, h);
+            fwrite(img.data(), 1, (size_t)w * h * 3, pf);
+            fclose(pf);
+            printf("PVC4 frame (%s): %llu dots, window %dx%d -> %s\n", pmono_last ? "mono" : "colour", e - s, w, h,
+                   fn.c_str());
+        }
+    }
+    if (PVC4_BUILD)
+        for (int k = 0; k < 2; k++) {
+            int n = 0; double sum = 0;
+            printf("PVC4 CPU %s of its memory, wait states:", k ? "writes" : "reads");
+            for (int t = 0; t < 32; t++) if (pw_hist[k][t]) { printf(" %d:%d", t, pw_hist[k][t]); n += pw_hist[k][t]; sum += t * pw_hist[k][t]; }
+            printf(" (%d cycles, mean %.2f)\n", n, n ? sum / n : 0.0);
+        }
     // text screen (80x25 at B8000 for the CGA, B0000 for the MDA)
     dump_screen(tb, mono ? "screen (MDA)" : "screen (CGA)", mono);
     // the last complete MDA frame (VSYNC start to VSYNC start), its window

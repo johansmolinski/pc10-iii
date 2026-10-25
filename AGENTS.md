@@ -52,6 +52,10 @@ why, test numbers).
   trace comparison `tools/ctrace_diff.py`).
 - `rtl/video/cga/` (cga_card.sv, cga_crtc.sv) and `tb/cga/` (Verilator TB
   with a C++ MartyPC model, `make run`, mutants `mut.py`): `doc/cga.md`.
+- `rtl/video/pvc4/pvc4.sv`, `rtl/system/cbm_cfg230.sv` and `tb/pvc4/`: the
+  PC10-III's onboard video (Paradise PVC4) and its 230h register:
+  `doc/pvc4.md`. No Commodore ROM or character ROM content in the repository
+  (the BIOS disassembly stays in `~/pcxt-work/pvc4/`).
 
 ## Harness facts
 

@@ -9,7 +9,12 @@ module pc_system #(
     parameter bit CGA_FIT = 1'b1,       // IBM CGA at B8000-BFFFF, 3D0-3DF
     parameter int MDA_FIT = 0,          // 0 none, 1 IBM MDA, 2 Hercules (B0000, 3B0-3BF)
     parameter int DRQ0_SKEW = 0,        // simulation only (xt_board)
-    parameter bit FE2010A = 1'b0        // 1: the PC10-III's FE2010A port logic (xt_board), 0: IBM 5160
+    parameter bit FE2010A = 1'b0,       // 1: the PC10-III's FE2010A port logic (xt_board), 0: IBM 5160
+    // the PC10-III's onboard video, the Paradise PVC4 (doc/pvc4.md), and its
+    // Commodore configuration register 230h; the CGA/MDA parameters above are
+    // then expansion cards (0 for the PC10-III as built). The vid_* outputs
+    // come from the PVC4.
+    parameter bit PVC4_FIT = 1'b0
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -53,6 +58,18 @@ module pc_system #(
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
     input  logic        font_thin,
+    // PVC4: the character ROM image's layout (1: the PC10-III's 32 KB ROM,
+    // font_addr_hi = address bits 14-13; 0: the IBM image above) and the two
+    // CONFIG switches that are not the 8255's (1 = off): [0] switch 1
+    // (1 = USA/Europe character set, 0 = Scandinavian), [1] switch 2
+    // (1 = onboard video monochrome, 0 = colour)
+    input  logic [1:0]  font_addr_hi,
+    input  logic        font_cbm,
+    input  logic [1:0]  cbm_dip,
+    // PVC4: MONO (the monochrome video pin) and the mono personality, in which
+    // vid_ce is the 16.257 MHz dot (1-2 clk) and vid_rgbi = {IT, MONO x 3}
+    output logic        vid_mono,
+    output logic        vid_monomode,
 
     // floppy drives A: and B: (rtl/fdc, doc/fdc.md): image geometry from the
     // glue, the sector port to the image backend
@@ -129,7 +146,6 @@ pc_clocks u_clocks (
     .ce_pclk    (ce_pclk),
     .pit_clk    (pit_clk)
 );
-assign vid_ce = ce_14m;
 
 // ------------------------------------------------------------ CPU
 logic [19:0] cpu_ad;
@@ -230,27 +246,29 @@ logic       cga_dsel, cga_ready, cga_dsel_c, cga_ready_c;
 logic [3:0] cga_rgbi;
 logic       cga_hs, cga_vs, cga_hb, cga_vb;
 
+wire        ibm_font_we = font_we && font_addr_hi == 2'b00;
+
 cga_card #(.REG_READY(1'b1)) u_cga (
     .clk        (clk),
     .reset      (reset),
     .ce_14m     (ce_14m),
     .isa_addr   (isa_addr),
     .isa_addr_next  (isa_addr_next),
-    .isa_memr_n_next(isa_memr_n_next),
-    .isa_memw_n_next(isa_memw_n_next),
+    .isa_memr_n_next(isa_memr_n_next | !CGA_FIT),   // an unfitted card sees no strobes
+    .isa_memw_n_next(isa_memw_n_next | !CGA_FIT),
     .isa_aen_next   (isa_aen_next),
-    .isa_ior_n_next (isa_ior_n_next),
-    .isa_iow_n_next (isa_iow_n_next),
+    .isa_ior_n_next (isa_ior_n_next  | !CGA_FIT),
+    .isa_iow_n_next (isa_iow_n_next  | !CGA_FIT),
     .isa_dout   (isa_dout),
     .isa_din    (cga_din_c),
     .isa_dsel   (cga_dsel_c),
-    .isa_memr_n (isa_memr_n),
-    .isa_memw_n (isa_memw_n),
-    .isa_ior_n  (isa_ior_n),
-    .isa_iow_n  (isa_iow_n),
+    .isa_memr_n (isa_memr_n | !CGA_FIT),
+    .isa_memw_n (isa_memw_n | !CGA_FIT),
+    .isa_ior_n  (isa_ior_n  | !CGA_FIT),
+    .isa_iow_n  (isa_iow_n  | !CGA_FIT),
     .isa_aen    (isa_aen),
     .isa_ready  (cga_ready_c),
-    .font_we    (font_we),
+    .font_we    (ibm_font_we),
     .font_addr  (font_addr),
     .font_data  (font_data),
     .font_thin  (font_thin),
@@ -273,11 +291,17 @@ cga_card #(.REG_READY(1'b1)) u_cga (
 assign cga_din    = CGA_FIT ? cga_din_c : 8'h00;
 assign cga_dsel   = CGA_FIT && cga_dsel_c;
 assign cga_ready  = !CGA_FIT || cga_ready_c;
-assign vid_rgbi   = CGA_FIT ? cga_rgbi : 4'h0;
-assign vid_hsync  = CGA_FIT && cga_hs;
-assign vid_vsync  = CGA_FIT && cga_vs;
-assign vid_hblank = !CGA_FIT || cga_hb;
-assign vid_vblank = !CGA_FIT || cga_vb;
+// video out: the PVC4 when it is on the board, else the CGA
+logic       pvc_ce, pvc_mono, pvc_mm, pvc_hs, pvc_vs, pvc_hb, pvc_vb;
+logic [3:0] pvc_rgbi;
+assign vid_ce       = PVC4_FIT ? pvc_ce : ce_14m;
+assign vid_rgbi     = PVC4_FIT ? pvc_rgbi : CGA_FIT ? cga_rgbi : 4'h0;
+assign vid_hsync    = PVC4_FIT ? pvc_hs : CGA_FIT && cga_hs;
+assign vid_vsync    = PVC4_FIT ? pvc_vs : CGA_FIT && cga_vs;
+assign vid_hblank   = PVC4_FIT ? pvc_hb : !CGA_FIT || cga_hb;
+assign vid_vblank   = PVC4_FIT ? pvc_vb : !CGA_FIT || cga_vb;
+assign vid_mono     = PVC4_FIT && pvc_mono;
+assign vid_monomode = PVC4_FIT && pvc_mm;
 
 // MDA or Hercules. With a CGA in the machine the Hercules card does not
 // answer at B8000-BFFFF (its page 2 stays invisible to the CPU).
@@ -300,7 +324,7 @@ mda_card #(.HERC(MDA_FIT == 2)) u_mda (
     .isa_aen    (isa_aen),
     .isa_ready  (mda_ready_c),
     .cga_fitted (CGA_FIT),
-    .font_we    (font_we),
+    .font_we    (ibm_font_we),
     .font_addr  (font_addr),
     .font_data  (font_data),
     .vid_ce     (mda_ce_c),
@@ -322,6 +346,92 @@ assign mda_hsync  = mda_on && mda_hs_c;
 assign mda_vsync  = mda_on && mda_vs_c;
 assign mda_hblank = !mda_on || mda_hb_c;
 assign mda_vblank = !mda_on || mda_vb_c;
+
+// The PC10-III's onboard video (doc/pvc4.md): the PVC4 with its power-up
+// straps as sheet 9-6 wires them, and the 230h register that enables it.
+// Paradise register (MA7-MA0): MA7 and MA5 through 33K to the switch 2 node
+// (1K pull-up; the switch grounds it for colour), MA6 open (the PVC4's
+// internal pull-up), MA4-MA0 pulled down: monochrome mapping and 9-dot
+// characters with switch 2 off. Configuration register (MD7-MD0): pull-ups on
+// MD7, 6, 4, 2, 1, 0, a pull-down on MD3, MD5 open: one 64K x 8 bank, IBM 200
+// lines, composite sync, MONO pin = mono video, border on, printer decode off.
+logic [7:0] pvc_din_c, cfg_din_c, pvc_din, cfg_din;
+logic       pvc_dsel_c, cfg_dsel_c, pvc_dsel, cfg_dsel, pvc_ready_c, pvc_ready;
+logic       venb_n;
+wire        pvc_on = PVC4_FIT;
+
+generate if (PVC4_FIT) begin : g_pvc4
+    cbm_cfg230 u_cfg230 (
+        .clk           (clk),
+        .reset         (reset),
+        .isa_addr      (isa_addr),
+        .isa_addr_next (isa_addr_next),
+        .isa_aen_next  (isa_aen_next),
+        .isa_ior_n_next(isa_ior_n_next),
+        .isa_iow_n_next(isa_iow_n_next),
+        .isa_dout      (isa_dout),
+        .isa_din       (cfg_din_c),
+        .isa_dsel      (cfg_dsel_c),
+        .isa_ior_n     (isa_ior_n),
+        .isa_iow_n     (isa_iow_n),
+        .isa_aen       (isa_aen),
+        .sw_mono       (cbm_dip[1]),
+        .venb_n        (venb_n),
+        .cfg           ()
+    );
+
+    pvc4 u_pvc4 (
+        .clk            (clk),
+        .reset          (reset),
+        .ce_14m         (ce_14m),
+        .isa_addr       (isa_addr),
+        .isa_addr_next  (isa_addr_next),
+        .isa_memr_n_next(isa_memr_n_next),
+        .isa_memw_n_next(isa_memw_n_next),
+        .isa_aen_next   (isa_aen_next),
+        .isa_ior_n_next (isa_ior_n_next),
+        .isa_iow_n_next (isa_iow_n_next),
+        .isa_dout       (isa_dout),
+        .isa_din        (pvc_din_c),
+        .isa_dsel       (pvc_dsel_c),
+        .isa_memr_n     (isa_memr_n),
+        .isa_memw_n     (isa_memw_n),
+        .isa_ior_n      (isa_ior_n),
+        .isa_iow_n      (isa_iow_n),
+        .isa_aen        (isa_aen),
+        .isa_ready      (pvc_ready_c),
+        .enable         (pvc_on && !venb_n),
+        .par_strap      ({cbm_dip[1], 1'b1, cbm_dip[1], 5'b00000}),
+        .cnf_strap      (8'hF7),
+        .cg_a14         (cbm_dip[0]),
+        .cg_a11         (!cbm_dip[1]),
+        .font_we        (font_we),
+        .font_addr      ({font_addr_hi, font_addr}),
+        .font_data      (font_data),
+        .font_cbm       (font_cbm),
+        .lpen_trig      (1'b0),
+        .lpen_sw        (1'b0),
+        .vid_ce         (pvc_ce),
+        .vid_rgbi       (pvc_rgbi),
+        .vid_mono       (pvc_mono),
+        .vid_hsync      (pvc_hs),
+        .vid_vsync      (pvc_vs),
+        .vid_hblank     (pvc_hb),
+        .vid_vblank     (pvc_vb),
+        .vid_monomode   (pvc_mm)
+    );
+end else begin : g_no_pvc4
+    assign cfg_din_c = 8'h00;  assign cfg_dsel_c = 1'b0;  assign venb_n = 1'b1;
+    assign pvc_din_c = 8'h00;  assign pvc_dsel_c = 1'b0;  assign pvc_ready_c = 1'b1;
+    assign pvc_ce = 1'b0;  assign pvc_rgbi = 4'h0;  assign pvc_mono = 1'b0;  assign pvc_mm = 1'b0;
+    assign pvc_hs = 1'b0;  assign pvc_vs = 1'b0;  assign pvc_hb = 1'b1;  assign pvc_vb = 1'b1;
+end endgenerate
+
+assign pvc_din   = pvc_on ? pvc_din_c : 8'h00;
+assign pvc_dsel  = pvc_on && pvc_dsel_c;
+assign pvc_ready = !pvc_on || pvc_ready_c;
+assign cfg_din   = pvc_on ? cfg_din_c : 8'h00;
+assign cfg_dsel  = pvc_on && cfg_dsel_c;
 
 logic [7:0] fdc_din;
 logic       fdc_dsel, fdc_ready;
@@ -415,9 +525,10 @@ xtide_card u_hdc (
 );
 
 assign isa_din   = (cga_dsel ? cga_din : 8'h00) | (mda_dsel ? mda_din : 8'h00) |
-                   (fdc_dsel ? fdc_din : 8'h00) | (hdc_dsel ? hdc_din : 8'h00);
-assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel;
-assign isa_ready = cga_ready & mda_ready & fdc_ready & hdc_ready;
+                   (fdc_dsel ? fdc_din : 8'h00) | (hdc_dsel ? hdc_din : 8'h00) |
+                   (pvc_dsel ? pvc_din : 8'h00) | (cfg_dsel ? cfg_din : 8'h00);
+assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel | pvc_dsel | cfg_dsel;
+assign isa_ready = cga_ready & mda_ready & fdc_ready & hdc_ready & pvc_ready;
 assign isa_irq   = fdc_irq | hdc_irq;
 assign isa_drq   = fdc_drq;
 

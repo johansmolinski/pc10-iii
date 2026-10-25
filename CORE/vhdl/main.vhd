@@ -7,6 +7,9 @@
 -- backend are owned by mega65.vhd.
 --
 -- Video: pc_system gives RGBI on the 14.31818 MHz enable (vid_ce = ce_14m, every second clock).
+-- The PC10-III's PVC4 (doc/pvc4.md) gives that in its colour personality; in its mono
+-- personality (MDA/Hercules timing) vid_ce is its 16.257 MHz dot (1 or 2 clocks apart),
+-- 18.4 kHz / 50 Hz, and the dot is (MONO, IT), shown as four levels of G_MONO_TINT.
 -- The PC and M2M's video pipeline run on the one 28.63636 MHz clock (clk.vhd, video_clk =
 -- main_clk), so the pixel, the syncs, the blanks and the enable are registered together and
 -- handed over as they are: one pixel per video_ce. RGBI becomes 8-bit RGB with the IBM 5153's
@@ -24,7 +27,14 @@ use ieee.numeric_std.all;
 
 entity main is
    generic (
-      G_RAM_KB                : natural := 640
+      G_RAM_KB                : natural := 640;
+      -- the PC10-III's CONFIG switches 1 and 2 that the PVC4 board wires (1 = off): bit 0 =
+      -- switch 1 (1 = USA/Europe character set), bit 1 = switch 2 (1 = onboard video mono).
+      -- Must agree with DIP SW1 bits 5-4 in mega65.vhd (0x5D: 80 x 25 colour). A menu item
+      -- later (doc/pvc4.md section 8).
+      G_CBM_DIP               : std_logic_vector(1 downto 0) := "01";
+      -- the mono personality's phosphor: 0 green, 1 amber, 2 white
+      G_MONO_TINT             : natural := 0
    );
    port (
       clk_main_i              : in  std_logic;     -- 28.63636 MHz, also M2M's video clock
@@ -128,6 +138,11 @@ architecture synthesis of main is
          font_addr   : in  std_logic_vector(12 downto 0);
          font_data   : in  std_logic_vector(7 downto 0);
          font_thin   : in  std_logic;
+         font_addr_hi : in  std_logic_vector(1 downto 0);
+         font_cbm    : in  std_logic;
+         cbm_dip     : in  std_logic_vector(1 downto 0);
+         vid_mono    : out std_logic;
+         vid_monomode : out std_logic;
          ucl_we      : in  std_logic;
          ucl_addr    : in  std_logic_vector(12 downto 0);
          ucl_data    : in  std_logic_vector(7 downto 0);
@@ -174,6 +189,10 @@ architecture synthesis of main is
    signal vid_vsync    : std_logic;
    signal vid_hblank   : std_logic;
    signal vid_vblank   : std_logic;
+   signal vid_mono     : std_logic;
+   signal vid_mm       : std_logic;
+   signal v_mono       : std_logic;
+   signal v_mm         : std_logic;
    signal speaker      : std_logic;
 
    signal v_rgbi       : std_logic_vector(3 downto 0) := (others => '0');
@@ -194,6 +213,24 @@ architecture synthesis of main is
       end if;
       return std_logic_vector(v);
    end function chan;
+
+   -- a mono dot (video, intensity) in one channel (0 R, 1 G, 2 B) of the phosphor `tint`
+   -- (0 green, 1 amber, 2 white): black, dim (intensity alone, doc/mda.md section 6),
+   -- normal, bright
+   function mono_lvl(v, i : std_logic; tint, ch : natural) return std_logic_vector is
+      type lvl_t is array (0 to 3) of natural;
+      constant LVL : lvl_t := (0, 16#40#, 16#B0#, 16#FF#);
+      type mul_t is array (0 to 2, 0 to 2) of natural;        -- per tint and channel, /256
+      constant MUL : mul_t := ((64, 256, 64), (256, 176, 0), (256, 256, 256));
+      variable l : natural;
+   begin
+      if v = '1' and i = '1' then l := LVL(3);
+      elsif v = '1' then l := LVL(2);
+      elsif i = '1' then l := LVL(1);
+      else l := LVL(0);
+      end if;
+      return std_logic_vector(to_unsigned((l * MUL(tint, ch)) / 256, 8));
+   end function mono_lvl;
 
 begin
 
@@ -226,6 +263,11 @@ begin
          font_addr   => font_addr_i,
          font_data   => font_data_i,
          font_thin   => font_thin_i,
+         font_addr_hi => "00",              -- the shell loads an 8 KB IBM image (pc_font.vhd)
+         font_cbm    => '0',
+         cbm_dip     => G_CBM_DIP,
+         vid_mono    => vid_mono,
+         vid_monomode => vid_mm,
          ucl_we      => ucl_we_i,
          ucl_addr    => ucl_addr_i,
          ucl_data    => ucl_data_i,
@@ -281,15 +323,20 @@ begin
          v_hb   <= vid_hblank;
          v_vb   <= vid_vblank;
          v_ce   <= vid_ce;
+         v_mono <= vid_mono;
+         v_mm   <= vid_mm;
       end if;
    end process p_video;
 
    video_ce_o     <= v_ce;
    video_ce_ovl_o <= '1';
 
-   video_red_o    <= chan(v_rgbi(2), v_rgbi(3));
-   video_green_o  <= x"55" when v_rgbi = "0110" else chan(v_rgbi(1), v_rgbi(3));
-   video_blue_o   <= chan(v_rgbi(0), v_rgbi(3));
+   -- colour: RGBI, colour 6 brown; mono (the PVC4's mono personality): (MONO, IT) as black,
+   -- dim (intensity without video), normal and bright in the G_MONO_TINT phosphor
+   video_red_o    <= mono_lvl(v_mono, v_rgbi(3), G_MONO_TINT, 0) when v_mm = '1' else chan(v_rgbi(2), v_rgbi(3));
+   video_green_o  <= mono_lvl(v_mono, v_rgbi(3), G_MONO_TINT, 1) when v_mm = '1' else
+                     x"55" when v_rgbi = "0110" else chan(v_rgbi(1), v_rgbi(3));
+   video_blue_o   <= mono_lvl(v_mono, v_rgbi(3), G_MONO_TINT, 2) when v_mm = '1' else chan(v_rgbi(0), v_rgbi(3));
    video_hs_o     <= v_hs;
    video_vs_o     <= v_vs;
    video_hblank_o <= v_hb;
