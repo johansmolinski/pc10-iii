@@ -599,9 +599,10 @@ CFG_SIGSET      SYSCALL(enter, 1)
 
 ; The menu's layout version (config.vhd): change it with every change of the
 ; menu lines. No signature: the 31-line menu up to 2026-10-25. "2": 32 lines,
-; "Drive sound" at line 6. At most 3 characters (CFG_SIGCHECK's buffer).
+; "Drive sound" at line 6. "3": 39 lines, the "Chipset" submenu at lines 8-14.
+; At most 3 characters (CFG_SIGCHECK's buffer).
 CFG_SIG_KEY     .ASCII_W "menu"
-CFG_SIG_VAL     .ASCII_W "2"
+CFG_SIG_VAL     .ASCII_W "4"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings
@@ -632,7 +633,7 @@ END_OF_ROM      .DW 0
 #include "../../M2M/rom/shell_vars.asm"
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
-; for this 25-line menu the demand is ~600 words, the Shell checks it at boot
+; for this 48-line menu the demand is 990 words, the Shell checks it at boot
 ; (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
 MENU_HEAP_SIZE  .EQU 1024
 

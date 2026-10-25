@@ -23,10 +23,16 @@
 // done by Johan Smolinski in 2026 and licensed under GPL v3
 
 module pc_system #(
-    parameter int RAM_KB = 640
+    parameter int RAM_KB = 640,
+    // the real pc_system's configuration (ignored by the stand-in)
+    parameter bit CGA_FIT = 1'b1,
+    parameter int MDA_FIT = 0,
+    parameter bit FE2010A = 1'b0,
+    parameter bit PVC4_FIT = 1'b0
 ) (
     input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high
+    input  logic        fe2010a,      // the chipset (ignored here)
 
     output logic [19:0] ram_addr,
     output logic        ram_en,
@@ -50,6 +56,11 @@ module pc_system #(
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
     input  logic        font_thin,
+    input  logic [1:0]  font_addr_hi,
+    input  logic        font_cbm,
+    input  logic [1:0]  cbm_dip,
+    output logic        vid_mono,
+    output logic        vid_monomode,
 
     input  logic        ucl_we,       // the 8088's microcode load port (ignored)
     input  logic [12:0] ucl_addr,
@@ -212,6 +223,8 @@ module pc_system #(
     always_ff @(posedge clk) div2 <= !div2;
     wire ce_14m = !div2;
     assign vid_ce = ce_14m;
+    assign vid_mono = 1'b0;
+    assign vid_monomode = 1'b0;
 
     // ------------------------------------------------------------------------------------
     // Raster

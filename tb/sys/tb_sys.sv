@@ -8,7 +8,8 @@ module tb_sys #(
     parameter int RAM_KB = 640,
     parameter int DRQ0_SKEW = 0,
     parameter int MDA_FIT = 0,
-    parameter bit FE2010A = 1'b0
+    parameter bit FE2010A = 1'b0,
+    parameter bit PVC4 = 1'b0           // the PC10-III's onboard video (doc/pvc4.md)
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -31,6 +32,17 @@ module tb_sys #(
     input  logic        font_we,
     input  logic [12:0] font_addr,
     input  logic [7:0]  font_data,
+    input  logic [1:0]  font_addr_hi,   // PVC4: a 32 KB Commodore character ROM
+    input  logic        font_cbm,
+    input  logic [1:0]  cbm_dip,        // PVC4: CONFIG switches 1 and 2 (1 = off)
+    output logic        vid_ce,
+    output logic [3:0]  vid_rgbi,
+    output logic        vid_mono,
+    output logic        vid_monomode,
+    output logic        vid_hsync,
+    output logic        vid_vsync,
+    output logic        vid_hblank,
+    output logic        vid_vblank,
     output logic        mda_ce,
     output logic        mda_video,
     output logic        mda_intens,
@@ -130,9 +142,11 @@ end
 assign ram_ack   = ack_sh[ram_lat - 1];
 assign ram_rdata = rd_sh[ram_lat - 1];
 
-pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT), .FE2010A(FE2010A)) u_pc (
+pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4), .MDA_FIT(MDA_FIT),
+            .PVC4_FIT(PVC4)) u_pc (
     .clk        (clk),
     .reset      (reset),
+    .fe2010a    (FE2010A),                   // make FE=1: the PC10-III's chipset
     .ucl_we     (ucl_we),
     .ucl_addr   (ucl_addr),
     .ucl_data   (ucl_data),
@@ -144,12 +158,17 @@ pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .MDA_FIT(MDA_FIT), .FE2010A(
     .ram_ack    (ram_ack),
     .rom_addr   (rom_addr),
     .rom_rdata  (rom_rdata),
-    .vid_ce     (),
-    .vid_rgbi   (),
-    .vid_hsync  (),
-    .vid_vsync  (),
-    .vid_hblank (),
-    .vid_vblank (),
+    .vid_ce     (vid_ce),
+    .vid_rgbi   (vid_rgbi),
+    .vid_hsync  (vid_hsync),
+    .vid_vsync  (vid_vsync),
+    .vid_hblank (vid_hblank),
+    .vid_vblank (vid_vblank),
+    .vid_mono   (vid_mono),
+    .vid_monomode(vid_monomode),
+    .font_addr_hi(font_addr_hi),
+    .font_cbm   (font_cbm),
+    .cbm_dip    (cbm_dip),
     .mda_ce     (mda_ce),
     .mda_video  (mda_video),
     .mda_intens (mda_intens),
@@ -263,5 +282,17 @@ always_ff @(posedge clk)
                  u_pc.u_cpu.cpu.eu.q_top, u_pc.u_cpu.cpu.eu.IR, u_pc.u_cpu.cpu.eu.biu_ip,
                  u_pc.cpu_bus_t, u_pc.u_cpu.cpu.eu.irq_take, u_pc.u_cpu.cpu.eu.int_cond,
                  u_pc.u_cpu.cpu.eu.F, u_pc.u_cpu.cpu.eu.CX);
+
+// FE2010A: log the configuration and switch registers (63h, 62h) when they change
+generate if (FE2010A) begin : g_felog
+    logic [7:0] cfg_q = 8'h00, sw_q = 8'h00;
+    always_ff @(posedge clk) begin
+        cfg_q <= u_pc.u_board.fe_cfg;  sw_q <= u_pc.u_board.fe_sw;
+        if (!reset && (u_pc.u_board.fe_cfg != cfg_q || u_pc.u_board.fe_sw != sw_q))
+            $display("[step %0d] FE cfg %02h sw %02h", zsteps, u_pc.u_board.fe_cfg, u_pc.u_board.fe_sw);
+        if (ram_en && ram_we && (ram_addr == 20'h00410 || ram_addr == 20'h00411) && ram[ram_addr] != ram_wdata)
+            $display("[step %0d] equipment %05h <= %02h", zsteps, ram_addr, ram_wdata);
+    end
+end endgenerate
 
 endmodule

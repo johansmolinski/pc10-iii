@@ -32,6 +32,13 @@ why, test numbers).
    (`rtl/cpu/z8086/z86_overlay.svh`) holds only our own words, derived from
    behaviour (doc/z8086.md section 5). Timing facts from the test suite,
    MartyPC (MIT), XTCE (The Unlicense) or published analyses are fine.
+   **Releases** (the user's decision, 2026-10-25): the release package may
+   ship the bundle as the separate file `pc10/ucode.bin` for the SD card,
+   with a notice that it is Intel's property, not covered by the core's GPLv3,
+   and withdrawn if Intel asks. It stays a separate file (never in the
+   bitstream, never in this repository), so withdrawing it leaves the core
+   untouched. The same pattern applies to Commodore's BIOS/character ROMs only
+   if Commodore grants permission (asked 2026-10-25).
 5. **Test data stays outside the repo** (`~/pcxt-work/`): the suite has no
    licence file, and the converted form is several GB.
 6. Hardware rules from Megamiga apply once there is a bitstream: board XDC,
@@ -52,6 +59,10 @@ why, test numbers).
   trace comparison `tools/ctrace_diff.py`).
 - `rtl/video/cga/` (cga_card.sv, cga_crtc.sv) and `tb/cga/` (Verilator TB
   with a C++ MartyPC model, `make run`, mutants `mut.py`): `doc/cga.md`.
+- `rtl/video/pvc4/pvc4.sv`, `rtl/system/cbm_cfg230.sv` and `tb/pvc4/`: the
+  PC10-III's onboard video (Paradise PVC4) and its 230h register:
+  `doc/pvc4.md`. No Commodore ROM or character ROM content in the repository
+  (the BIOS disassembly stays in `~/pcxt-work/pvc4/`).
 
 ## Harness facts
 

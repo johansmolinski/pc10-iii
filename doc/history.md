@@ -1462,6 +1462,166 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   and /DSKCHG behaviour), the firmware's settings-file path beyond the two
   callbacks (the Shell's load/save around them), Vivado (synthesis, timing).
 
+## 2026-10-25 - The chipset as a menu choice: PC10-III (FE2010A) or IBM XT (8255) (branch `chipset`)
+
+- **Why:** the Commodore BIOS 4.41 needs the FE2010A's port logic (b00d54a),
+  GLaBIOS (the free default BIOS) selects the switch nibble with PB3 like a
+  5160 and stops with "POST Error 0800 FDD" on it. The user chose a menu item.
+- **xt_board.sv:** the `FE2010A` parameter is now the input `fe2010a`, taken
+  into `fe_mode` while reset is high. Both port logics are always there: the
+  KF8255 as before (its chip select gated with !fe_mode, its port C from the
+  5160 switch nibble), the FE2010A registers (port B, 62h switch register, 63h
+  configuration, written only in FE mode); port B, its drive flag and the read
+  data are multiplexed by `fe_mode`, and the 63h RAM size limits `ram_top` only
+  in FE mode. pc_system has the input instead of the parameter; tb/sys keeps
+  its `FE2010A` parameter (`make FE=1`) and drives the input with it;
+  pc_system_flat, main.vhd, the stub and the OOC top pass it through.
+- **Shell:** `pc_chipset.vhd`: the menu bit, the switches (5D FE2010A, 6D
+  8255) and a restart on a change (the PC held in reset for 2^16 clocks =
+  2.3 ms from the clock the menu bit changes, OR-ed into `main_pc_reset`). The
+  memory size, by contrast, acts at once (`pc_ram.vhd`), so there was no
+  restart path to reuse.
+- **Menu:** submenu `Chipset: %s` at line 8 (headline, `PC10-III (FE2010A)`
+  default at 11, `IBM XT (8255)` at 12, back at 14), behind the drive sound;
+  39 lines, every C_MENU_* from Memory on moved by 7, OPTM_DY 19, menu heap
+  demand 806 of 1024. Settings signature `menu=3` (old files get the
+  defaults once). Firmware ROM 32037 words (unchanged), RAM unchanged.
+- **Tests:** `tb/shell/tb_chipset.vhd` PASS; `tb/shell/mut.py`: pc_chipset 7
+  of 7, pc_drvsnd 27 of 27, firmware 5 of 5 killed; `tb/shell/run.sh` PASS.
+- **Gates** (fedora, `gates.sh chipset` and `chipset-base` = main 00a51da
+  exported, `~/pcxt-work/clk/chipset*`): 8255 mode (tb/sys default):
+  - MartyPC trace (`DRQ0_SKEW=7`, `-s 1.27 -q -C 40 -t`): SHA-256 a72753ca...
+    on both (unchanged since clk28), first difference 2,227,925 (MartyPC's
+    LOOP); `-d EE` bd612823... and `-L 2` a72753ca... on both;
+  - floppy boot (GLaBIOS, `-a hello360.img -s 10 -C 40`): the log identical to
+    main's but the wall time (C0 H0 S1/S2 at 9,005.376/9,005.394 ms, "Booted
+    from floppy A:", the CGA oracle 134 reads / 14,147 writes, 0 differ);
+  - tb/fdc 232 checks, tb/hdc 3,182 checks, tb/cga, tb/mda, tb/shell PASS.
+- **FE2010A mode** (`make FE=1`, the Commodore BIOS 4.41,
+  `-s 24 -a hello360.img -d 5D`, `~/pcxt-work/chipset/cbm-fe`): the banner,
+  "Hard disk not found", no timer or keyboard error, "System RAM 256 KBytes
+  OK" at 24 s (the RAM test still running); the log (CS:IP every 50 ms over
+  24 s, POST codes, the screen) is identical to the run of main's code in
+  `~/pcxt-work/scratch/cbm/fe2_cbm.log` but for that run's extra screenshot
+  at 18 s.
+- The same at 50 s (`~/pcxt-work/chipset/cbm-fe45`, 3,489 s wall): "System
+  RAM 640 KBytes OK", the boot sector read (C0 H0 S1/S2) at 38,205.376 ms
+  and "Booted from floppy A: (pc10-iii FDC+DMA)"; the PC sits in the boot
+  sector's loop (0000:7C1D) from 39.9 s on. Not verified: the menu, the
+  restart and the settings file in the real shell (no Vivado, no hardware);
+  GLaBIOS with 6D on the 8255 is covered by tb/sys only.
+
+## 2026-10-25 - The PC10-III's onboard video: Paradise PVC4 (branch `pvc4`)
+
+- **What:** the PC10-III has no IBM CGA or MDA; its video is the Paradise
+  PVC4 on the main board ("video card on a chip": CGA, MDA, Hercules,
+  Plantronics ColorPlus, AT&T 6300; "flicker-free operation in all video
+  modes"). doc/pvc4.md is the chip as a specification (data sheet, the
+  PC10-III manual's chapters 2.2, 5, 6 and the video schematic sheet 9-6,
+  the Commodore BIOS 4.41 read for its use of the chip), with the
+  assumptions marked.
+- **Facts found:** the PC10-III straps the PVC4 (sheet 9-6) to Paradise
+  register E0h (DIP switch 2 off: mono mapping, 9-dot characters) or 40h
+  (switch 2 on: colour), both with the "flicker override" (video enable
+  forced on), and Configuration register F7h (one 64K x 8 bank, IBM 200
+  lines, border on, printer decode off); CLOCK1 and CLOCK2 are the same
+  16.257 MHz oscillator (no 24 MHz: the manual's ALPHA132 at 24 MHz cannot
+  run on this sheet); the character ROM is a 27256 with A14 = DIP switch 1
+  (national set), A11 = NOT switch 2 (mono/colour), A13 = the PVC4's CA13,
+  A12 = character bit 7; the BIOS never writes 3XA/3XB, so the straps decide
+  everything; 230h (in the 5720 gate array) reads switch 2 in bit 7, its
+  write bit 7 (venb') enables the PVC4's data buffer and READY, bits 6-0 read
+  back (the BIOS's handshake). The snow the user saw is the IBM CGA model's:
+  the PVC4's DRAM sequence gives the CPU its own memory cycle.
+- **Model** (`rtl/video/pvc4/pvc4.sv`): one 6845 (`cga_crtc.sv`; R8 gone,
+  R10 on/off only, the lock with R11 as underline row) for a colour
+  personality (`cga_card.sv`'s display on ce_14m, without snow) and a mono
+  one (`mda_card.sv`'s on a 16.257 MHz accumulator that never stops, /2 in
+  40 columns, 8/9-dot characters, Hercules with the PC10-III's own CRTC
+  table: 880 x 368); 64 KB in two A14 banks; Plantronics 320x200x16 and
+  640x200x4 with the plane swap; 3X8 readable, the unlock, 3DE (CA13), 3BF,
+  the PVC4 status bits, border control; a 32 KB character ROM RAM in the
+  Commodore layout or an IBM 5788005 image. CPU access: READY low with the
+  strobe, high after the CPU part (5 clocks) of the next memory sequence (16
+  colour clocks, two mono characters) that saw the synchronised request;
+  the sequencer runs on the undivided clock (a first version divided it in
+  40 columns and held READY up to 2.2 us, beyond the data sheet's 2000 ns:
+  the Commodore BIOS's video RAM probe showed it).
+- **230h** (`rtl/system/cbm_cfg230.sv`): the register (reset 00h assumed),
+  not the RTC, mouse, COM and LPT it enables.
+- **Integration:** `pc_system` `PVC4_FIT` (default 0: unchanged), new ports
+  `font_addr_hi`, `font_cbm`, `cbm_dip`, `vid_mono`, `vid_monomode`; an
+  unfitted CGA sees no strobes (its write check fired on the PVC4's shorter
+  cycles); the IBM cards' fonts take only `font_addr_hi` = 0. Shell:
+  `pc_system_flat` = FE2010A + PVC4, no CGA; `main.vhd` generics
+  `G_CBM_DIP` ("01": USA set, colour, matching DIP SW1 5Dh) and
+  `G_MONO_TINT` (green/amber/white for the mono personality's four levels);
+  the stand-in, the OOC top (now with the PVC4), gen_xpr.py and CORE-R6.xpr
+  carry the two new files; the default font gained an MDA part (the GLaBIOS
+  glyphs stretched to 14 rows; the CGA part byte-identical).
+- **tb/pvc4** (`make run`, ~1 min): the board's bus model and a reference
+  model built from tb/cga's MartyPC CGA and tb/mda's MDA models plus the
+  PVC4's differences; READY at every clk, every VRAM write instant, every
+  read and every dot compared. 22 tests PASS (registers and the unlock, wait
+  states in four clock modes, BIOS modes 0-6, flicker override, Plantronics,
+  no snow, status, torture 4+3 runs, MDA text 9/8-dot, mono /2, Hercules
+  pages, the Commodore ROM layout, blink). Wait states: colour reads 1-6
+  (mean 3.97), writes 2-7 (5.20); mono reads 1-6 (3.61), writes 2-7 (4.96);
+  READY low at most 1502 ns. `mut.py`: 37 of 37 mutants killed (the first
+  run left three; the harness then got the write-instant check, the `cbm`
+  test the switch-against-mapping cases).
+- **System** (`tb/sys`, fedora, `~/pcxt-work/pvc4/`): the Commodore BIOS 4.41
+  on the PC10-III build (`make FE=1 PVC4=1`, `sys_run -d 5D [-m] -a
+  hello360.img -s 28`): 230h = 00h (onboard video on) and the CRTC tables at
+  0.05-0.66 ms, 230h = 81h, the B0/B8:007B probe at 283 ms finds no expansion
+  card and writes 230h = 01h (on); colour: the banner ("Commodore PC BIOS
+  Rev. 4.41", "Hard disk not found") at 1.5 s, "System RAM ... KBytes OK"
+  counting; mono (DIP switch 2 off: Paradise E0h, 16.257 MHz, 9-dot): the
+  same on the mono personality (POST 00 at 2.78 s instead of 1.54 s); at
+  8.09 s the BIOS writes 230h 00/01/09/19/59 (onboard COM, mouse, RTC
+  enables). Frames: `cbm_col.ppm` (768 x 245, RGBI), `cbm_mono.ppm` (738 x
+  354, green). The CPU's cycles to the PVC4's memory over the 28 s: colour
+  28,093 reads 2-6 Tw (mean 4.33), 68,197 writes 2-7 (5.58); mono 11,609
+  writes 2-7 (6.08). No snow (there is none to show: the CPU never takes the
+  display's cycle). GLaBIOS 0.4.2 on the IBM board with the PVC4 (`make
+  PVC4=1`, 6 s; the FE2010A's switch select is PB2, GLaBIOS's PB3, so
+  GLaBIOS reads the wrong switch nibble on `FE=1`): colour and mono banners
+  at 1 s, "RAM [ 544 KB OK ]" / "[ 560 KB OK ]" at 6 s; 13,366 / 3,559
+  writes, 2-7 Tw (CGA in the same boot: 3-8). `sys_run` gained `-P`
+  (CONFIG switches 1-2), 32 KB Commodore fonts with `-F`, `-o` for the PVC4
+  frame, the text dump from the PVC4's RAM and the wait histogram.
+- **Gates** (fedora `gates.sh pvc4-a`, the default build): the MartyPC trace
+  (`DRQ0_SKEW=7`, `-s 1.27 -q -C 40 -t`) SHA-256 a72753ca..., the `-d EE`
+  trace bd612823..., the `-L 2` trace a72753ca...: byte-identical; floppy
+  boot log line for line equal to `chipset-base`'s (C0 H0 S1 at 9,005.376
+  ms, "Booted from floppy A:", oracle 134 reads + 14,147 writes, 0 differ);
+  tb/cga, tb/mda, tb/fdc (232 checks), tb/hdc (3,182) PASS; tb/shell PASS
+  (locally: the fedora copy has no M2M/QNICE).
+- Not verified: hardware, Vivado (synthesis, timing; the PVC4 adds about 24
+  RAMB36: 64 KB video RAM, 32 KB character ROM), the CPU access timing of a
+  real PVC4 (doc/pvc4.md section 4), ALPHA132, the mono personality on the
+  analog output (doc/pvc4.md 8.1), the user's Commodore character ROMs.
+
+## 2026-10-25 - The menu's Display (colour / mono, the phosphor) and 720p 50 Hz
+
+- **What:** the PVC4 merge (2896c09) left DIP switch 2 and the mono tint as
+  generics. The menu's "Display: %s" submenu (lines 32-40): Colour (default),
+  Monochrome green / amber / white. `pc_chipset.vhd` now also takes the
+  display: mono sets CONFIG switch 2 off (`cbm_dip` 11: the PVC4's straps,
+  230h bit 7) and switches 3/4 off (DIP SW1 bits 5-4 = 11, 7Dh on both
+  chipsets); a change between colour and mono restarts the PC like a chipset
+  change (the straps are taken in reset). The phosphor is `main.vhd`'s
+  `mono_tint_i` (constant tables per tint, no multiplier) and changes live.
+  The HDMI submenu gained 720p 50 Hz (`C_VIDEO_HDMI_16_9_50`) for the mono
+  personality's 49.8 Hz. "CGA: thin font" is gone (the PVC4 has no jumper
+  P3; `font_thin` tied 0). Menu 48 lines, `MENU_HEAP_SIZE` demand 990 of
+  1024, settings signature `menu=4`.
+- **Tests:** tb/shell PASS (tb_chipset: mono on both chipsets, the switches
+  change with the register, one restart per change); mut.py: pc_chipset 14 of
+  14 (5 new mono mutants), pc_drvsnd 27 of 27, signature 5 of 5 killed. ghdl
+  analysis of config/main/mega65.vhd clean.
+- Not verified: Vivado, hardware.
+
 ## 2026-10-25 - The PC20-III's hard disk: the specification (branch `xta`, step 1)
 
 - **What:** doc/xta.md, the plan's guesses replaced by facts: the
