@@ -68,6 +68,8 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
      |               video, the Paradise PVC4, doc/pvc4.md)
      +- cbm_cfg230  rtl/system/cbm_cfg230.sv      (PVC4_FIT: the Commodore
      |               configuration register 230h, the 5720's)
+     +- msm6242     rtl/system/msm6242.sv         (PVC4_FIT: the PC10-III's real-time
+     |               clock, an MSM6242B at 2C0h-2CFh while 230h bit 6 is set; doc/rtc.md)
      +- fdc_card    rtl/fdc/fdc_card.sv: the diskette adapter (765), doc/fdc.md
      +- xtide_card  rtl/hdc/xtide_card.sv: XTIDE hard disk card + option ROM socket, doc/hdc.md
      +- xta_card    rtl/hdc/xta_card.sv           (XTA_FIT: the PC20-III's hard disk, a
@@ -289,6 +291,15 @@ module pc_system #(
     output logic        xta_sp_wr_valid,  output logic [7:0] xta_sp_wr_data,
     input  logic        xta_sp_wr_ready, xta_sp_done, xta_sp_err,
 
+    // The PC10-III's real-time clock (PVC4_FIT, rtl/system/msm6242.sv,
+    // doc/rtc.md): seeded from M2M's main_rtc_i (MiSTer's 65-bit format, BCD,
+    // years since 2000, bit 64 a toggle per new value); rtc_set = one clk when
+    // the PC has set the clock, rtc_time = the clock in the register order of
+    // M2M's RTC device (hundredths .. year since 2000, weekday 0 = Monday)
+    input  logic [64:0] rtc_seed,
+    output logic        rtc_set,
+    output logic [63:0] rtc_time,
+
     // Keyboard: XT (set 1) scan codes from the glue
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,    // one-clk strobe; dropped if kbd_busy
@@ -356,6 +367,15 @@ Notes (2026-10-25, PC20-III hard disk):
   SD backend exists (doc/xta.md section 11).
 - `tb/sys` serves the drive from an image file (`make XTA=1`, `-A`,
   `-jmp208`, `-WA`, `-xl`).
+
+Notes (2026-10-26, real-time clock):
+- The chip has no reset: it keeps time across PC resets like the battery-backed
+  original; its 32.768 kHz is an exact fractional accumulator on `clk`.
+- Without `PVC4_FIT` there is no RTC (`rtc_set` 0, `rtc_time` 0); with it, the
+  chip answers only while 230h bit 6 is set (the Commodore BIOS sets it in
+  every POST; GLaBIOS on the IBM chipset never does, so 2C0h stays open there).
+- The shell: `pc_system_flat` passes `main_rtc_i` in and the write-back out to
+  `CORE/vhdl/pc_rtc.vhd` (doc/m2m-shell.md section 8). tb/sys: `-R` seeds it.
 
 Not yet in the contract: serial/parallel, composite video, turbo. They get
 added here when their module exists.

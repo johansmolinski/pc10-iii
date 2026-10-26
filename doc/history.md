@@ -1780,3 +1780,65 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   HDL and timing (WNS +0.263, WHS +0.036) with the SPACE eject; kit
   `~/pcxt-work/kits/pc10-real-t` (+ Commodore MS-DOS 3.21 disks 1/2 for the SD
   card, never in the repo). Loaded on the MEGA65.
+
+## 2026-10-26 - The PC10-III's real-time clock: an MSM6242B at 2C0h, seeded from and written back to the MEGA65's RTC (branch `rtc`)
+
+- **Why:** on hardware MS-DOS 3.21's AUTOEXEC (`setclock -r`) printed `RTC
+  timeout`: nothing answered at 2C0h (FFh reads have BUSY set).
+- **Facts** (doc/rtc.md): the board's U401 is an OKI MSM6242B (SM sheet 9-4:
+  D3-D0, A3-A0, RD'/WR' = NIOR'/NIOW', CS0' from the 5720, CS1/ALE on the
+  battery node, STD.P only on a pull-up: no interrupt), enabled by 230h bit 6,
+  which the BIOS 4.41 sets in every POST. The POST reads 2C0h twice 2.33 s
+  apart; ticking: `Onboard RTC at 02C0h`, the tick count from INT 1Ah AH=02;
+  not ticking: CD = 04h, CF = 07h/04h, once more. INT 1Ah AH=02-05 use HOLD
+  (07h) with BUSY polling, the year registers count from 1980. SETUP keeps its
+  configuration in the hard disk's MBR (signature `PC10` at 1B0h, the word at
+  1B4h), not in the RTC (the chip has no RAM: the old note was wrong).
+  SETCLOCK V3.0 (Colt disk): `-r` reads 13 registers in 24 h mode, `-w` uses
+  STOP/REST and writes W from DOS, and stores DOS's hundredths as the seconds
+  (a bug of V3.0). MS-DOS 3.21's IO.SYS reads the RTC (AH=02, AH=04) at boot
+  and never writes it: DOS's TIME/DATE do not persist, `setclock -w` does.
+- **Model** (`rtl/system/msm6242.sv`, in pc_system with the PVC4/230h board
+  logic): an exact 32.768 kHz accumulator on clk, the BCD calendar with leap
+  years, 12/24 h, HOLD with one held carry, BUSY (183 us window, cleared by a
+  16 kHz sample with HOLD = 0, kept while HOLD stays set), 30 s adjust,
+  STOP/REST/TEST, the STD.P/IRQ flag; no reset (battery). Seed: M2M's
+  `main_rtc_i` on its toggle (stable data, valid BCD, not during HOLD, not
+  after the PC set the clock; years + 20, weekday Monday = 0 -> W 1).
+  Write-back: `rtc_set` when the PC has set the clock and HOLD/STOP/ADJ are
+  clear, `rtc_time` in M2M's register order (years - 20 mod 100, so 1980-1999
+  are 2080-2099 on the MEGA65 and back). LUTs 374, FFs 184, 1 DSP.
+- **Shell:** `CORE/vhdl/pc_rtc.vhd` (QNICE device 0x0106, request/acknowledge
+  through `cdc_stable`), firmware `PC_RTC_WB` (`CORE/m2m-rom/pc_rtc.asm`, first
+  in `HANDLE_CORE_IO`): stop M2M's internal timer, its registers 0x00-0x07,
+  0x0C (copy to the RTC, then run), acknowledge; 61 words, ROM 32227 of 32768,
+  no variables (HEAP 0xA51C unchanged).
+- **tb/rtc** (`make run`, fedora; reference model + independent checks:
+  gmtime calendar, the BIOS's INT 1Ah and SETCLOCK V3.0 sequences with their
+  cycle gaps): 12 runs PASS, 2,836,999,846 clk compared with the model, 6.2 M
+  CPU reads, 492 explicit checks (322 calendar cases in 24 h and 12 h mode,
+  1980-2079); the phase sweep around the carry shows the BIOS's INT 1Ah
+  failing in 5 of 11 phases inside BUSY's ~250 us window (its 50 retries keep
+  HOLD set; DS's own note) and SETCLOCK in 3. `mut.py`: 54 of 54 killed (the
+  first run left two: no calendar year with odd tens and a leap year, and an
+  equivalent strobe mutant; the calendar gained 1990/1992/2010/2012).
+- **tb/shell** (local): `tb_rtc.vhd` (pc_rtc.vhd with M2M's rtc_controller,
+  the firmware's sequence, busy I2C, two requests, stray acknowledges),
+  `run_rtcwb.sh` (`PC_RTC_WB` on the QNICE emulator), `run.sh` PASS;
+  `mut_rtc.py` 8 of 8 + 7 of 7 killed. tb/pvc4 `make run` PASS.
+- **Gates** (fedora `gates.sh rtc-a`, vs merge-b): g_tr a72753ca..., g_tre
+  bd612823..., g_trL2 a72753ca...: identical; g_fd identical but for the wall
+  time; tb/fdc, tb/hdc, tb/cga, tb/mda logs identical but for paths.
+- **tb/sys** (fedora, Commodore BIOS 4.41 + Colt MS-DOS 3.21, `-R
+  "2026-10-26 12:34:56"`): 640 KB: `Onboard RTC at 02C0h`, IO.SYS reads the
+  date, `setclock -r` without `RTC timeout`, DATE `Mon 10-26-2026` and TIME
+  `12:36:09.17` at 70/73 s; 256 KB: `time 23:59:50`, `date 12-31-99`,
+  `setclock -w`: one write-back `2099-12-31 23:59:29.00` weekday 4 (the 29 s
+  are DOS's hundredths, SETCLOCK V3.0's bug), `setclock -r`, DATE `Fri
+  12-31-1999`, TIME `23:59:44.61`; without a seed: `1-01-1980 0:01:00`.
+- **Build** pc10-rtc-a (REF=pc10-real-r, commit 1aeb061): WNS +0.067, WHS
+  +0.036, BRAM 258 of 365 (unchanged); the worst path is QNICE's own (device
+  register to its address bus, +0.067; pc10-real-r +0.263), the new device in
+  the QNICE read mux. Kit `~/pcxt-work/kits/pc10-rtc-a/` (pc10-real-r's SD
+  files, `dos321-1.img`, `bios-cbm441.rom` to copy over `bios.rom`).
+- Not verified: hardware; M2M's RTC write on the real I2C chip.
