@@ -54,6 +54,7 @@ module pc_system_flat #(
     output logic        drv_step_in,
     output logic        sp_req,
     output logic        sp_write,
+    output logic        sp_fmt,
     output logic        sp_drive,
     output logic [7:0]  sp_cyl,
     output logic        sp_head,
@@ -118,7 +119,7 @@ pc_system #(.RAM_KB(RAM_KB), .PVC4_FIT(1'b1), .CGA_FIT(1'b0), .XTA_FIT(1'b1)) u_
     .drv_80trk, .img_present, .img_wp,
     .img_tracks(tracks), .img_heads(heads), .img_spt(spt),
     .drv_motor, .fdc_active, .drv_select, .drv_step, .drv_step_in,
-    .sp_req, .sp_write, .sp_drive, .sp_cyl, .sp_head, .sp_sector, .sp_lba,
+    .sp_req, .sp_write, .sp_fmt, .sp_drive, .sp_cyl, .sp_head, .sp_sector, .sp_lba,
     .sp_rd_valid, .sp_rd_data, .sp_wr_valid, .sp_wr_data, .sp_wr_ready, .sp_done, .sp_err,
     // the hard disk card is not wired into the shell yet (doc/hdc.md section 8):
     // card disabled, no drives, the option ROM socket empty

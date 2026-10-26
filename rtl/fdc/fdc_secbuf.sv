@@ -28,6 +28,7 @@ module fdc_secbuf (
     // transfer requests from the 765
     input  logic        x_start,
     input  logic        x_write,
+    input  logic        x_fmt,          // pc10-iii (internal drive): a FORMAT TRACK commit
     input  logic        x_slot,
     input  logic [7:0]  x_cyl,
     input  logic        x_head,
@@ -41,6 +42,7 @@ module fdc_secbuf (
     // sector port (to the MEGA65 glue)
     output logic        sp_req,
     output logic        sp_write,
+    output logic        sp_fmt,
     output logic        sp_drive,
     output logic [7:0]  sp_cyl,
     output logic        sp_head,
@@ -95,6 +97,7 @@ always_ff @(posedge clk) begin
             slot      <= x_slot;
             sp_req    <= 1'b1;
             sp_write  <= x_write;
+            sp_fmt    <= x_write && x_fmt;
             sp_drive  <= x_drive;
             sp_cyl    <= x_cyl;
             sp_head   <= x_head;

@@ -73,12 +73,14 @@ module tb_sys #(
     output logic        speaker,
 
     // floppy: geometry and the sector port (served by sys_run.cpp)
+    input  logic [1:0]  drv_80trk,      // {B, A}
     input  logic [1:0]  img_present,
     input  logic [15:0] img_tracks,     // {B, A}
     input  logic [3:0]  img_heads,
     input  logic [11:0] img_spt,
     output logic        sp_req,
     output logic        sp_write,
+    output logic        sp_fmt,
     output logic        sp_drive,
     output logic [7:0]  sp_cyl,
     output logic        sp_head,
@@ -205,7 +207,7 @@ pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4), .MDA_FIT(MD
     .font_addr  (font_addr),
     .font_data  (font_data),
     .font_thin  (1'b0),
-    .drv_80trk  (2'b00),
+    .drv_80trk  (drv_80trk),
     .img_present(img_present),
     .img_wp     (2'b00),
     .img_tracks (img_tracks),
@@ -218,6 +220,7 @@ pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4), .MDA_FIT(MD
     .drv_step_in(),
     .sp_req     (sp_req),
     .sp_write   (sp_write),
+    .sp_fmt     (sp_fmt),
     .sp_drive   (sp_drive),
     .sp_cyl     (sp_cyl),
     .sp_head    (sp_head),

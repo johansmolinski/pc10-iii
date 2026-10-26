@@ -1,7 +1,7 @@
 #include <unistd.h>
 // sys_run.cpp - Verilator driver for the pc_system simulation.
 //   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-i itrace.txt from_ms] [-q]
-//           [-a floppy.img] [-d dip_sw1] [-L ram_latency_clk]
+//           [-a floppy.img] [-B floppy.img] [-WB out.img] [-d dip_sw1] [-L ram_latency_clk]
 //           [-X xub.bin] [-H disk.img] [-J slave.img] [-G c,h,s] [-V variant]
 //           [-W out.img] [-K backend_us] [-S ms,ms,...]
 //           [-F font.bin] [-m] [-v] [-o image] [-C [max]] [-f]
@@ -13,6 +13,10 @@
 // 2C0h-2CFh and 230h.
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
+//
+// Floppies: -a and -B attach images to A: and B: (geometry from the size, an
+// 80-track drive for 720K as in the MEGA65 glue); -WB writes B:'s image to a
+// file at the end.
 //
 // Hard disk (rtl/hdc, doc/hdc.md): -X puts an option ROM (the XTIDE Universal
 // BIOS) into the card's socket at C8000, -H/-J attach master/slave images
@@ -209,6 +213,7 @@ static bool fdclog = false;     // -f
 int main(int argc, char **argv) {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
+    const char *fdimg_b = nullptr, *fdout_b = nullptr;   // -B image (drive B:), -WB out.img
     const char *xub = nullptr, *hdimg[2] = {nullptr, nullptr}, *hdgeo = nullptr, *hdout = nullptr;
     const char *xtaimg = nullptr, *xtaout = nullptr;
     int jmp208 = -1;                    // -1: B with an image, else A
@@ -251,6 +256,8 @@ int main(int argc, char **argv) {
             if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') wmax = atoi(argv[++i]);
         }
         else if (!strcmp(argv[i], "-a") && i + 1 < argc) fdimg = argv[++i];
+        else if (!strcmp(argv[i], "-B") && i + 1 < argc) fdimg_b = argv[++i];
+        else if (!strcmp(argv[i], "-WB") && i + 1 < argc) fdout_b = argv[++i];
         else if (!strcmp(argv[i], "-L") && i + 1 < argc) ramlat = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
         else if (!strcmp(argv[i], "-X") && i + 1 < argc) xub = argv[++i];
@@ -370,29 +377,41 @@ int main(int argc, char **argv) {
     std::vector<unsigned char> mring(1 << 20);
     unsigned long long mdots = 0;
 
-    // floppy A: from an image file (geometry from its size)
-    std::vector<unsigned char> disk;
-    if (fdimg) {
-        FILE *d = fopen(fdimg, "rb");
-        if (!d) { perror(fdimg); return 1; }
-        fseek(d, 0, SEEK_END); disk.resize(ftell(d)); fseek(d, 0, SEEK_SET);
-        if (fread(disk.data(), 1, disk.size(), d) != disk.size()) { perror(fdimg); return 1; }
-        fclose(d);
-        unsigned tr = 40, hd = 2, spt = 9;
-        switch (disk.size()) {
-            case 163840: hd = 1; spt = 8; break;
-            case 184320: hd = 1; spt = 9; break;
-            case 327680: spt = 8; break;
-            case 368640: break;
-            case 737280: tr = 80; break;
-            default: fprintf(stderr, "%s: unknown floppy size %zu\n", fdimg, disk.size()); return 1;
+    // floppies A: and B: from image files (geometry from the size; an 80-track
+    // drive for 720K, as pc_fdd_sd.vhd's drv_80trk)
+    std::vector<unsigned char> disks[2];
+    {
+        unsigned present = 0, tracks = 0, heads = 0, spts = 0, d80 = 0;
+        const char *names[2] = {fdimg, fdimg_b};
+        for (int k = 0; k < 2; k++) {
+            if (!names[k]) continue;
+            std::vector<unsigned char> &disk = disks[k];
+            FILE *d = fopen(names[k], "rb");
+            if (!d) { perror(names[k]); return 1; }
+            fseek(d, 0, SEEK_END); disk.resize(ftell(d)); fseek(d, 0, SEEK_SET);
+            if (fread(disk.data(), 1, disk.size(), d) != disk.size()) { perror(names[k]); return 1; }
+            fclose(d);
+            unsigned tr = 40, hd = 2, spt = 9;
+            switch (disk.size()) {
+                case 163840: hd = 1; spt = 8; break;
+                case 184320: hd = 1; spt = 9; break;
+                case 327680: spt = 8; break;
+                case 368640: break;
+                case 737280: tr = 80; break;
+                default: fprintf(stderr, "%s: unknown floppy size %zu\n", names[k], disk.size()); return 1;
+            }
+            present |= 1u << k;
+            tracks |= tr << (8 * k);
+            heads |= hd << (2 * k);
+            spts |= spt << (6 * k);
+            if (tr == 80) d80 |= 1u << k;
         }
-        tb->img_present = 1;
-        tb->img_tracks = tr;
-        tb->img_heads = hd;
-        tb->img_spt = spt;
-    } else
-        tb->img_present = 0;
+        tb->img_present = present;
+        tb->img_tracks = tracks;
+        tb->img_heads = heads;
+        tb->img_spt = spts;
+        tb->drv_80trk = d80;
+    }
     int sp_state = 0, sp_n = 0;     // 0 idle, 1 reading, 2 writing, 3 done pulse
 
     // hard disks
@@ -494,7 +513,8 @@ int main(int argc, char **argv) {
                                tb->sp_sector, tb->sp_lba);
         }
         size_t base = (size_t)tb->sp_lba * 512;
-        bool bad = tb->sp_drive != 0 || base + 512 > disk.size();
+        std::vector<unsigned char> &disk = disks[tb->sp_drive & 1];
+        bool bad = base + 512 > disk.size();
         if (sp_state == 1) {
             if (bad) { tb->sp_done = 1; tb->sp_err = 1; sp_state = 3; }
             else {
@@ -812,6 +832,12 @@ int main(int argc, char **argv) {
         printf("hard disk backend: %llu sector reads, %llu sector writes\n", hd_reads, hd_writes);
     if (xtaimg)
         printf("XTA backend: %llu sector reads, %llu sector writes\n", xta_reads, xta_writes);
+    if (fdout_b && fdimg_b) {
+        FILE *o = fopen(fdout_b, "wb");
+        if (!o || fwrite(disks[1].data(), 1, disks[1].size(), o) != disks[1].size()) perror(fdout_b);
+        if (o) fclose(o);
+        printf("B: image written to %s\n", fdout_b);
+    }
     if (xtaout && xtaimg) {
         FILE *o = fopen(xtaout, "wb");
         if (!o || fwrite(xta.data(), 1, xta.size(), o) != xta.size()) perror(xtaout);

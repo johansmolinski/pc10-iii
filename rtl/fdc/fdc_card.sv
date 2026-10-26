@@ -75,6 +75,7 @@ module fdc_card #(
     // sector port (doc/fdc.md)
     output logic        sp_req,
     output logic        sp_write,
+    output logic        sp_fmt,         // pc10-iii (internal drive): a FORMAT TRACK commit (doc/fdc.md section 5)
     output logic        sp_drive,
     output logic [7:0]  sp_cyl,
     output logic        sp_head,
@@ -175,7 +176,7 @@ logic       hd, step, step_dir;
 logic [9:0] buf_addr;
 logic       buf_we;
 logic [7:0] buf_wdata, buf_rdata;
-logic       x_start, x_write, x_slot, x_head, x_busy, x_done, x_err;
+logic       x_start, x_write, x_fmt, x_slot, x_head, x_busy, x_done, x_err;
 logic [7:0] x_cyl, x_sec;
 logic       active;
 
@@ -401,6 +402,7 @@ upd765 #(
     .buf_rdata  (buf_rdata),
     .x_start    (x_start),
     .x_write    (x_write),
+    .x_fmt      (x_fmt),
     .x_slot     (x_slot),
     .x_cyl      (x_cyl),
     .x_head     (x_head),
@@ -420,6 +422,7 @@ fdc_secbuf u_buf (
     .a_rdata     (buf_rdata),
     .x_start     (x_start),
     .x_write     (x_write),
+    .x_fmt       (x_fmt),
     .x_slot      (x_slot),
     .x_cyl       (x_cyl),
     .x_head      (x_head),
@@ -431,6 +434,7 @@ fdc_secbuf u_buf (
     .x_err       (x_err),
     .sp_req      (sp_req),
     .sp_write    (sp_write),
+    .sp_fmt      (sp_fmt),
     .sp_drive    (sp_drive),
     .sp_cyl      (sp_cyl),
     .sp_head     (sp_head),
