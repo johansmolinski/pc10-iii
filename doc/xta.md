@@ -1,9 +1,10 @@
 # The PC20-III hard disk (XTA)
 
-Status: 2026-10-25, branch `xta`. Step 1 is done: the interface, the commands
-and the timing below come from the Commodore BIOS 4.41 (318085-08), the
-PC10-III schematics, Western Digital's drive manual and three emulators.
-Nothing is built yet (section 9 is the design, section 10 the steps).
+Status: 2026-10-25, branch `xta`. The interface, the commands and the timing
+come from the Commodore BIOS 4.41 (318085-08), the PC10-III schematics,
+Western Digital's drive manual and three emulators (sections 1-8). The card
+is built (`rtl/hdc/xta_card.sv`, section 9) and tested (section 10); the
+MEGA65 shell does not serve it yet (section 11).
 
 The BIOS ROM is Commodore's copyrighted code. Its disassembly stays outside
 the repository (`~/pcxt-work/xta/`: `rom.dis`, `disk.lst`, `fmt.lst`,
@@ -367,7 +368,7 @@ Then it:
 - prints "Format Successful" and "System will now restart", waits for a
   key and jumps to FFFF:0000.
 
-## 8. Timing (what the real drive does; the plan for the model)
+## 8. Timing (what the real drive does)
 
 | Item | Value | Source |
 |---|---|---|
@@ -389,71 +390,301 @@ mode (~0.5 ms), 2 is enough. That is what WD states, so the model uses a
 one-sector buffer. Sequential reads at 3:1 give 9 sectors per revolution =
 256 KB/s at most; at the formatter's default of 4, 192 KB/s.
 
-## 9. Design (step 2, not started)
+## 9. The model (`rtl/hdc/xta_card.sv`)
 
-- `rtl/hdc/xta_card.sv` holds two parts:
-  - the CN202 host side: the decode of 320h-323h with AEN, and JMP208 as
-    the `enable` input (off = the ports read FFh, no DRQ, no IRQ);
-  - the drive's embedded controller: the registers and bus phases of
-    sections 4 and 5, the CCB, the commands of section 5.3, completion and
-    sense, DRQ3/DACK3 (no TC), IRQ5 and the one-sector buffer.
-- The drive model:
-  - the spindle: its angle advances with real time; the sector under the
-    head = (time mod 18.023 ms) / 667.5 us;
-  - the physical sector order of the last format (interleave);
-  - the head position, with the seek times of section 8;
-  - the translation of section 3;
-  - commands with drive bit 1 answer "not ready", except 0C, 0E/0F, E0/E4
-    and 03 (a parameter: see section 11).
-- Storage: the translated image, 615 x 4 x 17 x 512 = 21,411,840 bytes, raw
-  (the format of kobolt's emulator). The sector port is `hdc_secbuf`'s (LBA,
-  write-through), so the shell can serve it from the SD card as in the
-  XTIDE plan (doc/hdc.md section 8). Formatting writes the buffer's data to
-  every sector of the range.
-- `pc_system`: the card sits behind a parameter, default off, so every
-  existing gate stays bit-identical. tb/sys gets an option (e.g. `-A img`)
-  to attach the image.
-- Tests:
-  - tb/xta: a unit bench against a command-level model, with mutants;
-  - tb/sys with BIOS 4.41 (`make FE=1`, `sys_run -d 5D`): the drive is
-    found, the formatter runs, INT 13h reads and writes work, C: boots.
-  - tb/sys needs a key-injection option for the formatter's questions; it
-    has none yet.
+One card on the card bus: the CN202 host side and the drive's controller.
+Steps 2 and 3 are done (2026-10-25); section 10 has the tests.
 
-## 10. Steps
+### 9.1 Host side
+
+- Ports 320h-323h: `!AEN` and `isa_addr[9:2]` = 320h >> 2, as the 5720's
+  -HDCS (the decoded range is not legible, section 2). A DMA cycle is DACK3
+  with AEN, whatever the address: the board's DACK3 can outlast AEN into the
+  CPU's next I/O cycle (a first version took the BIOS's status poll after a
+  DMA byte for a DMA read and hung the boot sector read).
+- One data byte per CPU bus cycle: the board model resumes a CPU command
+  that AEN cut (a DMA transfer in the cycle's last wait state, below) with
+  a second strobe; the card counts a cycle from ALE's rising edge, repeats
+  the first strobe's byte on a resumed read and ignores a resumed write.
+  Only the CPU's strobes (AEN low) count; a refresh cycle's IOW does not.
+- `enable` = JMP208 in position B. Off, the card does nothing: the ports
+  float (FFh), no IRQ, no DRQ. This is also an empty CN202.
+- IRQ5 (parameter `IRQ`, JMP206) and DRQ3 (`DMA`, JMP207) are fixed wires.
+- `present`: a medium. Without one the drive answers but is never ready
+  (sense 04h). [A] (the real drive always has its disk; this is the
+  shell's "no image").
+- `active`: the LED. On while BSY is set or a write is still going to the
+  image. [A] (the drive's J6 LED is not documented).
+
+### 9.2 Bus phases and registers
+
+As in sections 4 and 5. Details the sources leave open:
+
+- A select (322h) starts the command phase from any phase except the
+  reset: BSY C/D REQ at once (the BIOS re-selects in a tight loop, so the
+  answer must come within a few us). It aborts a running command; data
+  already written to the "platter" still go to the image. [A]
+- REQ drops at the start of each CCB byte's strobe and comes back after
+  `CCB_US` (12 us). [A]
+- After the sixth byte: BSY C/D for `CMD_US` (300 us), then the command.
+  [A]
+- Data phases: BSY I/O REQ (in) or BSY REQ (out); between sectors the
+  phase stays, with REQ low. [A] A byte may move by PIO (320h) or by DMA
+  (DACK3) whenever REQ is set; DRQ3 = REQ and mask bit 0, only for sector
+  data (08, 0A, 0E, 0F, E5, E6). REQ/DRQ drop at the strobe's start and come
+  back `BYTE_CLK` (31 clk, 1.08 us = WD's 0.938 MB/s) after it, but not
+  before 2 clk after the strobe's end. The PC10-III's 8237 needs ~2.1-2.5 us
+  per byte while the CPU polls the status (1.1-1.3 ms per sector), so the
+  DMA, not the drive, sets the host rate.
+- Status phase: BSY C/D I/O REQ, the interrupt latch set. Status bit 5 and
+  IRQ5 = the latch AND mask bit 1; status bit 4 = DRQ3. Reading the
+  completion byte clears the latch; BSY drops `FREE_US` (2 us) later.
+- 321h write: controller reset, `RESET_US` (1 ms) with status 00h; it
+  clears the mask, the sense and the interrupt. RESET DRV does the same.
+  [A]
+- 322h read: `CONFIG` = FFh. 323h is not readable (FFh).
+- Sense: cleared at the start of every command but request sense, and by
+  request sense itself (all four bytes 00h). [A]
+
+### 9.3 Commands
+
+| Op | As modelled |
+|---|---|
+| 00 | OK when ready. Drive 1: OK (`DRV1_READY` = 1, kobolt's model; 0 = not ready, a 4.9 s / ~14 s boot wait) [A] |
+| 01 | seek to physical cylinder 0 |
+| 03 | 4 sense bytes (PIO) |
+| 04 | formats all 1,564 physical tracks (index to index, one revolution each); the sector buffer goes to all 41,820 sectors; CCB byte 4 becomes the interleave |
+| 05 | like 08 without data and without the image |
+| 06, 07 | format the 1 or 2 physical tracks that hold logical track (C, H); its 17 sectors get the buffer. 07 does not mark the track bad [A] |
+| 08, E5 | read; E5 adds 4 ECC bytes of 00h [A] |
+| 0A, E6 | write; E6 drops the 4 ECC bytes [A] |
+| 0B | seek to the cylinder of (C, H, 0) |
+| 0C | takes 8 bytes and ignores them (translate mode: fixed geometry); works for drive 1 |
+| 0D | 1 byte, 00h (the drive never corrects) |
+| 0E, 0F | the sector buffer: the slot used last |
+| E0, E3, E4 | `DIAG_US` (2.5 ms), OK [A] |
+| other | error 20h |
+
+Errors (sense code, address valid bit 7):
+- 04h (not ready, no address): no medium, spinning up, or drive 1 for a
+  command that needs the drive (all but 03, 0C, 0D, 0E, 0F, E0, E4);
+- 21h with the address: C >= 615, H >= 4, S >= 17 in the CCB; a multi-sector
+  command that runs past LBA 41,819 (the sectors before it move, then the
+  error with the first missing sector's address); 21h without address for
+  a format interleave of 0 or > 26 [A];
+- 11h with the address: the backend failed a read (the sectors before it
+  were delivered);
+- 03h (write fault) with the address of the first sector the backend failed
+  to write (reported after the whole command). [A]
+The block count 0 means 256 sectors. [A]
+
+### 9.4 The drive's timing
+
+| Item | Model | Parameter |
+|---|---|---|
+| Rotation | 27 slots per revolution, exactly 516,124 clk (3329 rpm); the spindle starts with RESET DRV [A] (its phase is arbitrary anyway) | `REV_CLK` |
+| Translation | logical sector L = physical sector L: track L / 27, cylinder L / 54, index k = L mod 27 on the track [A] | |
+| Interleave | sector k of a track sits in slot ((k mod 27/g) x i + k div (27/g)) mod 27, g = gcd(i, 27): the usual layout (place, step i, one slot on when occupied). One value for the whole drive, set by every format (04, 06, 07) [A]; 3 at power-on (WD's factory format) | `ILV_INIT` |
+| Seek | SEEK_A_US + SEEK_B_US x isqrt(256 d) us = 2760 + 140 x isqrt(256 d): 5.0 / 38.9 / 65.3 ms for d = 1 / 261 / 781 | `SEEK_A_US`, `SEEK_B_US` |
+| Head switch | free [A] | |
+| One-sector buffer | a read waits for its slot's start only once the host has taken the previous sector; the data come at the slot's end. A write waits until the host has sent the sector; the host may send the next one at the end of its slot. The seek to the next sector's cylinder starts at the end of the previous slot (during the host transfer) | |
+| Format | one revolution per track from the index; the next track (head switch) misses the index and waits one more [A]: 72 ms per cylinder, 56.4 s for the drive at any interleave | |
+| Overheads | `CMD_US` 300, `CCB_US` 12, `FREE_US` 2, `RESET_US` 1000, `DIAG_US` 2500 us [A] | |
+| Spin-up | 5 s after the first RESET DRV and after a new medium; later resets do not stop the drive [A] | `SPINUP_MS` |
+
+With single-transfer DMA on the 4.77 MHz PC (1.1-1.3 ms per sector in
+tb/sys, less than the two slots of 1.33 ms) the drive reaches interleave 3: a sequential read takes 3 slots per sector,
+9 sectors per revolution, 256 KB/s; interleave 4 (the formatter's default)
+192 KB/s, interleave 1 one revolution per sector (28 KB/s).
+
+### 9.5 Sector buffer and backend
+
+`hdc_secbuf` with four slots (2 KB, one block RAM) and the XTIDE card's
+sector port (doc/hdc.md section 5; `sp_lba` < 41,820, no drive bit). For
+reads the backend runs up to four sectors ahead of the host, for writes and
+formats up to four behind the platter. The drive's timing above stays the
+same as long as the backend needs less than about one slot (667 us) per
+sector; a slower backend delays the data (the TB checks a 3 ms backend for
+data, not timing). A write or format command ends only once the image holds
+every sector (write-through, as the floppy's). A new command waits until
+the previous command's writes are done.
+
+### 9.6 `pc_system`
+
+Parameter `XTA_FIT` (default 0: not built; every existing build and gate is
+unchanged). Ports (doc/architecture.md section 4):
+`xta_enable` (JMP208), `xta_present`, `xta_active`, `xta_sp_req`,
+`xta_sp_write`, `xta_sp_lba[27:0]`, `xta_sp_rd_valid`, `xta_sp_rd_data`,
+`xta_sp_wr_valid`, `xta_sp_wr_data`, `xta_sp_wr_ready`, `xta_sp_done`,
+`xta_sp_err`. The card's IRQ and DRQ are ORed with the FDC's and the
+XTIDE card's. The stand-in, `pc_system_flat.sv` and the OOC top tie the
+ports off (card not fitted).
+
+### 9.7 A board finding: DMA in a CPU read's last wait state
+
+The BIOS polls 321h while its DMA transfers run. The board model fixes a
+cycle's wait states one state ahead (biu88, as MartyPC) and its DMA wait
+reaches READY together with AEN, so the 8237 can take the bus (AEN) in the
+last Tw of the CPU's IN. AEN cuts the IOR, the card stops driving, and the
+CPU took the open bus at the step that starts T4: FFh, which has the
+interrupt bit set, so the BIOS read garbage as the completion byte. On the
+5160 the DMA wait goes to the 8284 with HOLDA, one clock before AEN, and the
+CPU waits. `xt_board.sv` now keeps the data the command had when AEN cut it
+and gives them to the CPU at that step; the timing is unchanged (the
+MartyPC trace gates stay identical, section 10.3). [Q] The 5160's own
+behaviour (a wait instead) would change the refresh timing against
+MartyPC; it affects every card's I/O read data during DMA, the FDC's too.
+
+## 10. Verification
+
+### 10.1 tb/xta (unit bench)
+
+`make run` (Verilator; `make run ARGS=-f` also formats the whole drive): the
+card with the PC10-III's I/O cycles (ALE, IOR from T1, IOW from T2, the
+board's wait state; some cycles resumed after a refresh cycle, as the board
+does), channel 3 of the 8237 in single-transfer mode (DACK3 outlasting AEN;
+a normal and a fast mode), a backend with random latency (20-300 us per
+sector, a write takes its bytes after the latency) and injectable read and
+write errors, and two models:
+- `Ref`, the command level: completion byte, sense bytes, data in, the
+  image and the sector buffer after each command;
+- the timing: the spindle (REV_CLK, 27 slots), the interleave's layout
+  (the classic placement algorithm, not the card's closed form), the seek
+  formula and the one-sector buffer predict when each sector's first byte
+  appears on DRQ3 (reads) or when the next sector's does (writes), within
+  3 us; verify and format by their completion time; the drive's byte rate
+  with a DMA faster than the drive.
+
+Tests: power-on and reset, JMP208 open, AEN, the window; the BIOS's
+detection sequence (reset, recalibrate without a mask write, E4, test
+ready, reset with recalibrate and initialize for both drives, drive 1's
+failures and sense, E0/E3 times, a cut CCB, the mask, a completion read
+with the interrupt still enabled); spin-up and media; PIO and DMA reads
+and writes of 1-256 sectors across head and cylinder boundaries, read long
+/ write long, verify; seeks over 0-614 cylinders and recalibrate; the
+sector buffer (DMA, PIO, fast DMA, after reads and writes), the ECC burst
+length; format track at interleave 1 (a revolution per sector), 2 (too
+fast for single-transfer DMA), 5 and 4, format bad track, bad interleaves;
+errors (invalid commands, C/H/S out of range, past the end, backend read
+and write errors, a select in a running DMA read, a 3 ms backend); 25
+random reads and writes.
+
+Results (final RTL): **2,742,243 checks, 0 failed** (seed 1, 7.5 s of PC
+time, ~45 s wall; seed 7 the same); with `-f` the full format takes
+**56.40 s** of PC time as the model predicts (43,174,827 checks, 0 failed).
+`mut.py`: **45 mutants, 45 killed** (fedora, `-j 6`). The bench grew with
+them: the first version missed 3 (the interrupt latch at the completion
+read, a read arming one sector early, write-behind overrunning the slots),
+and the system runs below found 2 bus faults that became 5 more mutants.
+
+### 10.2 tb/sys (the PC20-III with the Commodore BIOS 4.41)
+
+`make FE=1 PVC4=1 XTA=1`, `sys_run -b cbm-pc10c-bios-v4.41-318085-08.bin
+-d 5D -A image -xl` (on fedora; ~90 s wall per simulated second).
+
+- **DMA test ROM** (`tb/sys/hd/xtadma.S`, 8 KB, `mkxtadma.py`): with DRAM
+  refresh running, 16 rounds of 0Fh/0Eh by DMA (each 512 DACK3 cycles and
+  TC on channel 3, 1.07-1.29 ms per sector while the CPU polls the status)
+  and 0Eh by PIO; the buffers compare equal.
+- **Detection, cold boot** (`hdtest.img` from `mkhdimg.py build`): the disk
+  BIOS starts at 1.5 s: controller reset, recalibrate (04: still spinning
+  up; the BIOS ignores it), E4, test ready + request sense until the drive
+  is ready at 5.0 s, then reset (recalibrate 0 OK, 1 fails 22h/04h), the PIO
+  read of sector 0, initialize 0 and 1, recalibrate, test ready of drive 1
+  (OK). No "Hard disk not found"; "System RAM 640 KBytes OK".
+- **Boot from C:** at 45.6 s INT 19h resets the drive and reads sector 0 by
+  DMA (512 DACK3 cycles); the MBR test prints `MBR test, drive 80`,
+  `AH=08 CX DX 6591 0301` (last cylinder 613, 17 sectors, 4 heads, one
+  drive), the text of C0 H0 S2, `read 20, sum F600 OK` (10,240 DACK3 cycles
+  in 62.6 ms), `write 3, read back OK`, `done`. `mkhdimg.py check` on the
+  written image: only LBA 49-51 and 59 changed, as expected. 60 s of PC
+  time in 5,535 s wall.
+- **JMP208 open** (`-jmp208 A`): "Hard disk not found", no drive command:
+  the PC10-III as before.
+- **The WD formatter** (`tb/sys/hd/fmtboot.S`: a boot floppy with a
+  5-function INT 21h that jumps to F800:0005; `-k` types the answers): the
+  banner and "Current Drive is C:" appear; the answers are Enter (drive),
+  Enter (interleave 4), N (dynamic), N (virtual), y (start), then N (bad
+  tracks, asked after the format; "virtually" is asked only after a Y to
+  "dynamically"). The formatter writes the sector buffer (0Fh, DMA) and
+  formats the drive (04h, interleave 4) at 50.50 s; the command ends at
+  106.86 s (**56.36 s**, the timing model's 56.4 s), the screen shows
+  "Formatting . . .", "Do you want to format bad tracks - answer Y/N N",
+  "Format Successful", "System will now restart", "Insert DOS diskette in
+  drive A:". The image: 41,820 sector writes, every sector the same 512
+  bytes (the buffer, taken from 0000:0130 as noted in section 13). 125 s
+  of PC time in 11,377 s wall.
+- `-w` (the warm-boot flag in RAM) does not help with this BIOS: it still
+  tests the memory and then fails "Bad DMA port = 0004h" (a power-on state
+  that is not a warm one); the runs above are cold boots.
+
+Two faults found here, both invisible to the unit bench at first:
+- DACK3 outlasts AEN into the CPU's next I/O cycle: the card took the
+  BIOS's status poll for a DMA read and returned a buffer byte (the boot
+  sector read hung). Fix: a DMA cycle is DACK3 with AEN.
+- The board's DMA in a CPU read's last wait state (section 9.7): the status
+  poll read FFh, and the resumed strobe moved a second data byte. Fixes:
+  `xt_board.sv` keeps the cut command's data; the card moves one byte per
+  bus cycle.
+
+### 10.3 Gates
+
+Every existing build is unchanged (`XTA_FIT` = 0): on fedora
+`gates.sh xta-f` against `merge-a` (main): `g_tr.sha`, `g_tre.sha`,
+`g_trL2.sha` identical, `g_fd.log` identical but for the wall time, tb/fdc
+(232 checks), tb/hdc (3,182 checks), tb/cga, tb/mda PASS with identical
+logs. Locally tb/shell (`bash tb/shell/run.sh`, fedora lacks M2M/QNICE)
+and tb/pvc4 (`make run`) PASS.
+
+## 11. The MEGA65 shell (what it needs, not built)
+
+- `pc_system_flat`: `XTA_FIT` = 1 and the `xta_*` ports to main.vhd; the
+  card's file `rtl/hdc/xta_card.sv` into gen_xpr.py / CORE-R6.xpr and the
+  OOC file list (`hdc_secbuf.sv` is there already).
+- Image: a raw file of exactly 21,411,840 bytes (41,820 sectors, 615 x 4 x
+  17 x 512, kobolt's format; LBA = (C x 4 + H) x 17 + S - 1 in INT 13h
+  terms). A smaller file could be accepted with the sectors beyond it
+  failing (sp_err: sense 11h / 03h). `xta_present` = an image is mounted.
+- Backend: the hd_sp_* protocol, one sector per request; it should answer
+  within ~0.6 ms per sector to keep the drive's timing (section 9.5).
+- JMP208: a menu item "PC20-III hard disk" (B) / off (A); default off,
+  since the PC10-III has no drive and with the jumper on and no image the
+  BIOS waits until tick 446 (~24 s) and then prints "Hard disk not found".
+  [Q] Better: JMP208 on only while an image is mounted?
+- The LED: `xta_active`.
+- A ready image is made with `tb/sys/hd/mkhdimg.py build` (the MBR test) or
+  by the WD formatter (section 10.2) and then DOS FDISK/FORMAT.
+
+## 12. Steps
 
 1. Disassembly, references, this specification: **done** (2026-10-25).
 2. `xta_card.sv` with the drive model, the `pc_system` parameter, the tb/sys
-   option.
-3. tb/xta unit bench and mutants.
-4. tb/sys with the Commodore BIOS: detection, formatter, INT 13h, boot.
+   options: **done**.
+3. tb/xta unit bench and mutants: **done**.
+4. tb/sys with the Commodore BIOS: detection and boot from C: **done**;
+   the WD formatter **done** (section 10.2).
 5. Shell: menu (image, JMP208), SD backend, LED, settings signature.
 6. Build, hardware test.
 
-## 11. Open questions
+## 13. Open questions
 
-- **Drive 1 on a single drive.** Does the WD93024-X answer test ready for
-  drive 1 with "not ready", or with success?
-  - "Not ready": the BIOS waits 4.9 s on every cold boot and up to ~14 s on
-    Ctrl-Alt-Del.
-  - Success: only the recalibrate fails, and there is no wait. That is
-    kobolt's model; MartyPC does the same for the IBM BIOS to avoid a 25 s
-    wait.
-  - Either way, initialize (0C) must succeed for drive 1. This stays a
-    parameter until someone can watch a real PC20-III boot.
-- The configuration register's bits 7 and 3-2 on the real drive. FFh fits
-  everything the BIOS does; WD documents only bit 6, and that J8 sets it.
-  Where the demand-mode jumper shows up is unknown (BIOS 4.41 never uses
-  it).
-- The drive's translation (assumed linear), and how the drive applies the
-  format interleave to its 27-sector tracks; whether format writes the
-  buffer's data or a fixed pattern.
-- Command overhead, spin-up time, reset time (MartyPC holds 200 ms after a
-  reset; this BIOS waits only ~5 ms and then retries the select), and the
-  exact REQ timing per PIO byte.
-- An unformatted (blank) drive. The plan stores only data, so a new image
-  counts as formatted with zeros. Reads of a track that was never formatted
-  (ID not found, sense 12h/14h) would need a per-track flag.
+- **[Q] Drive 1 on a single drive.** Does the WD93024-X answer test ready
+  for drive 1 with "not ready", or with success? The model says success
+  (`DRV1_READY` = 1, kobolt); "not ready" costs 4.9 s on every cold boot
+  and up to ~14 s on Ctrl-Alt-Del. Initialize (0C) succeeds for drive 1
+  either way.
+- [Q] The configuration register's bits 7 and 3-2 on the real drive (FFh fits
+  everything the BIOS does).
+- [Q] The translation (assumed linear) and how the drive applies an
+  interleave given for 17-sector tracks to its 27-sector tracks (assumed:
+  directly), whether it is one value per drive or per track; whether format
+  writes the buffer's data or a fixed pattern (assumed: the buffer, as
+  86Box). The formatter writes its buffer from 0000:0130 (ES = 0), so with
+  DEBUG it formats the interrupt vectors 4Ch-CBh into every sector.
+- [Q] Command overhead, spin-up time, reset time, the per-byte REQ time,
+  track skew (none modelled: a cylinder step during a sequential read costs
+  one revolution).
+- An unformatted (blank) drive: a new image counts as formatted with zeros.
 - -HDCS's decoded range and the CN203 pin.
-- GLaBIOS has no disk BIOS. Without the Commodore ROM the drive needs an
-  option ROM; a WDXT-150 BIOS would work, but it is WD's code.
+- GLaBIOS has no disk BIOS: without the Commodore ROM the drive needs an
+  option ROM (a WDXT-150 BIOS would work, but it is WD's code).
