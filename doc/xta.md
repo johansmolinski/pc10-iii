@@ -615,6 +615,11 @@ and the system runs below found 2 bus faults that became 5 more mutants.
   drive A:". The image: 41,820 sector writes, every sector the same 512
   bytes (the buffer, taken from 0000:0130 as noted in section 13). 125 s
   of PC time in 11,377 s wall.
+- **DOS** (2026-10-26, `sys_run -e 'text|keys' ... -E text`: keys typed when
+  the cursor's line shows a text): Commodore MS-DOS 3.21 (the PC10-III's own,
+  not in the repository) from A: with a blank image: FDISK creates the
+  partition (whole disk, active) and restarts; `format c: /s` verifies about
+  0.38 s per cylinder, ~235 s of PC time for the drive (history 2026-10-26).
 - `-w` (the warm-boot flag in RAM) does not help with this BIOS: it still
   tests the memory and then fails "Bad DMA port = 0004h" (a power-on state
   that is not a warm one); the runs above are cold boots.

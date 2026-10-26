@@ -1826,4 +1826,21 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   pc10-xta-a): the same timing, **BRAM 260.5 of 365** (258 before: the
   card's sector buffer and the 8K-word extent map), 29,816 LUTs; `xta_card`
   1,268 LUTs, 1 RAMB36, 2 DSPs; `pc_fdd_sd` 757 LUTs. Kit
-  `~/pcxt-work/kits/pc10-xta-a/`. Not on hardware yet.
+  `~/pcxt-work/kits/pc10-xta-a/` (bitstream of pc10-xta-b; `sd/pc10/`: the
+  Commodore BIOS 4.41 as `bios.rom`, GLaBIOS as `bios-glabios.rom`, a blank
+  `hd20.img`, `hd20-wdfmt.img` = the WD formatter's result from tb/sys,
+  `fmtboot.img`, Commodore MS-DOS 3.21 `dos321-1.img`/`dos321-2.img`; none of
+  it in the repo). Not on hardware yet.
+- **tb/sys** (fedora, `make FE=1 PVC4=1 XTA=1`): the MBR test boot from C:
+  (`-A hdtest.img -s 60`) as before: `AH=08 CX DX 6591 0301`, `read 20, sum
+  F600 OK`, `write 3, read back OK`, `mkhdimg.py check` OK (LBA 49-51, 59).
+  New `sys_run -e 'text|keys'` (keys when the cursor's line shows text, in
+  order) and `-E text` (stop): Commodore MS-DOS 3.21 from A: with a blank C:
+  (`RAM_KB=256` for a shorter memory test): `fdisk` (Enter, Enter = the whole
+  disk, active; "System will now restart" at 53.4 s), the reboot, `format c:
+  /s` at 86.5 s, "Proceed with Format (Y/N)?y" at 100.1 s; FORMAT verifies
+  about 0.38 s per cylinder (cylinder 52 at 120 s), so the whole 615 take
+  about 235 s of PC time (8-9 h wall on the loaded host). Still running at
+  this entry: fedora `~/pcxt-work/dos/run1.log` (image `dos1.img`), then
+  `run2.sh` copies DOS disk 1's files onto C: (mtools) and cold-boots from C:
+  (`run2.log`, `dos2.img`).
