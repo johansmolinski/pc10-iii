@@ -11,10 +11,11 @@
 // PVC4, is enabled: the 5720's NOVID' output enables the PVC4's data buffer
 // U604 and its READY driver Q602). Bits 6-0 read back what was written (the
 // Commodore BIOS waits for the read-back after every write, F000:E07B and
-// E0D3). Only the register is built here: the onboard RTC (02C0h), the bus
-// mouse (023Ch), the serial port (com1/com0: off, 2F8h, 3F8h) and the
-// parallel port (lpt1/lpt0: off, 3BCh, 378h, 278h) that its bits enable are
-// not (doc/pvc4.md section 7).
+// E0D3). Only the register is built here; the onboard RTC (02C0h,
+// msm6242.sv), the bus mouse (023Ch, cbm_mouse.sv), the serial port
+// (com1/com0: off, 2F8h, 3F8h, off; uart8250.sv) and the parallel port
+// (lpt1/lpt0: off, 3BCh, 378h, 278h; lpt_ppc1.sv) that its bits enable are
+// their own modules in pc_system (doc/pvc4.md section 7, doc/ports.md).
 //
 // The value after reset is not documented; 00h (onboard video enabled, the
 // peripherals off) is assumed. The Commodore BIOS writes the register before

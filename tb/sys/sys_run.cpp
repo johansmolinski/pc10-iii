@@ -56,6 +56,13 @@
 //       page 0 cursor row) shows text; the -e's are taken in order, each one only after the
 //       keys of the one before were typed and 1.5 s passed (a dialogue: FDISK, FORMAT)
 //   -E text  ends the run when the cursor's line shows text, after the last -e
+//   PC10-III ports (PVC4 builds, doc/ports.md): -M ms:dx,dy[,b] moves the bus
+//       mouse (an Amiga quadrature mouse) by dx, dy counts from ms on, one count
+//       per axis every 250 us, with the buttons b held (1 left, 2 right, 4 middle)
+//       during the move and released 50 ms after it; may be given more than once.
+//       The BIOS data area's port tables (40:00-40:0F) and equipment word (40:10)
+//       are printed at the end; -SL logs the serial port's output (SOUT, decoded
+//       at 1200-115200 Bd from its bit times) and the parallel port's strobed bytes
 //   -w  warm start: the BIOS's warm-boot flag 0472h = 1234h is in the RAM at
 //       power-on (GLaBIOS-style BIOSes skip their memory test; the Commodore BIOS
 //       4.41 still tests it and then fails "Bad DMA port = 0004h": not for it)
@@ -206,6 +213,9 @@ static bool ascii_sc(char c, unsigned &sc, bool &shift) {
 }
 
 static bool fdclog = false;     // -f
+static bool portlog = false;    // -SL
+struct MouseMove { double ms; int dx, dy, btn; };
+static std::vector<MouseMove> mmoves;   // -M
 int main(int argc, char **argv) {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
@@ -265,6 +275,12 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-jmp208") && i + 1 < argc) { i++; jmp208 = argv[i][0] == 'B' || argv[i][0] == 'b'; }
         else if (!strcmp(argv[i], "-xl")) xtalog = true;
         else if (!strcmp(argv[i], "-w")) warm = true;
+        else if (!strcmp(argv[i], "-SL")) portlog = true;
+        else if (!strcmp(argv[i], "-M") && i + 1 < argc) {
+            double ms = 0; int dx = 0, dy = 0, bt = 0;
+            if (sscanf(argv[++i], "%lf:%d,%d,%d", &ms, &dx, &dy, &bt) < 3) { fprintf(stderr, "-M ms:dx,dy[,b]\n"); return 1; }
+            mmoves.push_back({ms, dx, dy, bt});
+        }
         else if (!strcmp(argv[i], "-cr")) cpurate = true;
         else if (!strcmp(argv[i], "-R") && i + 1 < argc) rtc_at = argv[++i];
         else if (!strcmp(argv[i], "-rl")) rtclog = true;
@@ -561,6 +577,55 @@ int main(int argc, char **argv) {
             tb->xta_sp_done = 1; tb->xta_sp_err = xerr; xs = 4;
         } else if (xs == 4 && !tb->xta_sp_req)
             xs = 0;
+        // the bus mouse (-M): quadrature steps, p leading q for + (right, down)
+        {
+            static size_t mi = 0;
+            static int qx = 2, qy = 2, rx = 0, ry = 0, btn = 0;
+            static unsigned long long next = 0, rel = 0;
+            static const bool P[4] = {false, true, true, false}, Q[4] = {false, false, true, true};
+            if (cyc == 0) { std::sort(mmoves.begin(), mmoves.end(), [](const MouseMove &a, const MouseMove &b) { return a.ms < b.ms; }); }
+            if (!rx && !ry && mi < mmoves.size() && cyc >= (unsigned long long)(mmoves[mi].ms * 1e-3 * CLK_HZ)) {
+                rx = mmoves[mi].dx; ry = mmoves[mi].dy; btn = mmoves[mi].btn; mi++; next = cyc;
+                if (!quiet) printf("[%9.3f ms] mouse %+d %+d buttons %d\n", cyc / CLK_HZ * 1e3, rx, ry, btn);
+                if (!rx && !ry) rel = cyc + (unsigned long long)(0.05 * CLK_HZ);
+            }
+            if ((rx || ry) && cyc >= next) {
+                if (rx) { qx = (qx + (rx > 0 ? 1 : 3)) & 3; rx += rx > 0 ? -1 : 1; }
+                if (ry) { qy = (qy + (ry > 0 ? 1 : 3)) & 3; ry += ry > 0 ? -1 : 1; }
+                next = cyc + (unsigned long long)(250e-6 * CLK_HZ);
+                if (!rx && !ry) rel = cyc + (unsigned long long)(0.05 * CLK_HZ);
+            }
+            if (rel && cyc >= rel) { btn = 0; rel = 0; }
+            tb->mouse_xp = P[qx]; tb->mouse_xq = Q[qx]; tb->mouse_yp = P[qy]; tb->mouse_yq = Q[qy];
+            tb->mouse_btn_n = ~(((btn & 1) ? 1 : 0) | ((btn & 4) ? 2 : 0) | ((btn & 2) ? 4 : 0)) & 7;
+        }
+        // the ports' outputs (-SL): SOUT decoded from its bit times, the parallel port's strobes
+        if (portlog) {
+            static bool so = true, stb = true;
+            static std::vector<unsigned long long> ed;
+            if (tb->ser_txd != so) { ed.push_back(cyc); so = tb->ser_txd; }
+            if (ed.size() && cyc - ed.back() > (unsigned long long)(0.02 * CLK_HZ)) {
+                // a burst ended: the shortest interval is one bit; decode 8N1 frames
+                unsigned long long bt = ~0ull;
+                for (size_t k = 1; k < ed.size(); k++) bt = std::min(bt, ed[k] - ed[k - 1]);
+                size_t k = 0;
+                std::string txt;
+                while (k < ed.size()) {
+                    unsigned long long t0 = ed[k];
+                    auto lvl = [&](unsigned long long t) { bool l = true; for (size_t j = 0; j < ed.size() && ed[j] <= t; j++) l = !l; return l; };
+                    unsigned c = 0;
+                    for (int b = 0; b < 8; b++) c |= lvl(t0 + bt * (b + 1) + bt / 2) << b;
+                    char hx[8]; snprintf(hx, sizeof hx, "%02X ", c); txt += hx;
+                    unsigned long long tend = t0 + bt * 9 + bt / 2;
+                    while (k < ed.size() && ed[k] <= tend) k++;
+                    while (k < ed.size() && !(lvl(ed[k]) == false)) k++;
+                }
+                printf("[%9.3f ms] serial out (%.0f Bd): %s\n", cyc / CLK_HZ * 1e3, CLK_HZ / bt, txt.c_str());
+                ed.clear();
+            }
+            if (!tb->lpt_strobe_n && stb && !quiet) printf("[%9.3f ms] printer strobe %02X\n", cyc / CLK_HZ * 1e3, tb->lpt_data);
+            stb = tb->lpt_strobe_n;
+        }
         // typed keys: one code per strobe, when the board has taken the last
         tb->kbd_valid = 0;
         static unsigned long long key_last = 0;
@@ -866,6 +931,13 @@ int main(int argc, char **argv) {
         }
     // text screen (80x25 at B8000 for the CGA, B0000 for the MDA)
     dump_screen(tb, mono ? "screen (MDA)" : "screen (CGA)", mono);
+    {
+        // the BIOS data area: the COM and LPT tables and the equipment word
+        auto w = [&](unsigned a) { return tb->rootp->tb_sys__DOT__ram[a] | tb->rootp->tb_sys__DOT__ram[a + 1] << 8; };
+        printf("BDA COM %04X %04X %04X %04X LPT %04X %04X %04X EQUIP %04X (%d serial, %d parallel)\n",
+               w(0x400), w(0x402), w(0x404), w(0x406), w(0x408), w(0x40A), w(0x40C), w(0x410),
+               (w(0x410) >> 9) & 7, w(0x410) >> 14);
+    }
     // the last complete MDA frame (VSYNC start to VSYNC start), its window
     if (mono && imgfile) {
         const size_t N = mring.size();
