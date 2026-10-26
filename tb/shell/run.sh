@@ -4,9 +4,10 @@
 # the drive sound against a model of the internal drive; tb_chipset.vhd: the menu's chipset,
 # its switches and the restart; tb_rtc.vhd: the real-time clock's write-back, pc_rtc.vhd with
 # M2M's RTC device and the firmware's access sequence), the firmware on the QNICE emulator (the
-# settings file signature: run_cfgsig.sh; PREP_LOAD_IMAGE: run_prepload.sh; the RTC write-back PC_RTC_WB: run_rtcwb.sh) and a
+# settings file signature: run_cfgsig.sh; PREP_LOAD_IMAGE: run_prepload.sh; the RTC write-back PC_RTC_WB: run_rtcwb.sh;
+# the hard disk C: across power-off, pc_hdc.asm on an SD card image: run_hdc.sh) and a
 # Verilator run of the stand-in pc_system (tb_stub.sv). Run from anywhere: tb/shell/run.sh.
-# Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py
+# Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py, tb/shell/mut_hdc.py
 set -e
 H=$(cd "$(dirname "$0")" && pwd)
 R=$(cd "$H/../.." && pwd)
@@ -34,6 +35,7 @@ ghdl -r --std=08 -frelaxed tb_rtc --ieee-asserts=disable 2>&1 | grep -E "PASS|FA
 "$H/run_cfgsig.sh"
 "$H/run_prepload.sh"
 "$H/run_rtcwb.sh"
+"$H/run_hdc.sh"
 verilator --binary -j 0 -Wno-fatal -Wno-lint -Wno-style --top-module tb_stub \
     "$R/CORE/stub/pc_system.sv" "$H/tb_stub.sv" -o tb_stub > /dev/null
 ./obj_dir/tb_stub

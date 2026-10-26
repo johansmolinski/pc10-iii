@@ -211,6 +211,10 @@ FD_SETUP        MOVE    R9, @--SP
                 MOVE    @R8, R8
                 RET
 
+; HDC_SAVE (pc_hdc.asm: C:'s path in the settings, run_hdc.sh tests it): R10 must stay
+HDC_SAVE        MOVE    0x0BAD, R10
+                RET
+
 S_PASS          .ASCII_W "PREPLOAD TEST: PASS\n"
 S_FAIL          .ASCII_W "PREPLOAD TEST: FAIL "
 

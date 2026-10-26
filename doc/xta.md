@@ -667,8 +667,9 @@ and 8 have the shell's side in its context).
   firmware maps a new image the drive is off (no disk, JMP208 open) for a
   moment; a command that runs then fails (sense 04h, or a write fault for
   writes behind). A new image is a new medium: the drive spins up for 5 s
-  (the BIOS waits for it). The image is not remembered over a power cycle
-  (the floppies are not either; doc/m2m-shell.md section 12).
+  (the BIOS waits for it). The image is remembered over a power cycle
+  (since 2026-10-26: its path in the settings file, mounted again before the
+  PC leaves reset; the floppies are not; doc/m2m-shell.md section 4).
 - **Backend** (`CORE/vhdl/pc_fdd_sd.vhd`, the floppies' engine): drive 2 =
   C:, QNICE device `C_DEV_PC_HDC` (0x0105) with the floppies' registers and
   windows, its own extent map (2048 words: **at most 511 extents**, as for
@@ -739,8 +740,8 @@ and 8 have the shell's side in its context).
 - [Q] The shell forgets the C: image at power-off (as the floppies'):
   remember its path in the settings file's text (M2M exception 17, as
   Megamiga's profiles do), so the PC20-III boots from C: without a menu
-  visit? Chosen for now: not remembered (the simple option, the same as A:
-  and B:).
+  visit? Decided 2026-10-26: yes, C: only (`CORE/m2m-rom/pc_hdc.asm`,
+  doc/m2m-shell.md section 4).
 - [Q] Images of other sizes (a smaller file with the sectors beyond it
   failing, section 11 of the plan) are refused: the drive has one size.
 - The SD card's single-block write time on real cards (section 11's

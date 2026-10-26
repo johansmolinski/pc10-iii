@@ -79,7 +79,9 @@ FILTER_FILES    XOR     R8, R8
 ; is left at the end, so the Shell only does the CSR handshake. C: takes only
 ; the PC20-III's drive: exactly 21,411,840 bytes (41,820 sectors); mounting it
 ; connects the drive (JMP208, mega65.vhd), which the BIOS finds at its next
-; start (Reset the PC).
+; start (Reset the PC). The settings file remembers C:'s path, or forgets it
+; when the mount fails (HDC_SAVE, pc_hdc.asm); HDC_RESTORE mounts it this way
+; at power-up.
 ;
 ; Input:  R8: file handle, R9: context (CTX_*), R10: menu group
 ; Output: R8: 0 = OK, else an error code; R9: image type (0) or the error text
@@ -147,19 +149,25 @@ _PCPL_SZ        CMP     0, @R3
 _PCPL_SET       MOVE    R0, R8                  ; R8: handle, R9: drive
                 MOVE    R1, R9
                 RSUB    FD_SETUP, 1             ; R8: 0, 1 = too fragmented,
-                CMP     0, R8                   ; 2 = FAT32 error
-                RBRA    _PCPL_OK, Z
+                XOR     R9, R9                  ; 2 = FAT32 error
+                CMP     0, R8
+                RBRA    _PCPL_HD, Z
                 MOVE    ERR_FD_FRAG, R9
                 CMP     1, R8
-                RBRA    _PCPL_RET, Z
+                RBRA    _PCPL_HD, Z
                 MOVE    ERR_FD_FAT, R9
-                RBRA    _PCPL_RET, 1
+                RBRA    _PCPL_HD, 1
 
 _PCPL_BAD       MOVE    3, R8
                 MOVE    ERR_FD_SIZE, R9
                 RBRA    _PCPL_RET, 1
 _PCPL_HBAD      MOVE    3, R8
                 MOVE    ERR_HD_SIZE, R9
+_PCPL_HD        CMP     2, R1                   ; C: the settings remember the
+                RBRA    _PCPL_RET, !Z           ; path (R8 = 0: mounted), or
+                MOVE    R0, R10                 ; forget it (pc_hdc.asm)
+                RSUB    HDC_SAVE, 1
+                MOVE    PC_OPTM_G_HDC, R10
                 RBRA    _PCPL_RET, 1
 
 _PCPL_OK        XOR     R8, R8
@@ -356,6 +364,7 @@ _PCPS_AL        RSUB    FONT_START, 1           ; the character ROM (optional)
                 RSUB    UCODE_START, 1          ; the 8088's microcode
                 CMP     0, R8
                 RBRA    _PCPS_RET, !Z
+                RSUB    HDC_RESTORE, 1          ; C: as before the power-off
                 MOVE    M2M$RAMROM_DEV, R0      ; back to the BIOS device
                 MOVE    PC_DEV_BIOS, @R0
                 MOVE    M2M$RAMROM_4KWIN, R0
@@ -599,7 +608,9 @@ CUSTOM_MSG      XOR     R8, R8
 ; menu open, no browser/help page running (PC_SUB_ACTIVE, set by OSM_SEL_PRE),
 ; the cursor on the drive's line, the drive mounted (PARSEST = PT_OK; an empty
 ; drive lets SPACE open the browser as before), and a new press (PC_UNMNT_PREV).
+; Ejecting C: removes its path from the settings (HDC_SAVE, pc_hdc.asm).
 HANDLE_CORE_IO  RSUB    PC_RTC_WB, 1            ; first the RTC's write-back (pc_rtc.asm)
+                RSUB    HDC_PEND_APPLY, 1       ; C:'s name after HDC_RESTORE
                 MOVE    R8, @--SP
                 MOVE    R9, @--SP
                 MOVE    R10, @--SP
@@ -666,6 +677,9 @@ _HCIO_D         MOVE    M2M$RAMROM_DEV, R0      ; keep the RAMROM selection
                 MOVE    CRTROM_CSR_STATUS, R9   ; Shell shows the line empty again
                 MOVE    CRTROM_CSR_ST_IDLE, R10
                 RSUB    CRTROM_CSR_W, 1
+                CMP     2, R2                   ; C: the settings forget it
+                RBRA    _HCIO_RET, !Z
+                RSUB    HDC_SAVE, 1             ; (R8: the device, not 0)
 
 _HCIO_RET       MOVE    M2M$RAMROM_DEV, R0
                 MOVE    R6, @R0
@@ -678,6 +692,7 @@ _HCIO_RET_NS    DECRB
                 RET
 
 #include "pc_rtc.asm"
+#include "pc_hdc.asm"
 
 ; CFG_SIGCHECK (M2M-UPSTREAM cfg-strings): C=1 = the settings file R8 (open,
 ; its text loaded by CFGS_LOAD) belongs to this menu: its text has the line
@@ -753,6 +768,11 @@ END_OF_ROM      .DW 0
 
 PC_UNMNT_PREV   .BLOCK 1                        ; SPACE at the last HANDLE_CORE_IO
 PC_SUB_ACTIVE   .BLOCK 1                        ; 1: a browser/help page runs
+HDC_PEND        .BLOCK 1                        ; pc_hdc.asm: 1 = C:'s name waits
+HDC_PATH        .BLOCK 127                      ; C:'s path ("SD1:/pc10/hd20.img"),
+HDC_PATH_Z      .BLOCK 1                        ; HDC_PLEN words in all
+HDC_FDH         .BLOCK FAT32$FDH_STRUCT_SIZE    ; the directories of its path
+HDC_DE          .BLOCK FAT32$DE_STRUCT_SIZE     ; (HDC_SAVE)
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
 ; for this 50-line menu the demand is 1058 words: 20 + 596 item characters
@@ -765,8 +785,9 @@ HEAP_SIZE       .EQU 0
 HEAP            .BLOCK 1
 #else
 ; HEAP + MENU_HEAP_SIZE + HEAP_SIZE must stay below VAR$STACK_START -
-; STACK_SIZE (check HEAP and VAR$STACK_START in m2m-rom.lis)
-HEAP_SIZE       .EQU 19904
+; STACK_SIZE (check HEAP and VAR$STACK_START in m2m-rom.lis). 19488 since
+; the hard disk's path (pc_hdc.asm: 412 words of variables; 19904 before)
+HEAP_SIZE       .EQU 19488
 HEAP            .BLOCK 1
 
                 .ORG    0xFED0                  ; as Megamiga: the FAT32 write layer's
