@@ -156,6 +156,46 @@ doc/history.md when done).
   8088 MPH and Area 5150 are drawn for; on RGB they look like
   black-and-white stripes.
 
+## Composite colour (asked 2026-10-26)
+
+An NTSC composite colour monitor as a menu choice: the CPU draws dot patterns
+in 640x200 (or 320x200) that a composite monitor shows as 16 or more
+"artefact" colours (8088 MPH, Area 5150, many games of the time with a
+"composite" option: Sierra AGI, Microsoft Flight Simulator, Ultima...). On RGB
+they look like black-and-white stripes. The MEGA65 has no composite output, so
+the core models the composite signal digitally and decodes it to RGB for HDMI
+and the analog RGB output, as emulators do (doc/plan.md section 4).
+
+- **Both video sources have a composite output:**
+  - **the IBM CGA card** (the backlog item above): the card already exports
+    the raw signals (doc/cga.md section 7: `comp_cphase`, `comp_hsync`,
+    `comp_burst`, `comp_vsync`, `comp_bw`, `comp_mode`). Old CGA (1981) and
+    new CGA (1983 on) differ only here (the new one adds R, G, B to the
+    luminance): a menu choice, as 8088 MPH has a setting for each.
+  - **the PC10-III's onboard PVC4:** CMPVD and CSYNCN to the RCA jack CN603
+    through Q601 (doc/pvc4.md section 5, today "not modelled"). To research
+    first: how the PVC4 forms CMPVD (data sheet DS 4-5): colour or mono
+    composite, the chroma phases, whether its artefact colours match the
+    IBM CGA's.
+- **The model:** the composite signal at 4 samples per colour carrier cycle
+  (14.318 MHz = 4 x 3.579545 MHz, the CGA's dot clock, fixed to the dot
+  phase; the power-up phase offset of a real card is a parameter), then an
+  NTSC decoder: luma/chroma separation (a filter over a few carrier cycles),
+  I/Q demodulation against the burst phase, YIQ -> RGB, at the dot rate into
+  the existing video path. References for the behaviour: reenigne's CGA
+  composite analysis, MartyPC's and 86Box's decoders, Graphics Gremlin's
+  `cga_composite.v` (CC BY-SA 4.0: behaviour only, no code). Licence check
+  before taking anything.
+- **Menu:** `Monitor: RGB / composite` (with the CGA card: old / new CGA). The
+  mode register's "black and white" bit (bit 2) kills the colour burst: the
+  monitor then shows grey levels, as a real one does.
+- **Tests:** a TB that compares the decoded colours of the 16 RGBI colours and
+  the standard artefact palettes (640x200 with each colour register value)
+  with reference values (MartyPC / reenigne's tables), then 8088 MPH's
+  composite parts and a Sierra game on the hardware.
+- **Cost:** a few DSPs for the filter and the YIQ matrix, a little logic; no
+  extra memory.
+
 ## Other open items
 
 - A changed SD card is not noticed (Megamiga re-checks the card generation).
