@@ -53,7 +53,7 @@ MUTANTS = [
     # the bus
     ('high nibble 0', "assign isa_din  = isa_dsel ? {4'hF, rd} : 8'h00;", "assign isa_din  = isa_dsel ? {4'h0, rd} : 8'h00;"),
     ('230h bit 6 ignored', "wire sel    = enable && !isa_aen", "wire sel    = !isa_aen"),
-    ('write at the strobe start', "wire wr_end = sel && !isa_iow_n && !(sel_nx && !isa_iow_n_next);", "wire wr_end = sel && !isa_iow_n && isa_iow_n_next;"),
+    ('write during the whole strobe', "wire wr_end = sel && !isa_iow_n && !(sel_nx && !isa_iow_n_next);", "wire wr_end = sel && !isa_iow_n;"),
     ('S10 4 bits', "4'h1: t.s10  <= wd[2:0];", "4'h1: t.s10  <= wd[2:0] | {2'b00, wd[3]};"),
     # STD.P / IRQ FLAG
     ('IRQ: writing 1 clears', "if (!wd[2]) begin irq <= 1'b0; irq_cnt <= 9'd0; end", "begin irq <= 1'b0; irq_cnt <= 9'd0; end"),
