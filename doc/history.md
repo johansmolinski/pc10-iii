@@ -2055,3 +2055,5 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   design error. `pc10-keys-b` (NO_REF_SYNTH=1, REF=pc10-turbo-b for the
   implementation): WNS +0.252, WHS +0.036. Loaded on the MEGA65; kit
   `~/pcxt-work/kits/pc10-keys-b` (the bitstream; SD files as pc10-turbo-b).
+- Hardware (pc10-keys-b): SETUP (Ctrl-Alt-Esc) saves and exits with
+  MEGA + CLR/HOME (End). DOS 3.21 boots from the hard disk (C:) at 9.54 MHz.
