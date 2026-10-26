@@ -1769,3 +1769,14 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   Found on the way: SPACE on a mounted floppy line opened the browser (no
   eject); fixed in 362e019 (build `pc10-real-s`). DOS 3.21's `setclock -r`
   printed "RTC timeout": no clock chip at 2C0h yet (branch `rtc`).
+- Build `pc10-real-s` (362e019, incremental from pc10-real-r): WNS +0.263 but
+  **WHS -0.068** (a same-clock hold path in `u_fdc/u_buf` across a clock region
+  boundary, cells "Moved" by the incremental placement; the only change was the
+  firmware's BRAM contents). Not used. Instead Megamiga's
+  `patch_firmware.sh`/`.tcl`/`.py` came over (`CORE/`, QNICE ROM only: no
+  rodata, no banks): `save` kept pc10-real-r's routed checkpoint
+  (fedora `~/pcxt-fw/pc10-real-r`), `patch` put the 362e019 firmware in
+  (16 block RAMs verified against the reference): `pc10-real-t` = pc10-real-r's
+  HDL and timing (WNS +0.263, WHS +0.036) with the SPACE eject; kit
+  `~/pcxt-work/kits/pc10-real-t` (+ Commodore MS-DOS 3.21 disks 1/2 for the SD
+  card, never in the repo). Loaded on the MEGA65.
