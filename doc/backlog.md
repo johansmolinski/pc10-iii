@@ -37,6 +37,21 @@ frame buffer, so the likely way is the analog output fed from the scaler
 60/70 Hz; to be designed (an M2M change: the VGA DAC follows the digital
 pipeline). Colour keeps today's analog paths.
 
+**And the native signal (asked 2026-10-26):** for owners of a monitor that
+takes it, the real 18.43 kHz / 49.8 Hz mono signal straight on the analog
+output. With "Analog: 15 kHz RGB" on (scandoubler off) M2M already passes the
+PVC4's own timing through unchanged (`retro15kHz` only halves the OSM's row
+scaling), so mono + that option should give it today; untested on hardware.
+To do: the menu label ("Analog: native 15/18 kHz" or similar: it is 15.7 kHz
+in colour, 18.4 kHz in mono), the sync polarities of a 5151-class monitor (H
+positive, V negative; check what M2M's VGA output drives), the mono shade for
+a mono monitor (white). A **TTL** mono monitor (IBM 5151, Commodore's mono
+monitor of the PC10-III: DE-9 with video, intensity, H, V at TTL levels) cannot
+use the VGA connector's 0.7 V video; for those, the PVC4's MONO/IT/HSYNC/VSYNC
+on a PMOD header (3.3 V, above TTL's 2 V threshold) with a small DE-9 adapter
+(the pins as the PC10-III's video connector), behind a menu option like
+Megamiga's PMOD serial port.
+
 ## Remember the hard disk across power-off (decided 2026-10-26)
 
 The C: image is mounted again at power-up; **the floppies are not** (A: and
