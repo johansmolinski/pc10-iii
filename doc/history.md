@@ -1923,3 +1923,8 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
 - Hardware (pc10-real-u): the user confirmed the RTC (date and time correct
   from the MEGA65's battery clock); the hard disk was formatting at the time,
   "all seems good so far".
+- Hardware (pc10-real-u): the user formatted `hd20.img` (FDISK, FORMAT C: /S)
+  and **DOS 3.21 boots from C:**; its date/time prompt is prefilled from the RTC.
+  The time was one hour ahead (the MEGA65's battery clock still on summer time,
+  which ended 2026-10-25 [A]); DOS TIME does not reach the RTC (IO.SYS never
+  writes it, as on the real machine), and FORMAT /S copied no SETCLOCK.EXE.
