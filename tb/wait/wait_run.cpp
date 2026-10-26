@@ -62,6 +62,7 @@ int main(int argc, char **argv) {
     long ws_seen[8] = {};
 
     while (done < cycles) {
+        if (t > (unsigned long long)cycles * 300) { CHECK(false, "no progress: %ld cycles done", done); break; }
         // the 8284's samples change in the rdy_ce clk (one before the step)
         bool rdy_ce = sub == PER[spd] - 1;
         if (rdy_ce) {

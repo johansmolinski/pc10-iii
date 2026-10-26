@@ -60,7 +60,11 @@ def one(m):
     if subprocess.run(cmd, capture_output=True, text=True).returncode != 0:
         return name, 'killed (does not build)'
     for seed in (1, 2, 3):
-        p = subprocess.run([os.path.join(obj, 'wait_run'), '400000', str(seed)], capture_output=True, text=True)
+        try:
+            p = subprocess.run([os.path.join(obj, 'wait_run'), '400000', str(seed)], capture_output=True, text=True,
+                               timeout=600)
+        except subprocess.TimeoutExpired:
+            return name, 'SURVIVED (timeout)'
         if p.returncode != 0:
             shutil.rmtree(work, ignore_errors=True)
             return name, 'killed (seed %d)' % seed
