@@ -241,15 +241,23 @@ begin
          pressed(k) <= p;
          wait for 7 us;
       end procedure;
-      constant exp : t_codes(0 to 7) := (x"1E", x"9E", x"3B", x"BB", x"02", x"82", x"2A", x"AA");
+      constant exp : t_codes(0 to 19) := (x"1E", x"9E", x"3B", x"BB", x"02", x"82", x"2A", x"AA",
+                                          x"4F", x"CF", x"49", x"C9", x"51", x"D1", x"53", x"D3",
+                                          x"52", x"D2", x"4A", x"CA");
    begin
       -- keyboard: A, MEGA+1 (F1; MEGA itself sends nothing), 1, left shift
       key(10, '1'); key(10, '0');
       key(61, '1'); key(56, '1'); key(61, '0'); key(56, '0');     -- break of F1 although MEGA is up
       key(56, '1'); key(56, '0');
       key(15, '1'); key(15, '0');
+      -- the MEGA layer's keypad keys: CLR/HOME End, up PgUp, down PgDn, INST/DEL Del, pound Ins,
+      -- - keypad - (the last one's break after MEGA is up)
+      key(61, '1');
+      key(51, '1'); key(51, '0'); key(73, '1'); key(73, '0'); key(7, '1'); key(7, '0');
+      key(0, '1'); key(0, '0'); key(48, '1'); key(48, '0');
+      key(43, '1'); key(61, '0'); key(43, '0');
       wait for 7 us;
-      assert ngot = 8 report "got " & integer'image(ngot) & " codes" severity failure;
+      assert ngot = 20 report "got " & integer'image(ngot) & " codes" severity failure;
       for i in exp'range loop
          assert got(i) = exp(i) report "code " & integer'image(i) & ": " & to_hstring(got(i)) severity failure;
       end loop;

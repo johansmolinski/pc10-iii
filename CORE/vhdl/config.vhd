@@ -81,15 +81,15 @@ constant HELP_1 : string :=
    " Keys (XT keyboard):\n" &
    " " & CHR_LINE_10 & CHR_LINE_10 & CHR_LINE_10 & "\n" &
    " MEGA + 1..0     F1..F10\n" &
-   " F1 F3 F5 F7     F1 F2 F3 F4\n" &
-   " F9 F11 F13      F5 F6 F7\n" &
-   " RUN/STOP        F8\n" &
-   " CLR/HOME        Home (keypad 7)\n" &
+   " F1..F13 RUN/STOP F1..F7 F8\n" &
+   " CLR/HOME        Home, MEGA: End\n" &
    " Cursor keys     keypad 8 2 4 6\n" &
+   " MEGA + up/down  PgUp PgDn\n" &
+   " MEGA + DEL/pound Del Ins\n" &
+   " MEGA + -        keypad -\n" &
    " RESTORE         Num Lock\n" &
    " NO SCROLL       Scroll Lock\n" &
-   " Arrow left      `\n" &
-   " Pound           Backslash\n" &
+   " Arrow left/pound ` backslash\n" &
    " Help            this menu\n\n" &
    " Press Space to close the help screen.";
 

@@ -319,8 +319,11 @@ positional where the MEGA65 has the PC key; `MEGA + 1..0` = F1..F10 (the code
 of the make is remembered for the break); F1/F3/F5/F7/F9/F11/F13 = F1..F7;
 RUN/STOP = F8; cursor keys = keypad 8/2/4/6 (an 83-key XT keyboard has no
 E0 keys); CLR/HOME = keypad 7; RESTORE = Num Lock; NO SCROLL = Scroll Lock.
-Not mapped: keypad - . 0 1 3 5 9 (the MEGA65 has no keypad), HELP (opens the
-menu), MEGA alone.
+The MEGA layer also gives the keypad keys the MEGA65 lacks (2026-10-26; the
+Commodore SETUP saves with End): `MEGA + CLR/HOME` = End (keypad 1),
+`MEGA + cursor up/down` = PgUp/PgDn (keypad 9/3), `MEGA + INST/DEL` = Del
+(keypad .), `MEGA + pound` = Ins (keypad 0), `MEGA + -` = keypad -. Not mapped:
+keypad 5, HELP (opens the menu), MEGA alone.
 
 The keyboard's power-on self-test answer (0xAA) comes from `xt_board`
 (architecture.md section 4).
