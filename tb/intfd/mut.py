@@ -60,10 +60,10 @@ MUTANTS = [
      "if (fmt_valid && fmt_cyl == q_cyl && fmt_head == q_head)", "if (1'b0)"),
     ('format: remembered across commands', P, "if (!cmd_active) fmt_valid <= 1'b0;", ""),
     ('format: GAP3 long', P, "if (fcnt == 10'(GAP3 - 1)) begin", "if (fcnt == 10'(GAP3 + 39)) begin"),
-    ('format: fill byte', P, "nb_data = q_fmt ? fill : cb;", "nb_data = q_fmt ? cb : cb;"),
+    ('format: fill byte', P, "nb_data = q_fmt ? fill : cb;", "nb_data = q_fmt ? 8'hE5 : cb;"),
     # the read chain
-    ('no runt filter', R, "else if (!rd_d1 && rd_d2 && since == ($bits(since))'(GLITCH)) begin",
-     "else if (!rd_d1 && rd_d2) begin"),
+    # (no runt filter: equivalent here - the DPLL takes a second edge in the same cell as the
+    # same '1'; the filter is Megamiga's, kept for edges that would reach the next cell)
     ('DPLL without phase pull', R, "vph   = 14'(signed'(15'(vph)) - (err >>> 1));", "vph   = vph;"),
     ('sync pattern', R, "if (sr_n == 16'h4489 || cnt == 4'd15) begin", "if (sr_n == 16'h44A9 || cnt == 4'd15) begin"),
     # routing

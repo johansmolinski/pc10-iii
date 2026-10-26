@@ -984,6 +984,25 @@ fmt:
         s.drv.wp = false;
         s.run_ms(1);
         CHECK(!(s.t->img_wp & 2), "B: still write protected");
+        // the tab closed after the 765 took the command: the drive refuses to write
+        for (int i = 0; i < 512; i++) s.mem[0x20000 + i] = (uint8_t)(i ^ 0xA5);
+        s.seek(1, 12);
+        s.dma_setup(2, 0x20000, 512);
+        s.cmd({ 0xC5, 1, 12, 0, 6, 2, 6, 0x2A, 0xFF });
+        uint64_t e = s.cyc + us2clk(500e3);
+        while (!s.t->busy && s.cyc < e) s.tick();
+        bool busy_seen = s.t->busy;
+        s.drv.wp = true;
+        CHECK(busy_seen, "the write did not reach the drive");
+        CHECK(s.wait_irq(3000), "no IRQ after a write whose disk became protected");
+        res = s.results(7);
+        s.dma_mask();
+        CHECK(res.size() == 7 && res[0] == 0x51,
+              "protected during the write: %s (expected 51: the write failed, EC)", hex(res).c_str());
+        CHECK(s.drv.gate_count == g0, "the gate opened on a disk protected during the command");
+        if (verbose) printf("     protected during the write: %s, busy seen %d\n", hex(res).c_str(), busy_seen);
+        s.drv.wp = false;
+        s.run_ms(1);
     }
     printf("== a lost step: IDs of the wrong cylinder, home and seek again (%.0f ms)\n", clk2ms(s.cyc));
     {
