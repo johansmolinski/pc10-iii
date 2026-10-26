@@ -33,10 +33,14 @@
 --   letters           letters                   cursor left/right keypad 4 / 6 (4B / 4D)
 --   F1 F3 F5 F7       F1 F2 F3 F4 (3B-3E)       F9 F11 F13        F5 F6 F7 (3F-41)
 --   RUN/STOP          F8 (42)
---   MEGA + 1 .. 0     F1 .. F10 (3B-44); the code sent at the make is remembered for the break
+--   MEGA + 1 .. 0     F1 .. F10 (3B-44)
+--   MEGA + CLR/HOME   End (keypad 1, 4F)        MEGA + cursor up    PgUp (keypad 9, 49)
+--   MEGA + INST/DEL   Del (keypad ., 53)        MEGA + cursor down  PgDn (keypad 3, 51)
+--   MEGA + pound      Ins (keypad 0, 52)        MEGA + -            keypad - (4A)
+--   (the MEGA layer: the code sent at the make is remembered for the break)
 --
--- Not mapped: MEGA alone, HELP (opens the OSM by default), keypad - . 0 1 3 5 9 (the MEGA65
--- has no keypad; see doc/m2m-shell.md). The cursor keys' C64 shift semantics (SHIFT + CRSR
+-- Not mapped: MEGA alone, HELP (opens the OSM by default), keypad 5 (the MEGA65 has no
+-- keypad; see doc/m2m-shell.md). The cursor keys' C64 shift semantics (SHIFT + CRSR
 -- right = left) are not used: the MEGA65 has separate up and left keys.
 --
 -- done by Johan Smolinski in 2026 and licensed under GPL v3
@@ -150,14 +154,22 @@ architecture synthesis of keyboard is
       others => x"00"
    );
 
-   -- MEGA + digit: F1..F10. The digits are scan codes 02..0B (1..0).
+   -- The MEGA layer, by the key's own scan code: MEGA + digit = F1..F10 (the digits are scan
+   -- codes 02..0B, 1..0), and the keypad keys the MEGA65 lacks (2026-10-26: SETUP's End).
    function fn_code(make : std_logic_vector(7 downto 0)) return std_logic_vector is
    begin
       if unsigned(make) >= 16#02# and unsigned(make) <= 16#0B# then
          return std_logic_vector(unsigned(make) + 16#39#);     -- 02 -> 3B (F1) .. 0B -> 44 (F10)
-      else
-         return x"00";
       end if;
+      case make is
+         when x"47"  => return x"4F";                           -- CLR/HOME   -> End
+         when x"48"  => return x"49";                           -- cursor up  -> PgUp
+         when x"50"  => return x"51";                           -- cursor down -> PgDn
+         when x"0E"  => return x"53";                           -- INST/DEL   -> Del
+         when x"2B"  => return x"52";                           -- pound      -> Ins
+         when x"0C"  => return x"4A";                           -- -          -> keypad -
+         when others => return x"00";
+      end case;
    end function fn_code;
 
    constant C_FIFO_LOG : natural := 4;

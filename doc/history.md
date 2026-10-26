@@ -2038,3 +2038,15 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   0836; simulation s1c/s2c: 40, 60 and the C0/A0 bus columns identical, the
   rest +-1, the timer tick's phase). The FPGA runs the model; whether the
   model matches a real PC10-III still needs one (doc/turbo.md [Q]).
+
+## 2026-10-26 - The MEGA layer's keypad keys (branch `keys`)
+
+- **Why:** the Commodore BIOS's SETUP (Ctrl-Alt-Esc) saves and exits with
+  End, which the MEGA65 keyboard could not send (keypad 1 was not mapped).
+- **What:** `keyboard.vhd`'s MEGA layer (`fn_code`, so the make's code is
+  remembered for the break as with MEGA + 1..0): CLR/HOME -> End (4F),
+  cursor up/down -> PgUp/PgDn (49/51), INST/DEL -> Del (53), pound -> Ins
+  (52), - -> keypad - (4A). The help page lists them (same line count).
+- **Tests:** tb/shell run.sh all PASS; tb_glue's keyboard check grows from 8
+  to 20 codes (the six MEGA keys, the last break after MEGA is up). A
+  mutant End -> 4E fails ("code 8: 4E").
