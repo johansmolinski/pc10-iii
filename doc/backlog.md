@@ -114,6 +114,48 @@ sound: nearly every sound option of the 1987-1991 games that run on an 8088.
   on the hardware: a game's setup that probes the card (Sierra SCI0: AdLib,
   Game Blaster and Sound Blaster drivers), digital sound by DMA.
 
+## An IBM CGA card instead of the onboard video (asked 2026-10-26)
+
+A menu choice **Video: onboard (PVC4) / IBM CGA card**: the PC10-III with an
+IBM CGA (or a faithful clone) in an expansion slot, the onboard video off.
+Authentic: the service manual (SM 5-1, doc/pvc4.md section 7) describes it:
+with an expansion adapter of the same kind as the straps (colour for a
+colour-strapped PVC4) the onboard video stays disabled. The Commodore BIOS 4.41
+does it by itself: at F000:E431 it writes to B800:7Bh with the onboard video
+off (230h bit 7 = venb' = 1) and reads back; a card that answers keeps the
+onboard video off. Why: demos and games written for the IBM 5150 + CGA
+(8088 MPH, Area 5150) depend on the IBM card's timing (its wait states, its
+6845, snow), which the PVC4 does not have (8088 MPH's hardware check fails
+and the demo hangs in its sprite part on pc10-real-u, 2026-10-26; analysis in
+doc/history.md when done).
+
+- **The model exists:** `cga_card.sv` + `cga_crtc.sv` (doc/cga.md, verified
+  against MartyPC: wait states, snow, CRTC), `pc_system`'s `CGA_FIT` next to
+  `PVC4_FIT`. Today the video output is chosen at build time
+  (`PVC4_FIT ? pvc : cga`); with both fitted it must follow the BIOS's choice
+  at run time (230h bit 7: venb' = 1 -> the CGA's picture, through the same
+  RGBI path and the same 59.92 Hz HDMI/analog timing).
+- **Menu:** a line in the video submenu; a change restarts the PC (a card is
+  plugged in with the power off), like colour <-> mono. With the CGA card the
+  PVC4 stays colour-strapped (DIP switch 2 on): a mono-strapped PVC4 plus a
+  CGA would be two displays at once (SM 5-1 allows it), and the core has one
+  output. So "IBM CGA card" implies colour, and the Display line's mono
+  entries do not apply.
+- **Font:** the CGA card has its own character ROM (IBM layout, 8 KB). The
+  kit's `char.rom` is the PC10-III's 32 KB Commodore layout (`font_cbm`); the
+  CGA needs an IBM-layout image (`font_addr_hi` = 0): a separate SD file
+  (e.g. `/pc10/cga.rom`, the user's own dump) or the 8x8 glyphs taken from
+  the Commodore ROM by the loader. To decide; no IBM ROM in the repo.
+- **Resources:** about 480 LUTs, 415 flip-flops, 6 BRAM tiles (doc/cga.md);
+  BRAM is at 260.5/365.
+- **Tests:** tb/sys with both fitted: the BIOS's probe finds the CGA and
+  leaves the PVC4 off (230h bit 7, 40:70h); 8088 MPH's hardware check and
+  CGA_COMP's video RAM speed (340 KB/s on an IBM CGA) in simulation, then on
+  the hardware.
+- **Later:** CGA composite colour (doc/plan.md section 4), the colours
+  8088 MPH and Area 5150 are drawn for; on RGB they look like
+  black-and-white stripes.
+
 ## Other open items
 
 - A changed SD card is not noticed (Megamiga re-checks the card generation).
