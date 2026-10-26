@@ -1906,3 +1906,17 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   the QNICE read mux. Kit `~/pcxt-work/kits/pc10-rtc-a/` (pc10-real-r's SD
   files, `dos321-1.img`, `bios-cbm441.rom` to copy over `bios.rom`).
 - Not verified: hardware; M2M's RTC write on the real I2C chip.
+
+## 2026-10-26 - Main with the hard disk and the RTC (build pc10-real-u)
+
+- Merged `xta-shell` (6584887; build pc10-xta-b loaded on the MEGA65 first)
+  and `rtc` (e80fb99; conflicts only where both added ports/lines: the drive
+  fitted plus the RTC ports in pc_system_flat/OOC/main/mega65, both doc
+  sections). Firmware 32357/32768 words, `HEAP` 0xA52E (418 words below the
+  stack). tb/shell run.sh: all PASS (tb_glue, tb_fdd 49 transfers, drvsnd,
+  chipset, tb_rtc, CFGSIG, PREPLOAD, RTCWB, stub).
+- Build `pc10-real-u` (REF=pc10-xta-b): WNS +0.021, WHS +0.036, BRAM
+  260.5/365; checkpoint saved for `patch_firmware.sh` (fedora
+  `~/pcxt-fw/pc10-real-u`). Kit `~/pcxt-work/kits/pc10-real-u` (Commodore BIOS
+  4.41, char ROM, DOS 3.21, hd20.img, hd20-wdfmt.img, fmtboot.img). Loaded on
+  the MEGA65. Gates of the merged tree: fedora `clk/merge-c`.
