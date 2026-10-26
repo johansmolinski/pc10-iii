@@ -4,7 +4,10 @@
 # count, unmask after the CCB) and runs on the drive:
 #   0Fh write sector buffer (DMA, memory -> drive, 512 bytes from 1000:0000)
 #   0Eh read sector buffer  (DMA, drive -> memory, to 2000:0000)
-# and compares the two buffers. Each command's completion byte goes to port
+#   0Eh again by PIO (mask FCh), to 2000:0000; its completion byte and the
+#       byte count / 256 (02) go to port 80h
+# and compares the buffers. The DMA commands run 16 times with DRAM refresh
+# (8237 channel 0 every 15 us) interleaving. Each command's completion byte goes to port
 # 80h (sys_run prints it as a POST code), then the 8237's status (port 08h),
 # then the comparison: 00 = equal, EE = different. A timeout writes the
 # drive's status (321h) to port 80h every ~0.2 s. Built by mkxtadma.py as an
@@ -36,10 +39,25 @@ _start:
     mov cx, 512
     xor al, al
     rep stosb
-    # the 8237: master clear, enabled, channel 3 masked
+    # the 8237: master clear, enabled, channel 3 masked; refresh as a BIOS
+    # sets it up: channel 0 mode 58h (read, autoinit, single), count FFFFh,
+    # the 8253's channel 1 in mode 2 with 18 (15 us)
     out 0x0D, al
     xor al, al
     out 0x08, al
+    mov al, 0x58
+    out 0x0B, al
+    mov al, 0xFF
+    out 0x01, al
+    out 0x01, al
+    xor al, al
+    out 0x0A, al
+    mov al, 0x54
+    out 0x43, al
+    mov al, 18
+    out 0x41, al
+    mov bp, 16                      # 16 rounds of 0Fh / 0Eh
+round:
     # 0Fh: memory -> drive, mode 4Bh, 1000:0000
     mov al, 0x4B
     mov bl, 0x01
@@ -52,6 +70,16 @@ _start:
     call dma3
     mov si, offset ccb_rbuf
     call xta
+    dec bp
+    jnz round
+    # 0Eh again by PIO (mask FCh), as the BIOS reads sector 0: to 2000:0000
+    mov ax, 0x2000
+    mov es, ax
+    xor di, di
+    mov cx, 512
+    xor al, al
+    rep stosb
+    call pio_rbuf
     # compare
     mov ax, 0x1000
     mov ds, ax
@@ -124,6 +152,56 @@ xta:
     in al, dx
     out 0x80, al
     in al, 0x08
+    out 0x80, al
+    ret
+
+# 0Eh by PIO: mask FCh, the CCB, 512 bytes each after REQ to ES:0000, the
+# completion byte to port 80h (a timeout: the status and the byte count)
+pio_rbuf:
+    mov dx, 0x323
+    mov al, 0xFC
+    out dx, al
+    dec dx
+1:  out dx, al
+    dec dx
+    in al, dx
+    inc dx
+    and al, 0x0D
+    cmp al, 0x0D
+    jne 1b
+    mov si, offset ccb_rbuf
+    mov cx, 6
+2:  mov dx, 0x321
+3:  in al, dx
+    test al, 1
+    jz 3b
+    mov dx, 0x320
+    lods al, byte ptr cs:[si]
+    out dx, al
+    loop 2b
+    xor di, di
+4:  mov dx, 0x321
+    mov cx, 0x4000
+5:  in al, dx
+    test al, 1
+    jnz 6f
+    loop 5b
+    out 0x80, al
+    mov ax, di
+    out 0x80, al
+    jmp 4b
+6:  and al, 0x0E
+    cmp al, 0x0E
+    je 7f
+    mov dx, 0x320
+    in al, dx
+    stosb
+    jmp 4b
+7:  mov dx, 0x320
+    in al, dx
+    out 0x80, al
+    mov ax, di
+    mov al, ah
     out 0x80, al
     ret
 
