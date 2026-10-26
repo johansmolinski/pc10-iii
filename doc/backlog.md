@@ -56,11 +56,9 @@ a second hard disk: D: (C: when no C: image is mounted).
 - **Names (decided 2026-10-26):** long names become 8.3 aliases by the FAT
   convention, `VeryLongName.file` -> `VERYLO~1.FIL`. The card's FAT32 already
   stores such a short name in every directory entry (the long name sits in
-  extra LFN entries before it), so the first choice is to use the card's own
+  extra LFN entries before it), so D: uses the card's own
   short name: unique per folder, and the same name a PC shows for the file.
-  Only where that is not usable, generate one: upper case, characters DOS does
-  not allow dropped or `_`, the first 6 characters + `~1` (`~2`.. on a clash,
-  then 5 characters + `~10`..), the first 3 characters of the last extension.
+  No fallback of our own (decided 2026-10-26): every FAT32 entry has one.
 - **Limits:** the size of one drive type of the BIOS table (21.4 MB like C:;
   the WD's "dynamic configuration", geometry from sector 0, might allow up to
   DOS 3.21's 32 MB); files that do not fit are left out; a snapshot at reset
