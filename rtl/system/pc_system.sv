@@ -569,6 +569,7 @@ generate if (XTA_FIT) begin : g_xta
         .isa_ior_n   (isa_ior_n),
         .isa_iow_n   (isa_iow_n),
         .isa_aen     (isa_aen),
+        .isa_ale     (isa_ale),
         .isa_irq     (xta_irq),
         .isa_drq     (xta_drq),
         .isa_dack_n  (isa_dack_n),

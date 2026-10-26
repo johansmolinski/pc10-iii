@@ -212,7 +212,7 @@ struct Sim {
         ref.img = img;
         t = new Vxta_card;
         t->clk = 0; t->reset = 1;
-        t->isa_ior_n = 1; t->isa_iow_n = 1; t->isa_aen = 0; t->isa_dack_n = 0xF;
+        t->isa_ior_n = 1; t->isa_iow_n = 1; t->isa_aen = 0; t->isa_dack_n = 0xF; t->isa_ale = 0;
         t->isa_addr = 0; t->isa_dout = 0;
         t->enable = 1; t->present = 1;
         t->sp_rd_valid = 0; t->sp_wr_ready = 0; t->sp_done = 0; t->sp_err = 0;
@@ -346,32 +346,89 @@ struct Sim {
     void dma_idle() { while (dma.st != 0 && dma.st < 5) tick(); }
 
     // ---------------------------------------------------- CPU I/O cycles
+    // An 8088 I/O cycle: ALE for T1 (C clk), IOW from T2, IOR from the falling
+    // edge in T1. split: the board's AEN cuts the command in its last wait
+    // state and resumes it after the DMA transfer (xt_board.sv): two strobes
+    // of the same bus cycle; the data of a read is the first strobe's.
+    bool split_next = false, refresh_next = false;
     void io_write(int port, int val, int gap = 2 * C) {
         dma_idle();
         cpu_cycle = true;
+        bool split = split_next; split_next = false;
         t->isa_addr = port; t->isa_aen = 0;
-        for (int i = 0; i < C + C / 3; i++) tick();
+        t->isa_ale = 1;
+        for (int i = 0; i < C; i++) tick();
+        t->isa_ale = 0;
+        for (int i = 0; i < C / 3; i++) tick();
+        if (refresh_next) {
+            // a refresh between the cycle's ALE and its strobe (DACK0, AEN, IOW)
+            refresh_next = false;
+            t->isa_aen = 1; t->isa_dack_n = 0xE;
+            for (int i = 0; i < C; i++) tick();
+            t->isa_iow_n = 0;
+            for (int i = 0; i < 2 * C; i++) tick();
+            t->isa_iow_n = 1;
+            for (int i = 0; i < C; i++) tick();
+            t->isa_aen = 0; t->isa_dack_n = 0xF; t->isa_addr = port;
+            for (int i = 0; i < 2; i++) tick();
+        }
         t->isa_dout = val;
         t->isa_iow_n = 0;
         for (int i = 0; i < 8 * C / 3; i++) tick();
         t->isa_iow_n = 1;
+        if (split) {
+            // a DMA cycle of another channel in between (a refresh: DACK0,
+            // MEMR + IOW), then the strobe again
+            t->isa_aen = 1; t->isa_dack_n = 0xE;
+            for (int i = 0; i < C; i++) tick();
+            t->isa_iow_n = 0;
+            for (int i = 0; i < 2 * C; i++) tick();
+            t->isa_iow_n = 1;
+            for (int i = 0; i < 2 * C; i++) tick();
+            t->isa_dack_n = 0xF;
+            t->isa_aen = 0; t->isa_addr = port;
+            for (int i = 0; i < 2; i++) tick();
+            t->isa_iow_n = 0;
+            for (int i = 0; i < C; i++) tick();
+            t->isa_iow_n = 1;
+        }
         cpu_cycle = false;
         for (int i = 0; i < C + gap; i++) tick();
     }
     int io_read(int port, int gap = 2 * C) {
         dma_idle();
         cpu_cycle = true;
+        bool split = split_next; split_next = false;
         t->isa_addr = port; t->isa_aen = 0;
+        t->isa_ale = 1;
         for (int i = 0; i < 2 * C / 3; i++) tick();
         t->isa_ior_n = 0;
         int first = -1; bool stable = true;
         for (int i = 0; i < 3 * C; i++) {
+            if (i == C / 3) t->isa_ale = 0;
             tick();
             if (i >= 1) { int v = t->isa_dsel ? t->isa_din : 0xFF; if (first < 0) first = v; else if (v != first) stable = false; }
         }
+        t->isa_ale = 0;
         CHECK(stable, "I/O read %03X: data not stable during IOR", port);
         int v = t->isa_dsel ? t->isa_din : 0xFF;
         t->isa_ior_n = 1;
+        if (split) {
+            t->isa_aen = 1; t->isa_dack_n = 0xE;
+            for (int i = 0; i < C; i++) tick();
+            t->isa_iow_n = 0;
+            for (int i = 0; i < 2 * C; i++) tick();
+            t->isa_iow_n = 1;
+            for (int i = 0; i < 2 * C; i++) tick();
+            t->isa_dack_n = 0xF;
+            t->isa_aen = 0; t->isa_addr = port;
+            for (int i = 0; i < 2; i++) tick();
+            t->isa_ior_n = 0;
+            for (int i = 0; i < 2 * C; i++) tick();
+            int v2 = t->isa_dsel ? t->isa_din : 0xFF;
+            CHECK(port == PORT + 1 || v2 == v, "I/O read %03X resumed: %02X, the first strobe %02X", port, v2, v);
+            t->isa_ior_n = 1;
+        }
         cpu_cycle = false;
         for (int i = 0; i < C + gap; i++) tick();
         return v;
@@ -423,6 +480,8 @@ struct Sim {
             do st = status(); while (!(st & REQ) && (st & BSY) && cyc < e);
             CHECK(st == (BSY | CD | REQ), "CCB byte %d: status %02X", i, st);
             if (st != (BSY | CD | REQ)) { o.ok = false; return o; }
+            split_next = i == 2;            // a CCB byte written with a resumed strobe
+            refresh_next = i == 4;          // one with a refresh between its ALE and its strobe
             io_write(PORT, ccb[i], 0);
             if (i == 5) o.t_ccb = cyc - C;      // io_write ends C clk after the strobe
             else {
@@ -454,9 +513,11 @@ struct Sim {
                 if (!(st & REQ)) continue;
                 if (st & IO) {
                     CHECK(st == (BSY | IO | REQ) && ni < din_len, "data in: status %02X, byte %zu of %zu", st, ni, din_len);
+                    split_next = ni % 5 == 3;   // some reads resumed after a DMA transfer
                     o.din.push_back(io_read(PORT, 0)); ni++;
                 } else {
                     CHECK(st == (BSY | REQ) && no < dout.size(), "data out: status %02X, byte %zu of %zu", st, no, dout.size());
+                    split_next = no % 5 == 2;
                     io_write(PORT, no < dout.size() ? dout[no] : 0, 0); no++;
                 }
             }

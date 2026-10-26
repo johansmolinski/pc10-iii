@@ -69,6 +69,7 @@ module xta_card #(
     input  logic        isa_ior_n,
     input  logic        isa_iow_n,
     input  logic        isa_aen,
+    input  logic        isa_ale,        // the CPU's T1 (a new bus cycle)
     output logic [7:2]  isa_irq,
     output logic [3:1]  isa_drq,
     input  logic [3:0]  isa_dack_n,
@@ -174,9 +175,11 @@ wire        ior_fall = !isa_ior_n && ior_d;
 wire        iow_fall = !isa_iow_n && iow_d;
 wire        ior_rise = isa_ior_n && !ior_d;
 wire        iow_rise = isa_iow_n && !iow_d;
+logic       ale_d;
 always_ff @(posedge clk) begin
     ior_d <= isa_ior_n;
     iow_d <= isa_iow_n;
+    ale_d <= isa_ale;
     if (!isa_iow_n) wdat_q <= isa_dout;     // the last value seen during the strobe
 end
 
@@ -460,7 +463,8 @@ logic [1:0]  h_slot;
 logic [5:0]  gap, rate;               // rate: clk until the next byte may be offered
 logic [7:0]  din_q;
 // CPU / DMA cycles in progress (decoded at the strobe's start)
-logic        r_cyc, r_take, w_cyc, w_take, d_rd, d_take;
+logic        r_cyc, r_take, w_cyc, w_take, d_rd, d_take, cpu_new;
+logic [7:0]  r_last;                    // the byte a CPU read of 320h took
 logic [1:0]  r_reg, w_reg;
 
 wire is_rd    = kind == K_READ || kind == K_RLONG || kind == K_VERIFY;
@@ -571,6 +575,7 @@ always_ff @(posedge clk) begin
         req   <= 1'b0;  irq_l <= 1'b0;  mask <= 2'b00;
         h_act <= 1'b0;  g_run <= 1'b0;  h_strobe <= 1'b0;  rate <= 6'd0;
         r_cyc <= 1'b0;  w_cyc <= 1'b0;  d_rd <= 1'b0;  r_take <= 1'b0;  w_take <= 1'b0;  d_take <= 1'b0;
+        cpu_new <= 1'b0;
         rd_en <= 1'b0;  w_lim <= 16'd0;  buf_slot <= 2'd0;  ring0 <= 2'd0;
         sn_code <= 6'd0;  sn_av <= 1'b0;  sn_drv <= 1'b0;  sn_c <= 10'd0;  sn_h <= 5'd0;  sn_s <= 6'd0;
         m_abort <= 1'b1;
@@ -581,6 +586,13 @@ always_ff @(posedge clk) begin
         if (rate != 6'd0) rate <= rate - 6'd1;
 
         // ---------------------------------------------- CPU and DMA strobes
+        // cpu_new: no CPU strobe yet in this bus cycle (since its ALE). The
+        // board resumes a CPU command that AEN cut (a DMA transfer in its last
+        // wait state, xt_board.sv) with a second strobe of the same cycle; it
+        // must not move a second byte.
+        // (ALE is the whole of T1; IOR already falls in T1: its rising edge)
+        if (isa_ale && !ale_d) cpu_new <= 1'b1;
+        else if ((ior_fall || iow_fall) && !isa_aen) cpu_new <= 1'b0;   // the CPU's strobes only
         if (ior_fall) begin
             r_cyc <= sel_io;
             r_reg <= rsel;
@@ -595,8 +607,11 @@ always_ff @(posedge clk) begin
                     d_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;  rate <= 6'(BYTE_C);
                 end
             end else if (sel_io) case (rsel)
-                2'd0: begin
+                2'd0: if (!cpu_new)
+                    isa_din <= r_last;          // the same bus cycle, resumed: the same byte
+                else begin
                     isa_din <= din_q;
+                    r_last  <= din_q;
                     if (req && ((phase == P_DIN && h_act) || phase == P_STAT)) begin
                         r_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;  rate <= 6'(BYTE_C);
                     end
@@ -607,10 +622,10 @@ always_ff @(posedge clk) begin
             endcase
         end
         if (iow_fall) begin
-            w_cyc  <= sel_io || dack;
+            w_cyc  <= (sel_io && cpu_new) || dack;      // a resumed write strobe: no second write
             w_reg  <= dack ? 2'd0 : rsel;
             w_take <= 1'b0;
-            if (((dack && h_act && h_dma) || (sel_io && rsel == 2'd0)) && req &&
+            if (((dack && h_act && h_dma) || (sel_io && cpu_new && rsel == 2'd0)) && req &&
                 ((phase == P_DOUT && h_act && !h_in) || (phase == P_CMD && !dack))) begin
                 w_take <= 1'b1;  req <= 1'b0;  h_strobe <= 1'b1;  rate <= 6'(BYTE_C);
             end
