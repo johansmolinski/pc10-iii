@@ -47,6 +47,10 @@
 //   -k ms:keys  types keys from ms on, one every 80 ms (XT scan codes, set 1;
 //       \n Enter, \e Esc, \b Backspace, \t Tab; capitals and symbols with Shift);
 //       may be given more than once
+//   -e 'text|keys'  types keys (as -k) 50 ms after the cursor's line (the BIOS data area's
+//       page 0 cursor row) shows text; the -e's are taken in order, each one only after the
+//       keys of the one before were typed and 1.5 s passed (a dialogue: FDISK, FORMAT)
+//   -E text  ends the run when the cursor's line shows text, after the last -e
 //   -w  warm start: the BIOS's warm-boot flag 0472h = 1234h is in the RAM at
 //       power-on (GLaBIOS-style BIOSes skip their memory test; the Commodore BIOS
 //       4.41 still tests it and then fails "Bad DMA port = 0004h": not for it)
@@ -94,6 +98,45 @@ struct HdImage {
         return true;
     }
 };
+
+// one line of the text screen (the PVC4 build: its RAM; else the CGA's)
+static std::string screen_line(Vtb_sys *tb, int y) {
+    std::string l;
+#if PVC4_BUILD
+    auto *r = tb->rootp;
+    for (int x = 0; x < 80; x++) {
+        unsigned o = (tb->vid_monomode ? 0x0000 : 0x8000) + (y * 80 + x) * 2;
+        unsigned char c = r->tb_sys__DOT__u_pc__DOT__g_pvc4__DOT__u_pvc4__DOT__vram0[((o >> 1) & 0x4000) | (o & 0x3FFF)];
+        l += (c >= 32 && c < 127) ? (char)c : ' ';
+    }
+#else
+    (void)tb; (void)y;
+#endif
+    return l;
+}
+
+static bool ascii_sc(char c, unsigned &sc, bool &shift);
+
+// keys (as -k: one every 80 ms from ms on, make, break 30 ms later; \n \e \b \t escapes)
+static bool add_keys(std::vector<std::pair<unsigned long long, unsigned>> &keys, double ms,
+                     const char *s) {
+    for (const char *c = s; *c; c++) {
+        char ch = *c;
+        if (ch == '\\' && c[1]) {
+            c++;
+            ch = *c == 'n' ? '\n' : *c == 'e' ? 27 : *c == 'b' ? '\b' : *c == 't' ? '\t' : *c;
+        }
+        unsigned sc; bool sh;
+        if (!ascii_sc(ch, sc, sh)) { fprintf(stderr, "-k: no scan code for '%c'\n", ch); return false; }
+        unsigned long long t0 = (unsigned long long)(ms * 1e-3 * CLK_HZ), d = (unsigned long long)(0.03 * CLK_HZ);
+        if (sh) keys.push_back({t0, 0x2A});
+        keys.push_back({t0 + 1, sc});
+        keys.push_back({t0 + d, sc | 0x80});
+        if (sh) keys.push_back({t0 + d + 1, 0xAA});
+        ms += 80;
+    }
+    return true;
+}
 
 static void dump_screen(Vtb_sys *tb, const char *title, bool mono = false) {
     auto *r = tb->rootp;
@@ -154,6 +197,8 @@ int main(int argc, char **argv) {
     int jmp208 = -1;                    // -1: B with an image, else A
     bool xtalog = false, warm = false;
     std::vector<std::pair<unsigned long long, unsigned>> keys;     // (clk, scan code)
+    std::vector<std::pair<std::string, std::string>> trig;         // -e text|keys
+    const char *endtext = nullptr;                                 // -E
     unsigned variant = 0;
     double hd_lat_us = 20;
     std::vector<double> shots;
@@ -201,23 +246,16 @@ int main(int argc, char **argv) {
             // ms:keys, one key every 80 ms: make, break 30 ms later
             char *t = argv[++i], *colon = strchr(t, ':');
             if (!colon) { fprintf(stderr, "-k ms:keys\n"); return 1; }
-            double ms = atof(t);
-            for (char *c = colon + 1; *c; c++) {
-                char ch = *c;
-                if (ch == '\\' && c[1]) {
-                    c++;
-                    ch = *c == 'n' ? '\n' : *c == 'e' ? 27 : *c == 'b' ? '\b' : *c == 't' ? '\t' : *c;
-                }
-                unsigned sc; bool sh;
-                if (!ascii_sc(ch, sc, sh)) { fprintf(stderr, "-k: no scan code for '%c'\n", ch); return 1; }
-                unsigned long long t0 = (unsigned long long)(ms * 1e-3 * CLK_HZ), d = (unsigned long long)(0.03 * CLK_HZ);
-                if (sh) keys.push_back({t0, 0x2A});
-                keys.push_back({t0 + 1, sc});
-                keys.push_back({t0 + d, sc | 0x80});
-                if (sh) keys.push_back({t0 + d + 1, 0xAA});
-                ms += 80;
-            }
+            if (!add_keys(keys, atof(t), colon + 1)) return 1;
         }
+        else if (!strcmp(argv[i], "-e") && i + 1 < argc) {
+            char *t = argv[++i], *bar = strchr(t, '|');
+            if (!bar) { fprintf(stderr, "-e text|keys\n"); return 1; }
+            trig.push_back({std::string(t, bar - t), std::string(bar + 1)});
+            std::vector<std::pair<unsigned long long, unsigned>> chk;
+            if (!add_keys(chk, 0, bar + 1)) return 1;
+        }
+        else if (!strcmp(argv[i], "-E") && i + 1 < argc) endtext = argv[++i];
         else if (!strcmp(argv[i], "-S") && i + 1 < argc) {
             for (char *t = strtok(argv[++i], ","); t; t = strtok(nullptr, ",")) shots.push_back(atof(t));
             std::sort(shots.begin(), shots.end());
@@ -490,6 +528,26 @@ int main(int argc, char **argv) {
             if (!quiet && !(keys[key_i].second & 0x80))
                 printf("[%9.3f ms] key %02X\n", cyc / CLK_HZ * 1e3, keys[key_i].second);
             key_i++;
+        }
+        // -e / -E: the cursor's line (BIOS data area 0451h: page 0's row), every 20 ms
+        static size_t trig_i = 0;
+        static unsigned long long trig_quiet = 0;
+        if ((!trig.empty() || endtext) && cyc % (unsigned long long)(0.02 * CLK_HZ) == 0 &&
+            key_i == keys.size() && cyc >= trig_quiet) {
+            unsigned row = tb->rootp->tb_sys__DOT__ram[0x451];
+            std::string line = screen_line(tb, row < 25 ? row : 24);
+            if (trig_i < trig.size() && line.find(trig[trig_i].first) != std::string::npos) {
+                double ms = cyc / CLK_HZ * 1e3 + 50;
+                printf("[%9.3f ms] -e '%s': %s\n", cyc / CLK_HZ * 1e3, trig[trig_i].first.c_str(), line.c_str());
+                size_t k0 = keys.size();
+                add_keys(keys, ms, trig[trig_i].second.c_str());
+                std::sort(keys.begin() + k0, keys.end());
+                trig_quiet = keys.empty() ? cyc : keys.back().first + (unsigned long long)(1.5 * CLK_HZ);
+                trig_i++;
+            } else if (trig_i == trig.size() && endtext && line.find(endtext) != std::string::npos) {
+                printf("[%9.3f ms] -E '%s': %s\n", cyc / CLK_HZ * 1e3, endtext, line.c_str());
+                total = cyc + 1;
+            }
         }
         tb->eval();
         // sample before the edge (the BIU changes its pins on the edge)

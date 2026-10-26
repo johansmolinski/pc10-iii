@@ -351,9 +351,12 @@ Notes (2026-10-25, PVC4):
   sampled at `reset`.
 
 Notes (2026-10-25, PC20-III hard disk):
-- `XTA_FIT` = 0 (the default) removes the card; the shell's
-  `pc_system_flat` keeps it at 0 and ties the `xta_*` ports off until the
-  SD backend exists (doc/xta.md section 11).
+- `XTA_FIT` = 0 (the default) removes the card. The shell's
+  `pc_system_flat` sets it to 1 (since 2026-10-26, doc/xta.md section 11):
+  `xta_enable` (JMP208) and `xta_present` are both "an image of exactly
+  41,820 sectors is mounted as C:", the sector port goes to
+  `CORE/vhdl/pc_fdd_sd.vhd` (drive 2, its second sector port, served in
+  turn with the FDC's), `xta_active` to the drive LED (red).
 - `tb/sys` serves the drive from an image file (`make XTA=1`, `-A`,
   `-jmp208`, `-WA`, `-xl`).
 

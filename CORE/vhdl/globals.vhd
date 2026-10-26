@@ -89,6 +89,9 @@ constant C_DEV_PC_BIOS        : std_logic_vector(15 downto 0) := x"0100";
 -- window 0xFFFF the CRT/ROM load CSR. Manual "ROM" loads in the menu (nothing is streamed).
 constant C_DEV_PC_FDA         : std_logic_vector(15 downto 0) := x"0101";
 constant C_DEV_PC_FDB         : std_logic_vector(15 downto 0) := x"0102";
+-- The hard disk image of C: (pc_fdd_sd.vhd's third drive, the same windows): the PC20-III's drive,
+-- a raw image of exactly 21,411,840 bytes (41,820 sectors, 615 x 4 x 17).
+constant C_DEV_PC_HDC         : std_logic_vector(15 downto 0) := x"0105";
 -- The character ROM (pc_font.vhd): windows 0..7 the 32 KB image, window 0x0100 control.
 constant C_DEV_PC_FONT        : std_logic_vector(15 downto 0) := x"0103";
 -- The 8088's microcode bundle (pc_ucode.vhd): windows 0..1 the 6 KB image, window 0x0100 control.
@@ -120,12 +123,14 @@ constant C_CRTROMTYPE_SDRAM      : std_logic_vector(15 downto 0) := x"0002";
 constant C_CRTROMTYPE_MANDATORY  : std_logic_vector(15 downto 0) := x"0003";
 constant C_CRTROMTYPE_OPTIONAL   : std_logic_vector(15 downto 0) := x"0004";
 
--- Manually loadable ROMs: the floppy images of A: and B: (menu lines " A:%s", " B:%s"). The
--- firmware's PREP_LOAD_IMAGE hands the file to pc_fdd_sd.vhd (extent map) and leaves the file
--- pointer at the end, so the Shell streams nothing and only does the CSR handshake.
-constant C_CRTROMS_MAN_NUM       : natural := 2;
+-- Manually loadable ROMs: the floppy images of A: and B: and the hard disk image of C: (menu
+-- lines " A:%s", " B:%s", " C:%s"). The firmware's PREP_LOAD_IMAGE hands the file to
+-- pc_fdd_sd.vhd (extent map) and leaves the file pointer at the end, so the Shell streams
+-- nothing and only does the CSR handshake.
+constant C_CRTROMS_MAN_NUM       : natural := 3;
 constant C_CRTROMS_MAN           : crtrom_buf_array := ( C_CRTROMTYPE_DEVICE, C_DEV_PC_FDA,
                                                          C_CRTROMTYPE_DEVICE, C_DEV_PC_FDB,
+                                                         C_CRTROMTYPE_DEVICE, C_DEV_PC_HDC,
                                                          x"EEEE");
 
 -- Automatically loaded ROMs: the BIOS, mandatory. The Shell loads it into C_DEV_PC_BIOS before the

@@ -77,7 +77,7 @@ constant HELP_1 : string :=
    "\n PC10-III for MEGA65 " & CORE_VERSION & "\n\n" &
    " /pc10/bios.rom  BIOS, 8-64 KB\n" &
    " /pc10/char.rom  character ROM (optional)\n" &
-   " A: B:  160K-720K disk images\n\n" &
+   " A: B:  160K-720K  C: 20 MB (raw)\n\n" &
    " Keys (XT keyboard):\n" &
    " " & CHR_LINE_10 & CHR_LINE_10 & CHR_LINE_10 & "\n" &
    " MEGA + 1..0     F1..F10\n" &
@@ -190,67 +190,70 @@ constant OPTM_S_SAVING     : string := "<Saving>";
 --     1  ----
 --     2  A:%s                    floppy image of A: (manual ROM load 0, pc_fdd_sd.vhd)
 --     3  B:%s                    floppy image of B: (manual ROM load 1)
---     4  A: write protected      C_MENU_WP_A
---     5  B: write protected      C_MENU_WP_B
---     6  Drive sound (int. drive) C_MENU_DRV_SOUND (default on; pc_drvsnd.vhd)
---     7  ----
---     8  Chipset: %s             submenu (a change restarts the PC, mega65.vhd)
---     9    Chipset               headline
---    10    ----
---    11    PC10-III (FE2010A)    C_MENU_CHIP_PC10 (default; switches 5D)
---    12    IBM XT (8255)         C_MENU_CHIP_XT (switches 6D)
---    13    ----
---    14    Back to main menu
---    15  Memory: %s              submenu
---    16    Memory size           headline
---    17    ----
---    18    640 KB                C_MENU_MEM_640 (default)
---    19    512 KB                C_MENU_MEM_512
---    20    256 KB                C_MENU_MEM_256
---    21    128 KB                C_MENU_MEM_128
---    22    ----
---    23    Back to main menu
---    24  HDMI: %s                submenu
---    25    HDMI mode             headline
---    26    ----
---    27    720p 60 Hz 16:9       C_MENU_HDMI_720P (default)
---    28    480p 59.94 Hz 4:3     C_MENU_HDMI_480P
---    29    720p 50 Hz 16:9       C_MENU_HDMI_720P50 (the PVC4's mono personality is 49.8 Hz)
---    30    ----
---    31    Back to main menu
---    32  Display: %s             submenu: the PVC4's CONFIG switch 2 + switches 3/4 (a change
+--     4  C:%s                    hard disk image of C: (manual ROM load 2, pc_fdd_sd.vhd;
+--                                JMP208 follows it: no image = no drive)
+--     5  A: write protected      C_MENU_WP_A
+--     6  B: write protected      C_MENU_WP_B
+--     7  Drive sound (int. drive) C_MENU_DRV_SOUND (default on; pc_drvsnd.vhd)
+--     8  ----
+--     9  Chipset: %s             submenu (a change restarts the PC, mega65.vhd)
+--    10    Chipset               headline
+--    11    ----
+--    12    PC10-III (FE2010A)    C_MENU_CHIP_PC10 (default; switches 5D)
+--    13    IBM XT (8255)         C_MENU_CHIP_XT (switches 6D)
+--    14    ----
+--    15    Back to main menu
+--    16  Memory: %s              submenu
+--    17    Memory size           headline
+--    18    ----
+--    19    640 KB                C_MENU_MEM_640 (default)
+--    20    512 KB                C_MENU_MEM_512
+--    21    256 KB                C_MENU_MEM_256
+--    22    128 KB                C_MENU_MEM_128
+--    23    ----
+--    24    Back to main menu
+--    25  HDMI: %s                submenu
+--    26    HDMI mode             headline
+--    27    ----
+--    28    720p 60 Hz 16:9       C_MENU_HDMI_720P (default)
+--    29    480p 59.94 Hz 4:3     C_MENU_HDMI_480P
+--    30    720p 50 Hz 16:9       C_MENU_HDMI_720P50 (the PVC4's mono personality is 49.8 Hz)
+--    31    ----
+--    32    Back to main menu
+--    33  Display: %s             submenu: the PVC4's CONFIG switch 2 + switches 3/4 (a change
 --                                between colour and mono restarts the PC, pc_chipset.vhd)
---    33    Display               headline
---    34    ----
---    35    Colour                (default; 80 x 25 colour)
---    36    Monochrome, green     C_MENU_DISP_GREEN (mono; the phosphor only in main.vhd)
---    37    Monochrome, amber     C_MENU_DISP_AMBER
---    38    Monochrome, white     C_MENU_DISP_WHITE
---    39    ----
---    40    Back to main menu
---    41  Scandinavian charset    C_MENU_CHARSET_SCAN (CONFIG switch 1 on: the Commodore character
+--    34    Display               headline
+--    35    ----
+--    36    Colour                (default; 80 x 25 colour)
+--    37    Monochrome, green     C_MENU_DISP_GREEN (mono; the phosphor only in main.vhd)
+--    38    Monochrome, amber     C_MENU_DISP_AMBER
+--    39    Monochrome, white     C_MENU_DISP_WHITE
+--    40    ----
+--    41    Back to main menu
+--    42  Scandinavian charset    C_MENU_CHARSET_SCAN (CONFIG switch 1 on: the Commodore character
 --                                ROM's A14 = 0, live as on the board; default off = USA/Europe)
---    42  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
---    43  Analog: CSYNC           C_MENU_ANALOG_CSYNC
---    44  ----
---    45  Help
---    46  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
---    47  ----
---    48  Close Menu
+--    43  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
+--    44  Analog: CSYNC           C_MENU_ANALOG_CSYNC
+--    45  ----
+--    46  Help
+--    47  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
+--    48  ----
+--    49  Close Menu
 --
 -- The settings file keeps one byte per line, so the layout is part of its format: the
 -- firmware's CFG_SIGCHECK accepts only a file whose text carries this menu's signature
 -- (m2m-rom.asm, CFG_SIG_VAL; change it with every layout change), any other file is reset to
 -- the defaults.
-constant OPTM_SIZE         : natural := 49;
+constant OPTM_SIZE         : natural := 50;
 constant OPTM_DX           : natural := 28;
-constant OPTM_DY           : natural := 20;   -- the visible main menu (lines 0-8, 15, 24, 32, 41-48)
+constant OPTM_DY           : natural := 21;   -- the visible main menu (lines 0-9, 16, 25, 33, 42-49)
 
 constant OPTM_ITEMS        : string :=
    " PC10-III\n"              &
    "\n"                       &
    " A:%s\n"                  &
    " B:%s\n"                  &
+   " C:%s\n"                  &
    " A: write protected\n"    &
    " B: write protected\n"    &
    " Drive sound (int. drive)\n" &
@@ -311,6 +314,7 @@ constant OPTM_G_RESET      : integer := 10;
 constant OPTM_G_DRVSND     : integer := 11;
 constant OPTM_G_CHIP       : integer := 12;
 constant OPTM_G_CHARSET    : integer := 13;
+constant OPTM_G_HDC        : integer := 14;
 
 type OPTM_GTYPE is array (0 to OPTM_SIZE - 1) of integer range 0 to 2**OPTM_GTC- 1;
 
@@ -318,51 +322,52 @@ constant OPTM_GROUPS       : OPTM_GTYPE := ( OPTM_G_TEXT + OPTM_G_HEADLINE,     
                                              OPTM_G_LINE,                              --  1
                                              OPTM_G_FDA + OPTM_G_LOAD_ROM + OPTM_G_START, --  2 A:%s
                                              OPTM_G_FDB + OPTM_G_LOAD_ROM,             --  3 B:%s
-                                             OPTM_G_WPA + OPTM_G_SINGLESEL,            --  4 A: write protected
-                                             OPTM_G_WPB + OPTM_G_SINGLESEL,            --  5 B: write protected
-                                             OPTM_G_DRVSND + OPTM_G_SINGLESEL + OPTM_G_STDSEL, --  6 Drive sound
-                                             OPTM_G_LINE,                              --  7
-                                             OPTM_G_SUBMENU,                           --  8 Chipset: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            --  9 Chipset
-                                             OPTM_G_LINE,                              -- 10
-                                             OPTM_G_CHIP + OPTM_G_STDSEL,              -- 11 PC10-III (FE2010A)
-                                             OPTM_G_CHIP,                              -- 12 IBM XT (8255)
-                                             OPTM_G_LINE,                              -- 13
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 14 Back
-                                             OPTM_G_SUBMENU,                           -- 15 Memory: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 16 Memory size
-                                             OPTM_G_LINE,                              -- 17
-                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 18 640 KB
-                                             OPTM_G_MEM,                               -- 19 512 KB
-                                             OPTM_G_MEM,                               -- 20 256 KB
-                                             OPTM_G_MEM,                               -- 21 128 KB
-                                             OPTM_G_LINE,                              -- 22
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 23 Back
-                                             OPTM_G_SUBMENU,                           -- 24 HDMI: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 25 HDMI mode
-                                             OPTM_G_LINE,                              -- 26
-                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 27 720p 60 Hz
-                                             OPTM_G_HDMI,                              -- 28 480p 59.94 Hz
-                                             OPTM_G_HDMI,                              -- 29 720p 50 Hz
-                                             OPTM_G_LINE,                              -- 30
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 31 Back
-                                             OPTM_G_SUBMENU,                           -- 32 Display: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 33 Display
-                                             OPTM_G_LINE,                              -- 34
-                                             OPTM_G_DISP + OPTM_G_STDSEL,              -- 35 Colour
-                                             OPTM_G_DISP,                              -- 36 Monochrome, green
-                                             OPTM_G_DISP,                              -- 37 Monochrome, amber
-                                             OPTM_G_DISP,                              -- 38 Monochrome, white
-                                             OPTM_G_LINE,                              -- 39
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 40 Back
-                                             OPTM_G_CHARSET + OPTM_G_SINGLESEL,        -- 41 Scandinavian charset
-                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 42 Analog: 15 kHz
-                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 43 Analog: CSYNC
-                                             OPTM_G_LINE,                              -- 44
-                                             OPTM_G_HELP,                              -- 45 Help
-                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 46 Reset the PC
-                                             OPTM_G_LINE,                              -- 47
-                                             OPTM_G_CLOSE                              -- 48 Close Menu
+                                             OPTM_G_HDC + OPTM_G_LOAD_ROM,             --  4 C:%s
+                                             OPTM_G_WPA + OPTM_G_SINGLESEL,            --  5 A: write protected
+                                             OPTM_G_WPB + OPTM_G_SINGLESEL,            --  6 B: write protected
+                                             OPTM_G_DRVSND + OPTM_G_SINGLESEL + OPTM_G_STDSEL, --  7 Drive sound
+                                             OPTM_G_LINE,                              --  8
+                                             OPTM_G_SUBMENU,                           --  9 Chipset: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 10 Chipset
+                                             OPTM_G_LINE,                              -- 11
+                                             OPTM_G_CHIP + OPTM_G_STDSEL,              -- 12 PC10-III (FE2010A)
+                                             OPTM_G_CHIP,                              -- 13 IBM XT (8255)
+                                             OPTM_G_LINE,                              -- 14
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 15 Back
+                                             OPTM_G_SUBMENU,                           -- 16 Memory: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 17 Memory size
+                                             OPTM_G_LINE,                              -- 18
+                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 19 640 KB
+                                             OPTM_G_MEM,                               -- 20 512 KB
+                                             OPTM_G_MEM,                               -- 21 256 KB
+                                             OPTM_G_MEM,                               -- 22 128 KB
+                                             OPTM_G_LINE,                              -- 23
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 24 Back
+                                             OPTM_G_SUBMENU,                           -- 25 HDMI: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 26 HDMI mode
+                                             OPTM_G_LINE,                              -- 27
+                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 28 720p 60 Hz
+                                             OPTM_G_HDMI,                              -- 29 480p 59.94 Hz
+                                             OPTM_G_HDMI,                              -- 30 720p 50 Hz
+                                             OPTM_G_LINE,                              -- 31
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 32 Back
+                                             OPTM_G_SUBMENU,                           -- 33 Display: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 34 Display
+                                             OPTM_G_LINE,                              -- 35
+                                             OPTM_G_DISP + OPTM_G_STDSEL,              -- 36 Colour
+                                             OPTM_G_DISP,                              -- 37 Monochrome, green
+                                             OPTM_G_DISP,                              -- 38 Monochrome, amber
+                                             OPTM_G_DISP,                              -- 39 Monochrome, white
+                                             OPTM_G_LINE,                              -- 40
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 41 Back
+                                             OPTM_G_CHARSET + OPTM_G_SINGLESEL,        -- 42 Scandinavian charset
+                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 43 Analog: 15 kHz
+                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 44 Analog: CSYNC
+                                             OPTM_G_LINE,                              -- 45
+                                             OPTM_G_HELP,                              -- 46 Help
+                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 47 Reset the PC
+                                             OPTM_G_LINE,                              -- 48
+                                             OPTM_G_CLOSE                              -- 49 Close Menu
                                            );
 
 begin

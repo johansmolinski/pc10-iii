@@ -1,12 +1,15 @@
 ----------------------------------------------------------------------------------
 -- PC10-III for MEGA65
 --
--- pc_fdd_sd: the floppy images of drives A: and B: straight from the SD card.
+-- pc_fdd_sd: the floppy images of drives A: and B: and the hard disk image of C: (the
+-- PC20-III's WD93024-X, rtl/hdc/xta_card.sv) straight from the SD card.
 --
--- The FDC card (rtl/fdc, doc/fdc.md section 5) asks for whole 512-byte sectors through the
--- sector port and buffers them itself, so this backend has no cache: every request becomes one
+-- The FDC card (rtl/fdc, doc/fdc.md section 5) and the hard disk card (doc/xta.md, the
+-- hd_sp_* protocol of doc/hdc.md section 5) ask for whole 512-byte sectors through their sector
+-- ports and buffer them themselves, so this backend has no cache: every request becomes one
 -- single-block transfer through the SD host controller's engine port (M2M-UPSTREAM sd-host,
--- the approach of Megamiga's adf_sd.vhd):
+-- the approach of Megamiga's adf_sd.vhd). Two sector ports, one engine: the main side takes
+-- one request at a time; when both ports ask, the one that was not served last goes first.
 --
 --   * the firmware hands over each image as Megamiga does: the extent map of the file
 --     (FAT32$FILE_MAP format: word 0 = number of extents, then per extent first cluster lo/hi
@@ -16,6 +19,9 @@
 --         320 sectors 160K 40/1/8, 360 180K 40/1/9, 640 320K 40/2/8, 720 360K 40/2/9,
 --         1440 720K 80/2/9; anything else: no disk.
 --     drv_80trk follows the image (an 80-track drive for a 720K image).
+--     C: (drive 2) is a disk only with exactly G_HD_SECTS sectors (41,820 = 615 x 4 x 17, the
+--     PC20-III's drive in translate mode): hd_present_o. Its LBA is 28 bits wide; one beyond
+--     the file (or above 65535) ends with sp_err. C: is never write-protected.
 --   * a request crosses into the QNICE clock domain as a toggle with a payload that is stable
 --     while it crosses (CORE.xdc bounds qnice <-> main), and the answer comes back the same way.
 --   * read: the LBA becomes an SD block through the extent map; the block lands in a 512-byte
@@ -29,9 +35,13 @@
 --     transfer that ended without a block (QNICE preempted the engine port before the block)
 --     is issued again. Errors, a drive that is off, an LBA outside the file and a write to a
 --     write-protected image end with sp_err.
+--   * a port that drops its request before sp_done (the card was reset: RESET DRV) abandons
+--     it: the transfer that is running ends, nothing is streamed and no sp_done is given, and
+--     the next request is taken.
 --
--- QNICE devices C_DEV_PC_FDA / C_DEV_PC_FDB (qnice_drive_i selects which one is addressed;
--- writes on the falling edge like every M2M device, reads combinational):
+-- QNICE devices C_DEV_PC_FDA / C_DEV_PC_FDB / C_DEV_PC_HDC (qnice_drive_i selects which one is
+-- addressed: 0 A:, 1 B:, 2 C:; writes on the falling edge like every M2M device, reads
+-- combinational):
 --   window 0x0000  registers of the drive:
 --     0x00 MODE    bit 0 = on, bit 1 = the card is in slot 1
 --     0x01/0x02    SECTS  number of 512-byte sectors of the file (lo, hi)
@@ -40,7 +50,7 @@
 --     0x06 WP      (read) bit 0 = write protected (from the menu, qnice_wp_i)
 --     0x08 STATUS  (read) bit 0 = a transfer is running (any drive), bit 1 = the drive has a disk
 --     0x10..0x12   (read) blocks read, blocks written, failed requests (all drives, wrapping)
---   window 0x0001  the extent map of the drive (2048 words)
+--   window 0x0001  the extent map of the drive (2048 words: at most 511 extents)
 --   window 0xFFFF  the M2M CRT/ROM load CSR (STATUS, file size; PARSEST answers "ready" as soon
 --                  as STATUS is "ok": the firmware has set the drive up in PREP_LOAD_IMAGE)
 --
@@ -58,13 +68,14 @@ entity pc_fdd_sd is
    generic (
       G_RETRIES      : natural := 2;
       G_MS           : natural := 50_000;      -- QNICE clocks per millisecond
-      G_READY_WAIT   : natural := 500          -- ms
+      G_READY_WAIT   : natural := 500;         -- ms
+      G_HD_SECTS     : natural := 41_820       -- the only image size of C:
    );
    port (
       -- QNICE clock domain
       qnice_clk_i     : in  std_logic;
       qnice_rst_i     : in  std_logic;
-      qnice_drive_i   : in  std_logic;         -- 0 = A:, 1 = B:
+      qnice_drive_i   : in  std_logic_vector(1 downto 0);   -- 0 = A:, 1 = B:, 2 = C:
       qnice_addr_i    : in  std_logic_vector(27 downto 0);
       qnice_data_i    : in  std_logic_vector(15 downto 0);
       qnice_data_o    : out std_logic_vector(15 downto 0);
@@ -96,7 +107,19 @@ entity pc_fdd_sd is
       sp_wr_ready_o   : out std_logic;
       sp_done_o       : out std_logic;
       sp_err_o        : out std_logic;
-      main_busy_o     : out std_logic                       -- a transfer is running (LED)
+      -- the hard disk C: (xta_card.sv): its medium and its sector port
+      hd_present_o    : out std_logic;
+      hd_sp_req_i     : in  std_logic;
+      hd_sp_write_i   : in  std_logic;
+      hd_sp_lba_i     : in  std_logic_vector(27 downto 0);
+      hd_sp_rd_valid_o: out std_logic;
+      hd_sp_rd_data_o : out std_logic_vector(7 downto 0);
+      hd_sp_wr_valid_i: in  std_logic;
+      hd_sp_wr_data_i : in  std_logic_vector(7 downto 0);
+      hd_sp_wr_ready_o: out std_logic;
+      hd_sp_done_o    : out std_logic;
+      hd_sp_err_o     : out std_logic;
+      main_busy_o     : out std_logic                       -- a transfer is running
    );
 end entity pc_fdd_sd;
 
@@ -104,34 +127,33 @@ architecture synthesis of pc_fdd_sd is
 
    attribute async_reg : string;
 
-   type t_u16x2 is array (0 to 1) of unsigned(15 downto 0);
-   type t_u32x2 is array (0 to 1) of unsigned(31 downto 0);
-   type t_u3x2  is array (0 to 1) of unsigned(2 downto 0);
-   type t_csr   is array (0 to 1) of std_logic_vector(3 downto 0);
+   type t_u32x3 is array (0 to 2) of unsigned(31 downto 0);
+   type t_u3x3  is array (0 to 2) of unsigned(2 downto 0);
+   type t_csr   is array (0 to 2) of std_logic_vector(3 downto 0);
 
    ------------------------------------------------------------------------------------------
    -- QNICE side: registers
    ------------------------------------------------------------------------------------------
-   signal q_mode_on   : std_logic_vector(1 downto 0) := "00";
-   signal q_slot1     : std_logic_vector(1 downto 0) := "00";
-   signal q_wp        : std_logic_vector(1 downto 0);
-   signal q_sects     : t_u32x2 := (others => (others => '0'));
-   signal q_base      : t_u32x2 := (others => (others => '0'));
-   signal q_shift     : t_u3x2  := (others => (others => '0'));
+   signal q_mode_on   : std_logic_vector(2 downto 0) := "000";
+   signal q_slot1     : std_logic_vector(2 downto 0) := "000";
+   signal q_wp        : std_logic_vector(2 downto 0);
+   signal q_sects     : t_u32x3 := (others => (others => '0'));
+   signal q_base      : t_u32x3 := (others => (others => '0'));
+   signal q_shift     : t_u3x3  := (others => (others => '0'));
    signal q_csr       : t_csr   := (others => (others => '0'));
-   signal q_fs        : t_u32x2 := (others => (others => '0'));
+   signal q_fs        : t_u32x3 := (others => (others => '0'));
    signal q_st_rd     : unsigned(15 downto 0) := (others => '0');
    signal q_st_wr     : unsigned(15 downto 0) := (others => '0');
    signal q_st_err    : unsigned(15 downto 0) := (others => '0');
 
    signal q_win       : std_logic_vector(15 downto 0);
    signal q_ofs       : std_logic_vector(11 downto 0);
-   signal q_d         : natural range 0 to 1;
+   signal q_d         : natural range 0 to 2;
    signal q_map_we    : std_logic;
    signal q_map_q     : std_logic_vector(15 downto 0);
 
    -- geometry per drive (combinational from SECTS)
-   signal q_present   : std_logic_vector(1 downto 0);
+   signal q_present   : std_logic_vector(2 downto 0);
    signal q_tracks    : std_logic_vector(15 downto 0);
    signal q_heads     : std_logic_vector(3 downto 0);
    signal q_spt       : std_logic_vector(11 downto 0);
@@ -144,8 +166,9 @@ architecture synthesis of pc_fdd_sd is
    signal qstate      : t_qstate := Q_IDLE;
    signal q_req_s     : std_logic_vector(2 downto 0) := "000";   -- sync of m_req_tgl, + last
    attribute async_reg of q_req_s : signal is "true";
-   signal q_drv       : natural range 0 to 1 := 0;
+   signal q_drv       : natural range 0 to 2 := 0;
    signal q_write     : std_logic := '0';
+   signal q_oor       : std_logic := '0';                         -- LBA above 65535
    signal q_lba       : unsigned(15 downto 0) := (others => '0');
    signal q_cluster   : unsigned(15 downto 0) := (others => '0');
    signal q_offs      : unsigned(15 downto 0) := (others => '0');
@@ -155,7 +178,7 @@ architecture synthesis of pc_fdd_sd is
    signal q_first     : unsigned(31 downto 0) := (others => '0');
    signal q_cnt       : unsigned(31 downto 0) := (others => '0');
    signal q_block     : unsigned(31 downto 0) := (others => '0');
-   signal q_map_raddr : std_logic_vector(11 downto 0);
+   signal q_map_raddr : std_logic_vector(12 downto 0);
    signal q_map_rq    : std_logic_vector(15 downto 0);
    signal q_tries     : natural range 0 to G_RETRIES := 0;
    signal q_ms_cnt    : natural range 0 to G_MS - 1 := 0;
@@ -177,9 +200,16 @@ architecture synthesis of pc_fdd_sd is
    type t_mstate is (M_IDLE, M_COLLECT, M_WAIT, M_STREAM, M_FIN, M_LOW);
    signal mstate      : t_mstate := M_IDLE;
    signal m_req_tgl   : std_logic := '0';
-   signal m_drive     : std_logic := '0';
+   signal m_drive     : std_logic_vector(1 downto 0) := "00";
    signal m_write     : std_logic := '0';
    signal m_lba       : std_logic_vector(15 downto 0) := (others => '0');
+   signal m_oor       : std_logic := '0';
+   signal m_src       : std_logic := '0';      -- the port being served: 0 = FDC, 1 = hard disk
+   signal m_last      : std_logic := '0';      -- the port served last (round robin)
+   signal m_drop      : std_logic := '0';      -- the port dropped its request: abandoned
+   signal m_req_sel   : std_logic;
+   signal m_wv_sel    : std_logic;
+   signal m_wd_sel    : std_logic_vector(7 downto 0);
    signal m_done_s    : std_logic_vector(2 downto 0) := "000";
    attribute async_reg of m_done_s : signal is "true";
    signal m_idx       : unsigned(9 downto 0) := (others => '0');
@@ -189,7 +219,7 @@ architecture synthesis of pc_fdd_sd is
    signal m_rd_valid  : std_logic := '0';
    signal m_done      : std_logic := '0';
    signal m_err       : std_logic := '0';
-   signal m_geo       : std_logic_vector(35 downto 0);
+   signal m_geo       : std_logic_vector(36 downto 0);
 
    -- the q_err of the answer, read in the main domain when the done toggle has crossed
    signal q_err_out   : std_logic := '0';
@@ -226,25 +256,30 @@ begin
       end process p_geo;
    end generate g_geo;
 
+   -- C: only with the size of the PC20-III's drive
+   q_present(2) <= '1' when q_mode_on(2) = '1' and q_sects(2) = G_HD_SECTS else '0';
+
    -- into the main domain (static while the drive is set up; the FDC card drops its buffer at
    -- every command)
    i_cdc_geo : entity work.cdc_stable
       generic map (
-         G_DATA_SIZE    => 36,
+         G_DATA_SIZE    => 37,
          G_REGISTER_SRC => true
       )
       port map (
          src_clk_i               => qnice_clk_i,
-         src_data_i(1 downto 0)  => q_present,
-         src_data_i(3 downto 2)  => q_wp,
+         src_data_i(1 downto 0)  => q_present(1 downto 0),
+         src_data_i(3 downto 2)  => q_wp(1 downto 0),
          src_data_i(19 downto 4) => q_tracks,
          src_data_i(23 downto 20)=> q_heads,
          src_data_i(35 downto 24)=> q_spt,
+         src_data_i(36)          => q_present(2),
          dst_clk_i               => main_clk_i,
          dst_data_o              => m_geo
       ); -- i_cdc_geo
 
    img_present_o <= m_geo(1 downto 0);
+   hd_present_o  <= m_geo(36);
    img_wp_o      <= m_geo(3 downto 2);
    img_tracks_o  <= m_geo(19 downto 4);
    img_heads_o   <= m_geo(23 downto 20);
@@ -256,10 +291,10 @@ begin
    -- QNICE registers
    ------------------------------------------------------------------------------------------
 
-   q_wp  <= qnice_wp_i;
+   q_wp  <= '0' & qnice_wp_i;                                -- C: is never write-protected
    q_win <= qnice_addr_i(27 downto 12);
    q_ofs <= qnice_addr_i(11 downto 0);
-   q_d   <= 1 when qnice_drive_i = '1' else 0;
+   q_d   <= 0 when qnice_drive_i = "00" else 1 when qnice_drive_i = "01" else 2;
 
    p_qregs : process (qnice_clk_i)
    begin
@@ -286,7 +321,7 @@ begin
             end if;
          end if;
          if qnice_rst_i = '1' then
-            q_mode_on <= "00";
+            q_mode_on <= "000";
             q_csr     <= (others => (others => '0'));
          end if;
       end if;
@@ -334,14 +369,14 @@ begin
 
    i_map : entity work.dualport_2clk_ram
       generic map (
-         ADDR_WIDTH        => 12,
+         ADDR_WIDTH        => 13,
          DATA_WIDTH        => 16,
          RAM_STYLE_SELECT  => "block",
          FALLING_A         => true
       )
       port map (
          clock_a           => qnice_clk_i,
-         address_a         => qnice_drive_i & q_ofs(10 downto 0),
+         address_a         => std_logic_vector(to_unsigned(q_d, 2)) & q_ofs(10 downto 0),
          data_a            => qnice_data_i,
          wren_a            => q_map_we,
          q_a               => q_map_q,
@@ -369,11 +404,7 @@ begin
          when Q_EC        => v_w := v_b + 4;
          when others      => v_w := (others => '0');
       end case;
-      if q_drv = 1 then
-         q_map_raddr <= '1' & std_logic_vector(v_w);
-      else
-         q_map_raddr <= '0' & std_logic_vector(v_w);
-      end if;
+      q_map_raddr <= std_logic_vector(to_unsigned(q_drv, 2)) & std_logic_vector(v_w);
    end process p_maddr;
 
    p_engine : process (qnice_clk_i)
@@ -390,8 +421,13 @@ begin
                q_busy <= '0';
                if q_req_s(2) /= q_req_s(1) then
                   q_busy  <= '1';
-                  if m_drive = '1' then q_drv <= 1; else q_drv <= 0; end if;
+                  case m_drive is
+                     when "00"   => q_drv <= 0;
+                     when "01"   => q_drv <= 1;
+                     when others => q_drv <= 2;
+                  end case;
                   q_write <= m_write;
+                  q_oor   <= m_oor;
                   q_lba   <= unsigned(m_lba);
                   q_tries <= 0;
                   q_err   <= '0';
@@ -404,8 +440,8 @@ begin
                q_offs    <= q_lba and (shift_left(to_unsigned(1, 16), v_shift) - 1);
                q_e       <= (others => '0');
                q_next    <= (others => '0');
-               if q_mode_on(q_drv) = '0' or resize(q_lba, 32) >= q_sects(q_drv) or
-                  (q_write = '1' and q_wp(q_drv) = '1') then
+               if q_mode_on(q_drv) = '0' or q_oor = '1' or resize(q_lba, 32) >= q_sects(q_drv) or
+                  (q_drv = 2 and q_present(2) = '0') or (q_write = '1' and q_wp(q_drv) = '1') then
                   q_err  <= '1';
                   qstate <= Q_FINISH;
                else
@@ -556,20 +592,28 @@ begin
          q_a               => q_buf_q,
          clock_b           => main_clk_i,
          address_b         => m_buf_addr,
-         data_b            => sp_wr_data_i,
+         data_b            => m_wd_sel,
          wren_b            => m_buf_we,
          q_b               => m_buf_q
       ); -- i_buf
 
    ------------------------------------------------------------------------------------------
-   -- Main side: the sector port
+   -- Main side: the two sector ports (FDC, hard disk), one request at a time
    ------------------------------------------------------------------------------------------
 
+   -- the port being served
+   m_req_sel <= hd_sp_req_i      when m_src = '1' else sp_req_i;
+   m_wv_sel  <= hd_sp_wr_valid_i when m_src = '1' else sp_wr_valid_i;
+   m_wd_sel  <= hd_sp_wr_data_i  when m_src = '1' else sp_wr_data_i;
+
    m_buf_addr <= std_logic_vector(m_idx(8 downto 0));
-   m_buf_we   <= sp_wr_valid_i when mstate = M_COLLECT else '0';
-   sp_wr_ready_o <= '1' when mstate = M_COLLECT else '0';
+   m_buf_we   <= m_wv_sel when mstate = M_COLLECT else '0';
+   sp_wr_ready_o    <= '1' when mstate = M_COLLECT and m_src = '0' else '0';
+   hd_sp_wr_ready_o <= '1' when mstate = M_COLLECT and m_src = '1' else '0';
 
    p_main : process (main_clk_i)
+      variable v_take : boolean;
+      variable v_src  : std_logic;
    begin
       if rising_edge(main_clk_i) then
          m_done_s   <= m_done_s(1 downto 0) & q_done_tgl;
@@ -579,12 +623,33 @@ begin
 
          case mstate is
             when M_IDLE =>
-               m_idx <= (others => '0');
-               if sp_req_i = '1' then
-                  m_drive <= sp_drive_i;
-                  m_write <= sp_write_i;
-                  m_lba   <= sp_lba_i;
-                  if sp_write_i = '1' then
+               m_idx  <= (others => '0');
+               m_drop <= '0';
+               -- round robin: with both ports asking, the one not served last
+               v_take := true;
+               if sp_req_i = '1' and (hd_sp_req_i = '0' or m_last = '1') then
+                  v_src := '0';
+               elsif hd_sp_req_i = '1' then
+                  v_src := '1';
+               else
+                  v_take := false;
+                  v_src  := '0';
+               end if;
+               if v_take then
+                  m_src  <= v_src;
+                  m_last <= v_src;
+                  if v_src = '0' then
+                     m_drive <= '0' & sp_drive_i;
+                     m_write <= sp_write_i;
+                     m_lba   <= sp_lba_i;
+                     m_oor   <= '0';
+                  else
+                     m_drive <= "10";
+                     m_write <= hd_sp_write_i;
+                     m_lba   <= hd_sp_lba_i(15 downto 0);
+                     m_oor   <= or hd_sp_lba_i(27 downto 16);
+                  end if;
+                  if (v_src = '0' and sp_write_i = '1') or (v_src = '1' and hd_sp_write_i = '1') then
                      mstate <= M_COLLECT;
                   else
                      m_req_tgl <= not m_req_tgl;
@@ -593,7 +658,9 @@ begin
                end if;
 
             when M_COLLECT =>
-               if sp_wr_valid_i = '1' then
+               if m_req_sel = '0' then                      -- abandoned before the block
+                  mstate <= M_IDLE;
+               elsif m_wv_sel = '1' then
                   if m_idx = 511 then
                      m_req_tgl <= not m_req_tgl;
                      mstate    <= M_WAIT;
@@ -604,7 +671,9 @@ begin
             when M_WAIT =>
                m_idx <= (others => '0');
                if m_done_s(2) /= m_done_s(1) then
-                  if m_write = '0' and q_err_out = '0' then
+                  if m_drop = '1' or m_req_sel = '0' then   -- abandoned: no answer
+                     mstate <= M_IDLE;
+                  elsif m_write = '0' and q_err_out = '0' then
                      mstate <= M_STREAM;
                   else
                      m_done <= '1';
@@ -626,10 +695,15 @@ begin
                mstate <= M_LOW;
 
             when M_LOW =>
-               if sp_req_i = '0' then
+               if m_req_sel = '0' or m_drop = '1' then
                   mstate <= M_IDLE;
                end if;
          end case;
+
+         -- a request that drops before its sp_done is abandoned (the card was reset)
+         if mstate /= M_IDLE and mstate /= M_LOW and m_req_sel = '0' then
+            m_drop <= '1';
+         end if;
 
          if main_rst_i = '1' then
             mstate     <= M_IDLE;
@@ -639,10 +713,15 @@ begin
       end if;
    end process p_main;
 
-   sp_rd_valid_o <= m_rd_valid;
-   sp_rd_data_o  <= m_buf_q;
-   sp_done_o     <= m_done;
-   sp_err_o      <= m_err;
-   main_busy_o   <= '0' when mstate = M_IDLE else '1';
+   -- the answer goes to the port being served only (and not to one that gave up)
+   sp_rd_valid_o    <= m_rd_valid and not m_src and not m_drop;
+   sp_rd_data_o     <= m_buf_q;
+   sp_done_o        <= m_done and not m_src and not m_drop;
+   sp_err_o         <= m_err and not m_src and not m_drop;
+   hd_sp_rd_valid_o <= m_rd_valid and m_src and not m_drop;
+   hd_sp_rd_data_o  <= m_buf_q;
+   hd_sp_done_o     <= m_done and m_src and not m_drop;
+   hd_sp_err_o      <= m_err and m_src and not m_drop;
+   main_busy_o      <= '0' when mstate = M_IDLE else '1';
 
 end architecture synthesis;

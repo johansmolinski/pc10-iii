@@ -4,7 +4,7 @@
 -- Wrapper for the PC: pc_system (rtl/system/pc_system.sv, through CORE/sv/pc_system_flat.sv;
 -- the shell-only stand-in CORE/stub/pc_system.sv has the same ports) plus what it needs from
 -- the MEGA65: keyboard, video into M2M, audio. RAM, BIOS ROM, character ROM loader and the floppy
--- backend are owned by mega65.vhd.
+-- and hard disk backend are owned by mega65.vhd.
 --
 -- Video: pc_system gives RGBI on the 14.31818 MHz enable (vid_ce = ce_14m, every second clock).
 -- The PC10-III's PVC4 (doc/pvc4.md) gives that in its colour personality; in its mono
@@ -107,6 +107,21 @@ entity main is
       sp_done_i               : in  std_logic;
       sp_err_i                : in  std_logic;
 
+      -- The PC20-III's hard disk (xta_card.sv; the image: pc_fdd_sd.vhd, drive C:)
+      xta_enable_i            : in  std_logic;     -- JMP208 in position B
+      xta_present_i           : in  std_logic;     -- a valid image is mounted
+      xta_active_o            : out std_logic;     -- the drive's LED
+      xta_sp_req_o            : out std_logic;
+      xta_sp_write_o          : out std_logic;
+      xta_sp_lba_o            : out std_logic_vector(27 downto 0);
+      xta_sp_rd_valid_i       : in  std_logic;
+      xta_sp_rd_data_i        : in  std_logic_vector(7 downto 0);
+      xta_sp_wr_valid_o       : out std_logic;
+      xta_sp_wr_data_o        : out std_logic_vector(7 downto 0);
+      xta_sp_wr_ready_i       : in  std_logic;
+      xta_sp_done_i           : in  std_logic;
+      xta_sp_err_i            : in  std_logic;
+
       -- Configuration
       dip_sw1_i               : in  std_logic_vector(7 downto 0)
    );
@@ -173,6 +188,19 @@ architecture synthesis of main is
          sp_wr_ready : in  std_logic;
          sp_done     : in  std_logic;
          sp_err      : in  std_logic;
+         xta_enable  : in  std_logic;
+         xta_present : in  std_logic;
+         xta_active  : out std_logic;
+         xta_sp_req  : out std_logic;
+         xta_sp_write : out std_logic;
+         xta_sp_lba  : out std_logic_vector(27 downto 0);
+         xta_sp_rd_valid : in  std_logic;
+         xta_sp_rd_data : in  std_logic_vector(7 downto 0);
+         xta_sp_wr_valid : out std_logic;
+         xta_sp_wr_data : out std_logic_vector(7 downto 0);
+         xta_sp_wr_ready : in  std_logic;
+         xta_sp_done : in  std_logic;
+         xta_sp_err  : in  std_logic;
          kbd_code    : in  std_logic_vector(7 downto 0);
          kbd_valid   : in  std_logic;
          kbd_busy    : out std_logic;
@@ -310,6 +338,19 @@ begin
          sp_wr_ready => sp_wr_ready_i,
          sp_done     => sp_done_i,
          sp_err      => sp_err_i,
+         xta_enable  => xta_enable_i,
+         xta_present => xta_present_i,
+         xta_active  => xta_active_o,
+         xta_sp_req  => xta_sp_req_o,
+         xta_sp_write => xta_sp_write_o,
+         xta_sp_lba  => xta_sp_lba_o,
+         xta_sp_rd_valid => xta_sp_rd_valid_i,
+         xta_sp_rd_data => xta_sp_rd_data_i,
+         xta_sp_wr_valid => xta_sp_wr_valid_o,
+         xta_sp_wr_data => xta_sp_wr_data_o,
+         xta_sp_wr_ready => xta_sp_wr_ready_i,
+         xta_sp_done => xta_sp_done_i,
+         xta_sp_err  => xta_sp_err_i,
          dip_sw1     => dip_sw1_i
       ); -- i_pc_system
 

@@ -67,6 +67,22 @@ module pc_system_flat #(
     input  logic        sp_done,
     input  logic        sp_err,
 
+    // the PC20-III's hard disk (rtl/hdc/xta_card.sv, doc/xta.md): JMP208, the medium, the LED
+    // and the sector port (hd_sp_* protocol, xta_sp_lba < 41820)
+    input  logic        xta_enable,
+    input  logic        xta_present,
+    output logic        xta_active,
+    output logic        xta_sp_req,
+    output logic        xta_sp_write,
+    output logic [27:0] xta_sp_lba,
+    input  logic        xta_sp_rd_valid,
+    input  logic [7:0]  xta_sp_rd_data,
+    output logic        xta_sp_wr_valid,
+    output logic [7:0]  xta_sp_wr_data,
+    input  logic        xta_sp_wr_ready,
+    input  logic        xta_sp_done,
+    input  logic        xta_sp_err,
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -84,8 +100,10 @@ assign heads  = img_heads;
 assign spt    = img_spt;
 
 // the PC10-III: its onboard video, the Paradise PVC4 (doc/pvc4.md), instead of
-// the IBM CGA; no expansion video card. The chipset is the menu's (fe2010a).
-pc_system #(.RAM_KB(RAM_KB), .PVC4_FIT(1'b1), .CGA_FIT(1'b0)) u_pc (
+// the IBM CGA; no expansion video card. The chipset is the menu's (fe2010a). The
+// PC20-III's hard disk on CN202 (XTA_FIT): JMP208 = xta_enable (the shell: an image
+// is mounted).
+pc_system #(.RAM_KB(RAM_KB), .PVC4_FIT(1'b1), .CGA_FIT(1'b0), .XTA_FIT(1'b1)) u_pc (
     .clk, .reset, .fe2010a,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,
@@ -105,11 +123,10 @@ pc_system #(.RAM_KB(RAM_KB), .PVC4_FIT(1'b1), .CGA_FIT(1'b0)) u_pc (
     .hd_sp_req(), .hd_sp_write(), .hd_sp_drive(), .hd_sp_lba(),
     .hd_sp_rd_valid(1'b0), .hd_sp_rd_data(8'h00), .hd_sp_wr_valid(), .hd_sp_wr_data(),
     .hd_sp_wr_ready(1'b0), .hd_sp_done(1'b0), .hd_sp_err(1'b0),
-    // nor the PC20-III's hard disk (doc/xta.md; XTA_FIT = 0: not built)
-    .xta_enable(1'b0), .xta_present(1'b0), .xta_active(),
-    .xta_sp_req(), .xta_sp_write(), .xta_sp_lba(),
-    .xta_sp_rd_valid(1'b0), .xta_sp_rd_data(8'h00), .xta_sp_wr_valid(), .xta_sp_wr_data(),
-    .xta_sp_wr_ready(1'b0), .xta_sp_done(1'b0), .xta_sp_err(1'b0),
+    .xta_enable, .xta_present, .xta_active,
+    .xta_sp_req, .xta_sp_write, .xta_sp_lba,
+    .xta_sp_rd_valid, .xta_sp_rd_data, .xta_sp_wr_valid, .xta_sp_wr_data,
+    .xta_sp_wr_ready, .xta_sp_done, .xta_sp_err,
     .kbd_code, .kbd_valid, .kbd_busy,
     .speaker,
     .dip_sw1

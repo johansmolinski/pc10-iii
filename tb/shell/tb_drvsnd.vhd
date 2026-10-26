@@ -4,7 +4,7 @@
 -- the disk change latch (low after power-up and a removal, cleared by a step with a disk in),
 -- outputs high while the drive is not selected. Small timing generics.
 --
--- Checks: the LED; homing before the first step (and that PC steps wait for it); one step
+-- Checks: the LED (yellow for A:/B:, red for the hard disk, a floppy wins); homing before the first step (and that PC steps wait for it); one step
 -- per head movement, the 0..79 limits, TRK0 resync only after an outward step; a step
 -- dropped while a pulse is made; no step before the settle time; no step when the motor
 -- stopped meanwhile; pulse width, direction setup and hold; the disk guard (the first step
@@ -33,6 +33,7 @@ architecture sim of tb_drvsnd is
    signal sound       : std_logic := '1';
    signal motor, sel  : std_logic_vector(1 downto 0) := "00";
    signal step, st_in : std_logic := '0';
+   signal hd_act      : std_logic := '0';
    signal led         : std_logic;
    signal led_col     : std_logic_vector(23 downto 0);
    signal f_motor, f_sel, f_dir, f_step : std_logic;
@@ -69,7 +70,7 @@ begin
       port map (
          clk_i => clk, rst_i => rst, sound_i => sound,
          drv_motor_i => motor, drv_select_i => sel, drv_step_i => step, drv_step_in_i => st_in,
-         led_o => led, led_col_o => led_col,
+         hd_active_i => hd_act, led_o => led, led_col_o => led_col,
          f_motora_o => f_motor, f_selecta_o => f_sel, f_stepdir_o => f_dir, f_step_o => f_step,
          f_track0_i => f_trk0, f_diskchanged_i => f_chg,
          cyl_o => cyl, known_o => known, disk_o => disk);
@@ -184,6 +185,15 @@ begin
       expect("a LED colour", to_integer(unsigned(led_col)), 16#FFFF00#);
       sel <= "10"; clk_n(1); expect_sl("a LED B:", led, '1');
       sel <= "00"; clk_n(1); expect_sl("a LED off again", led, '0');
+      -- the hard disk: red, a floppy wins; no sound (no motor, no select)
+      hd_act <= '1'; clk_n(1); expect_sl("a LED hard disk", led, '1');
+      expect("a LED hard disk colour", to_integer(unsigned(led_col)), 16#FF0000#);
+      sel <= "10"; clk_n(1); expect("a LED B: wins", to_integer(unsigned(led_col)), 16#FFFF00#);
+      sel <= "01"; clk_n(1); expect("a LED A: wins", to_integer(unsigned(led_col)), 16#FFFF00#);
+      sel <= "00"; clk_n(20);
+      expect("a LED hard disk again", to_integer(unsigned(led_col)), 16#FF0000#);
+      expect_sl("a hard disk: no motor", f_motor, '1'); expect_sl("a hard disk: no select", f_sel, '1');
+      hd_act <= '0'; clk_n(1); expect_sl("a LED off at last", led, '0');
 
       -- b) no motor: nothing, a step does not reach the drive
       pc_step('0', 40);

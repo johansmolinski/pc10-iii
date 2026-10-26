@@ -72,22 +72,28 @@ SUBMENU_SUMMARY XOR     R8, R8
 FILTER_FILES    XOR     R8, R8
                 RET
 
-; PREP_LOAD_IMAGE: the floppy images of A: and B: (menu lines " A:%s",
-; " B:%s", manual ROM loads 0 and 1 into C_DEV_PC_FDA/FDB). Nothing is loaded:
-; pc_fdd_sd.vhd reads and writes the file on the SD card through its extent
-; map (FD_SETUP), and the file pointer is left at the end, so the Shell only
-; does the CSR handshake.
+; PREP_LOAD_IMAGE: the floppy images of A: and B: and the hard disk image of
+; C: (menu lines " A:%s", " B:%s", " C:%s", manual ROM loads 0..2 into
+; C_DEV_PC_FDA/FDB/HDC). Nothing is loaded: pc_fdd_sd.vhd reads and writes the
+; file on the SD card through its extent map (FD_SETUP), and the file pointer
+; is left at the end, so the Shell only does the CSR handshake. C: takes only
+; the PC20-III's drive: exactly 21,411,840 bytes (41,820 sectors); mounting it
+; connects the drive (JMP208, mega65.vhd), which the BIOS finds at its next
+; start (Reset the PC).
 ;
 ; Input:  R8: file handle, R9: context (CTX_*), R10: menu group
 ; Output: R8: 0 = OK, else an error code; R9: image type (0) or the error text
 PREP_LOAD_IMAGE INCRB
                 CMP     CTX_LOAD_ROM, R9
                 RBRA    _PCPL_OK, !Z
-                XOR     R1, R1                  ; R1: drive 0 = A:, 1 = B:
+                XOR     R1, R1                  ; R1: drive 0 = A:, 1 = B:, 2 = C:
                 CMP     PC_OPTM_G_FDA, R10
                 RBRA    _PCPL_D, Z
                 MOVE    1, R1
                 CMP     PC_OPTM_G_FDB, R10
+                RBRA    _PCPL_D, Z
+                MOVE    2, R1
+                CMP     PC_OPTM_G_HDC, R10
                 RBRA    _PCPL_OK, !Z
 
 _PCPL_D         MOVE    R8, R0                  ; R0: the file handle
@@ -114,7 +120,14 @@ _PCPL_W3
                 MOVE    R0, R3
                 ADD     FAT32$FDH_SIZE_HI, R3
                 MOVE    @R3, R3                 ; R3: size hi
-                MOVE    R2, R4
+                CMP     2, R1                   ; C: 0x0146B800 bytes exactly
+                RBRA    _PCPL_FD, !Z
+                CMP     0xB800, R2
+                RBRA    _PCPL_HBAD, !Z
+                CMP     0x0146, R3
+                RBRA    _PCPL_HBAD, !Z
+                RBRA    _PCPL_SET, 1
+_PCPL_FD        MOVE    R2, R4
                 AND     0x01FF, R4
                 RBRA    _PCPL_BAD, !Z
                 MOVE    R3, R4
@@ -131,7 +144,7 @@ _PCPL_SZ        CMP     0, @R3
                 CMP     R2, @R3++
                 RBRA    _PCPL_SZ, !Z
 
-                MOVE    R0, R8                  ; R8: handle, R9: drive
+_PCPL_SET       MOVE    R0, R8                  ; R8: handle, R9: drive
                 MOVE    R1, R9
                 RSUB    FD_SETUP, 1             ; R8: 0, 1 = too fragmented,
                 CMP     0, R8                   ; 2 = FAT32 error
@@ -145,6 +158,9 @@ _PCPL_SZ        CMP     0, @R3
 _PCPL_BAD       MOVE    3, R8
                 MOVE    ERR_FD_SIZE, R9
                 RBRA    _PCPL_RET, 1
+_PCPL_HBAD      MOVE    3, R8
+                MOVE    ERR_HD_SIZE, R9
+                RBRA    _PCPL_RET, 1
 
 _PCPL_OK        XOR     R8, R8
                 XOR     R9, R9
@@ -153,11 +169,13 @@ _PCPL_RET       DECRB
 
 FD_SIZES        .DW     320, 360, 640, 720, 1440, 0     ; 160K..720K in sectors
 ERR_FD_SIZE     .ASCII_W "Not a 160K-720K disk image"
+ERR_HD_SIZE     .ASCII_W "Not a PC20-III hard disk image:\nC: needs exactly 21,411,840 bytes\n(615 x 4 x 17 sectors, raw)"
 ERR_FD_FRAG     .ASCII_W "Image too fragmented"
 ERR_FD_FAT      .ASCII_W "FAT32 error mapping the image"
 
 ; FD_SEL: point the RAMROM window at one drive's device
-; Input: R8: drive 0/1, R9: window (FD_REGWIN or FD_MAPWIN); registers preserved
+; Input: R8: drive 0..2 (A:, B:, C:), R9: window (FD_REGWIN or FD_MAPWIN);
+; registers preserved
 FD_SEL          INCRB
                 MOVE    FD_DEV_TAB, R0
                 ADD     R8, R0
@@ -168,20 +186,20 @@ FD_SEL          INCRB
                 DECRB
                 RET
 
-FD_DEV_TAB      .DW     PC_DEV_FDA, PC_DEV_FDB
+FD_DEV_TAB      .DW     PC_DEV_FDA, PC_DEV_FDB, PC_DEV_HDC
 FD_REGWIN       .EQU    0x0000
 FD_MAPWIN       .EQU    0x0001
 FD_MODE         .EQU    0x8000                  ; bit 0 on, bit 1 the card in slot 1
 FD_SECT         .EQU    0x8001                  ; sectors lo, hi; BASE lo, hi; SHIFT
 FD_STAT         .EQU    0x8008                  ; bit 0: a transfer is running
 FD_MAP          .EQU    0x8000
-FD_MAPW         .EQU    2048                    ; map words: 511 extents
+FD_MAPW         .EQU    2048                    ; map words: 511 extents (C: too)
 
 ; FD_SETUP: hand an image file to pc_fdd_sd.vhd (after Megamiga's ADF_TB_SETUP):
 ; the extent map, the number of sectors, the block of cluster 0
 ; (DEV_CLUSTER - (2 << shift)), the cluster size and the card; the mode goes
 ; last. The handle is moved to the end of the file.
-; Input:  R8: file handle, R9: drive 0/1
+; Input:  R8: file handle, R9: drive 0..2
 ; Output: R8: 0 = OK, 1 = more extents than the map holds, 2 = FAT32 error;
 ;         R9 clobbered, R10..R12 preserved (the RAMROM selection is changed)
 FD_SETUP        MOVE    R10, @--SP
@@ -573,7 +591,7 @@ CUSTOM_MSG      XOR     R8, R8
 ; HANDLE_CORE_IO (M2M-UPSTREAM core-io-hook): the Shell's time slice for
 ; background work. Must preserve all registers.
 ;
-; SPACE on a mounted " A:"/" B:" line ejects the disk (Megamiga's
+; SPACE on a mounted " A:"/" B:"/" C:" line ejects the disk (Megamiga's
 ; HANDLE_UNMOUNT_KEY): the Shell has no unmount path for manual ROM loads (it
 ; opens the browser), so the key is taken here. The Shell calls this at the top
 ; of every menu key-wait iteration, before its KEYB$SCAN, so setting the SPACE
@@ -603,13 +621,16 @@ HANDLE_CORE_IO  MOVE    R8, @--SP
                 CMP     0, @R0
                 RBRA    _HCIO_RET_NS, !Z
 
-                MOVE    OPTM_CUR_SEL, R0        ; the cursor on A: or B:?
+                MOVE    OPTM_CUR_SEL, R0        ; the cursor on A:, B: or C:?
                 MOVE    @R0, R0
                 XOR     R2, R2                  ; R2: drive
                 CMP     PC_OSM_FDA_LN, R0
                 RBRA    _HCIO_D, Z
                 MOVE    1, R2
                 CMP     PC_OSM_FDB_LN, R0
+                RBRA    _HCIO_D, Z
+                MOVE    2, R2                   ; or C:
+                CMP     PC_OSM_HDC_LN, R0
                 RBRA    _HCIO_RET_NS, !Z
 
 _HCIO_D         MOVE    M2M$RAMROM_DEV, R0      ; keep the RAMROM selection
@@ -633,7 +654,9 @@ _HCIO_D         MOVE    M2M$RAMROM_DEV, R0      ; keep the RAMROM selection
                 CMP     0, R5
                 RBRA    _HCIO_RET, !Z
 
-                MOVE    R2, R8                  ; eject: the drive off (no disk)..
+                MOVE    R2, R8                  ; eject: the drive off (no disk; C:
+                                                ; then has no JMP208 either: the
+                                                ; drive is gone at the next reset)..
                 MOVE    FD_REGWIN, R9
                 RSUB    FD_SEL, 1
                 MOVE    FD_MODE, R0
@@ -691,9 +714,11 @@ CFG_SIGSET      SYSCALL(enter, 1)
 ; The menu's layout version (config.vhd): change it with every change of the
 ; menu lines. No signature: the 31-line menu up to 2026-10-25. "2": 32 lines,
 ; "Drive sound" at line 6. "3": 39 lines, the "Chipset" submenu at lines 8-14.
+; "4": 48 lines, the "Display" submenu. "5": 49 lines, the character set.
+; "6": 50 lines, " C:%s" (the hard disk image) at line 4.
 ; At most 3 characters (CFG_SIGCHECK's buffer).
 CFG_SIG_KEY     .ASCII_W "menu"
-CFG_SIG_VAL     .ASCII_W "5"
+CFG_SIG_VAL     .ASCII_W "6"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings
@@ -727,9 +752,10 @@ PC_UNMNT_PREV   .BLOCK 1                        ; SPACE at the last HANDLE_CORE_
 PC_SUB_ACTIVE   .BLOCK 1                        ; 1: a browser/help page runs
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
-; for this 49-line menu the demand is 1017 words, the Shell checks it at boot
-; (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
-MENU_HEAP_SIZE  .EQU 1024
+; for this 50-line menu the demand is 1058 words: 20 + 596 item characters
+; + 1 + 4 x 50 + 1 + (4 submenus + 3 manual ROMs + 1) x 30; the Shell checks
+; it at boot (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
+MENU_HEAP_SIZE  .EQU 1088
 
 #ifndef RELEASE
 HEAP_SIZE       .EQU 0
@@ -737,7 +763,7 @@ HEAP            .BLOCK 1
 #else
 ; HEAP + MENU_HEAP_SIZE + HEAP_SIZE must stay below VAR$STACK_START -
 ; STACK_SIZE (check HEAP and VAR$STACK_START in m2m-rom.lis)
-HEAP_SIZE       .EQU 19968
+HEAP_SIZE       .EQU 19904
 HEAP            .BLOCK 1
 
                 .ORG    0xFED0                  ; as Megamiga: the FAT32 write layer's
