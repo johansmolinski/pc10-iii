@@ -146,6 +146,7 @@ logic cmd_memr, cmd_memw, cmd_ior, cmd_iow, cmd_inta;
 wire  in_cycle = cpu_bus_t == T1 || cpu_bus_t == T2 || cpu_bus_t == T3 || cpu_bus_t == TW;
 wire  in_t3tw  = cpu_bus_t == T3 || cpu_bus_t == TW;
 logic t3_last;                          // biu88's: the running T3/Tw is the last
+logic fe_mode;                          // FE2010A port logic (taken in reset, section 8255)
 always_ff @(posedge clk)
     if (reset) t3_last <= 1'b1;
     else if (cpu_step && (cpu_bus_t == T2 || (in_t3tw && !t3_last))) t3_last <= cpu_ready;
@@ -225,6 +226,21 @@ always_ff @(posedge clk)
 logic       hold_request, hold_request_next, hrq_ff1, hrq_ff2, hold_ack, dma_wait;
 logic       aen_next, dma_wait_next;    // their D inputs (for the bus address register)
 wire        cpu_passive = cpu_s2_s0[1] & cpu_s2_s0[0];       // S1 S0 = 11
+// pc10-iii (turbo): the FE2010A gives the bus to its DMA through the 8088's
+// RQ/GT (Kiselev, vcfed: "It does use RQ/GT signals"), which the 8088 grants
+// only between bus cycles: in T4 or Ti (8086 data sheet), never in a running
+// cycle's T3/Tw. The 5160's HOLD logic samples the status pins, which biu88
+// (MartyPC) makes passive from T3 on, so a DMA transfer can take the bus in a
+// T3/Tw that is not the last and cut the CPU's command; the command comes back
+// after the transfer as a second strobe of the same cycle. With one I/O wait
+// state that never reaches an I/O command (the earliest AEN is at T4), but
+// with the FE2010A's 4-6 turbo I/O wait states it does: a second IOW to the
+// FDC's data register was a second command byte ("Drive A: Bad" at 9.54 MHz).
+// In the FE2010A mode the hold flip-flop therefore takes a T3/Tw only when it
+// is the last (where the real 8088's status pins go passive), else T4/Ti.
+// The 5160 mode is unchanged (the MartyPC gates).
+wire        hold_ok = !fe_mode ? cpu_passive :
+                      cpu_passive && !((cpu_bus_t == T3 || cpu_bus_t == TW) && !t3_last);
 always_comb begin
     aen_next      = aen;
     dma_wait_next = dma_wait;
@@ -248,7 +264,7 @@ always_ff @(posedge clk) begin
         hrq_ff1 <= 1'b0;  hrq_ff2 <= 1'b0;
     end else begin
         if (cpu_step)
-            hrq_ff1  <= cpu_passive & cpu_lock_n & hold_request;
+            hrq_ff1  <= hold_ok & cpu_lock_n & hold_request;
         if (cpu_fall)
             hrq_ff2 <= !hold_request ? 1'b0 : hrq_ff2 ? 1'b1 : hrq_ff1;
     end
@@ -471,7 +487,6 @@ assign cpu_intr = pic_int;
 // Both port logics are present; fe_mode (fe2010a, taken in reset) picks one.
 // The 8255 sees its chip select only in 5160 mode, the FE2010A's registers
 // change only in FE2010A mode, so the other one stays in its reset state.
-logic       fe_mode;
 always_ff @(posedge clk)
     if (reset) fe_mode <= fe2010a;
 logic [7:0] ppi_dout, kbd_data;

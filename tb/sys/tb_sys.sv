@@ -324,6 +324,27 @@ always_ff @(posedge clk)
                  u_pc.cpu_bus_t, u_pc.u_cpu.cpu.eu.irq_take, u_pc.u_cpu.cpu.eu.int_cond,
                  u_pc.u_cpu.cpu.eu.F, u_pc.u_cpu.cpu.eu.CX);
 
+// +cutlog: a CPU command strobe that starts more than once in one bus cycle
+// (a DMA transfer took the bus in its T3/Tw and the strobe came back after
+// it): the cycle, the address and the speed (doc/turbo.md)
+bit cutlog = 1'b0;
+initial if ($test$plusargs("cutlog")) cutlog = 1'b1;
+logic [3:0] cut_d = '0;
+int unsigned cut_n [4] = '{0, 0, 0, 0};
+wire  [3:0] cut_c = {u_pc.u_board.cpu_memw, u_pc.u_board.cpu_memr, u_pc.u_board.cpu_iow, u_pc.u_board.cpu_ior};
+always_ff @(posedge clk) if (cutlog) begin
+    cut_d <= cut_c;
+    if (u_pc.cpu_bus_t == 3'd1) cut_n <= '{0, 0, 0, 0};
+    for (int k = 0; k < 4; k++)
+        if (cut_c[k] && !cut_d[k]) begin
+            cut_n[k] <= cut_n[k] + 1;
+            if (cut_n[k] != 0)
+                $display("[step %0d] cut: %s strobe again in one cycle, address %05h, data %02h, speed %0d",
+                         zsteps, k == 0 ? "IOR" : k == 1 ? "IOW" : k == 2 ? "MEMR" : "MEMW",
+                         u_pc.u_board.cpu_addr, u_pc.isa_dout, u_pc.spd);
+        end
+end
+
 // FE2010A: log the configuration and switch registers (63h, 62h) when they change
 generate if (FE2010A) begin : g_felog
     logic [7:0] cfg_q = 8'h00, sw_q = 8'h00;
