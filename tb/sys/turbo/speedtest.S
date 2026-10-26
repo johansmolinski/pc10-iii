@@ -3,9 +3,9 @@
 # four loops between two BIOS timer ticks (0040:006C, the 8253's channel 0 at
 # 1.19318 MHz / 65536 = 18.2 Hz, independent of the CPU clock):
 #   0 registers only (code in the on-board RAM)
-#   1 IN AL,61h (an I/O cycle per iteration)
-#   2 a read of the video memory (B800:0000, the PVC4: memory bus)
-#   3 a read of the ROM (F000:0000, memory bus [A])
+#   1 four IN AL,61h (I/O cycles)
+#   2 four reads of the video memory (B800:0000, the PVC4: memory bus)
+#   3 four reads of the ROM (F000:0000, memory bus [A])
 # It writes 63h itself and 0040:0012 (the speed the Commodore BIOS restores on
 # its service exits, (12h & C0h) | 01h, F000:C6B5) and calls no BIOS service
 # while it measures. Results: per value one POST code (port 80h) with the 63h
@@ -77,6 +77,9 @@ l_reg:
     ret
 l_io:
     in al, 0x61
+    in al, 0x61
+    in al, 0x61
+    in al, 0x61
     inc cx
     cmp bx, es:[0x6C]
     je l_io
@@ -86,6 +89,9 @@ l_vid:
     mov ax, 0xB800
     mov ds, ax
 2:  mov al, ds:[0]
+    mov al, ds:[0]
+    mov al, ds:[0]
+    mov al, ds:[0]
     inc cx
     cmp bx, es:[0x6C]
     je 2b
@@ -95,6 +101,9 @@ l_rom:
     mov ax, 0xF000
     mov ds, ax
 3:  mov al, ds:[0]
+    mov al, ds:[0]
+    mov al, ds:[0]
+    mov al, ds:[0]
     inc cx
     cmp bx, es:[0x6C]
     je 3b

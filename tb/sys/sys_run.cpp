@@ -226,7 +226,10 @@ int main(int argc, char **argv) {
     bool woracle = false;
     int wmax = 20;
     int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 2)
-    bool cpurate = false;    // -cr: the CPU clocks per 50 ms
+    bool cpurate = false;    // -cr: the CPU clocks per 50 ms, the wait states per speed
+    static unsigned long long cw_hist[4][3][16] = {};
+    bool cw_on = false, cw_dma = false;
+    int cw_tw = 0, cw_spd = 0, cw_cls = 0;
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
     unsigned cbm_dip = 1;    // PVC4: CONFIG switch 1 off (USA/Europe), switch 2 on (colour)
     const char *rtc_at = nullptr;
@@ -593,6 +596,22 @@ int main(int argc, char **argv) {
         // sample before the edge (the BIU changes its pins on the edge)
         if (tb->cpu_step) {
             steps++;
+            // -cr: the wait states of every CPU cycle without a DMA wait, by
+            // speed and class (I/O, on-board RAM, other memory)
+            if (cpurate) {
+                auto *rp = tb->rootp;
+                unsigned bt = tb->bus_t & 7, ty = tb->bus_type & 7;
+                bool dmaw = rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__aen ||
+                            rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__dma_wait;
+                if (cw_on) {
+                    if (bt == 3 || bt == 4) { if (dmaw) cw_dma = true; if (bt == 4) cw_tw++; }
+                    else { if (!cw_dma && cw_tw < 16) cw_hist[cw_spd][cw_cls][cw_tw]++; cw_on = false; }
+                }
+                if (bt == 2 && ty != 0 && ty != 3 && ty != 7) {
+                    cw_on = true; cw_dma = dmaw; cw_tw = 0; cw_spd = rp->tb_sys__DOT__u_pc__DOT__spd & 3;
+                    cw_cls = (ty == 1 || ty == 2) ? 0 : tb->bus_addr < rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__ram_top ? 1 : 2;
+                }
+            }
             if (PVC4_BUILD) {
                 auto *rp = tb->rootp;
                 unsigned bt = tb->bus_t & 7, ty = tb->bus_type & 7;
@@ -776,6 +795,18 @@ int main(int argc, char **argv) {
             dump_screen(tb, t, mono);
             shot++;
         }
+    }
+    if (cpurate) {
+        static const char *mhz[3] = {"4.77", "7.16", "9.54"}, *cls[3] = {"I/O", "on-board RAM", "other memory"};
+        for (int sp = 0; sp < 3; sp++)
+            for (int k = 0; k < 3; k++) {
+                unsigned long long n = 0;
+                for (int t = 0; t < 16; t++) n += cw_hist[sp][k][t];
+                if (!n) continue;
+                printf("wait states at %s MHz, %s (%llu cycles without DMA wait):", mhz[sp], cls[k], n);
+                for (int t = 0; t < 16; t++) if (cw_hist[sp][k][t]) printf(" %d:%llu", t, cw_hist[sp][k][t]);
+                printf("\n");
+            }
     }
     if (tb->hdc_enable)
         printf("hard disk backend: %llu sector reads, %llu sector writes\n", hd_reads, hd_writes);
