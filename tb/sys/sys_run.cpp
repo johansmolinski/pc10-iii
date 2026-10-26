@@ -131,6 +131,7 @@ static bool add_keys(std::vector<std::pair<unsigned long long, unsigned>> &keys,
         char ch = *c;
         // \#hh: one raw scan code (make or break as given), 40 ms to the next key
         // (Ctrl-Alt-D: \#1d\#38\#20\#a0\#b8\#9d)
+        if (ch == '\\' && c[1] == '.') { ms += 250; c++; continue; }     // \. a pause of 250 ms
         if (ch == '\\' && c[1] == '#' && isxdigit((unsigned char)c[2]) && isxdigit((unsigned char)c[3])) {
             char hx[3] = {c[2], c[3], 0};
             keys.push_back({(unsigned long long)(ms * 1e-3 * CLK_HZ), (unsigned)strtoul(hx, nullptr, 16)});
