@@ -4,6 +4,9 @@
 # codes (port 80h): the 63h value, then per read the status (AH) and the 16-bit
 # sum of the 4608 bytes (two codes); EEh at the end. The same image gives the
 # same sums at every speed. Built by mkspeedtest.py (fdtest.S as the source).
+# The codes also go to the screen (2026-10-26, for the MEGA65, which has no
+# port 80h display): one line per speed, "vv: ss/hhhh ss/hhhh ss/hhhh ss/hhhh"
+# (vv = 63h, ss = the read's status, 00 = OK, hhhh = the sum), then "done".
 # GPL-3.0-or-later, pc10-iii.
 
     .code16
@@ -23,7 +26,11 @@ next_cfg:
     cs lodsb
     cmp al, 0xFF
     je done
-    out 0x80, al
+    push ax
+    call code
+    mov al, ':'
+    call putc
+    pop ax
     mov ah, al
     and ah, 0xC0
     or ah, 0x01
@@ -48,7 +55,13 @@ cyl:
     int 0x13
     pop cx
     mov al, ah
-    out 0x80, al
+    push ax
+    mov al, ' '
+    call putc
+    pop ax
+    call code
+    mov al, '/'
+    call putc
     # the sum of the 4608 bytes
     push ds
     push si
@@ -65,17 +78,55 @@ cyl:
     pop si
     pop ds
     mov al, dh
-    out 0x80, al
+    call code
     mov al, dl
-    out 0x80, al
+    call code
     inc ch
     cmp ch, 4
     jb cyl
+    call crlf
     jmp next_cfg
 done:
     mov al, 0xEE
     out 0x80, al
+    mov si, offset s_done
+3:  cs lodsb
+    or al, al
+    jz 2f
+    call putc
+    jmp 3b
 2:  jmp 2b
+
+# a POST code to port 80h and in hex to the screen (AX, CL changed)
+code:
+    out 0x80, al
+hex2:
+    push ax
+    mov cl, 4
+    shr al, cl
+    call hex1
+    pop ax
+hex1:
+    and al, 0x0F
+    add al, '0'
+    cmp al, '9'
+    jbe putc
+    add al, 7
+putc:
+    push bx
+    mov ah, 0x0E
+    xor bx, bx
+    int 0x10
+    pop bx
+    ret
+crlf:
+    mov al, 13
+    call putc
+    mov al, 10
+    jmp putc
+
+s_done:
+    .asciz "done"
 
 cfgs:
     .byte 0x40, 0x80, 0x00, 0xFF
