@@ -30,16 +30,6 @@ it adds a new drive letter) to use an 80-track drive; a tb/sys run with a
 (image <-> internal drive, 40 <-> 80 tracks) needs no reset; DOS rereads a
 disk's boot sector when it suspects a change.
 
-## Remember the hard disk across power-off (decided 2026-10-26)
-
-The C: image is mounted again at power-up; **the floppies are not** (A: and
-B: start empty, as today). Megamiga keeps such paths in the settings file's
-text (M2M exception 17, `CFGS_*`, already in this project's M2M for the
-menu signature): a key like `hdc=SD1:/pc10/hd20.img`, written when C: is
-mounted or ejected (SPACE), applied at start-up before the PC leaves reset
-(the extent map through PREP_LOAD_IMAGE's path); a missing or wrong-size file
-leaves C: empty with a message.
-
 ## D: from a folder of the SD card, read-only (asked 2026-10-26)
 
 A folder of the SD card as a hard disk that DOS reads without a driver: the

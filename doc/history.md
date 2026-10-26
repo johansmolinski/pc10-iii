@@ -2061,3 +2061,62 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   reports "everything works as supposed": `dos321-speed.img` with `speed2`
   (-s/-t/-d) and `speed -t`, `fdtest.img` (with its results now on the
   screen, 4170253) at all three speeds. The turbo is HW-confirmed.
+
+## 2026-10-26 - The hard disk C: across power-off (branch `hdc`, build pc10-hdc-a)
+
+- **What** (the backlog item, decided 2026-10-26): the C: image is mounted
+  again at power-up; A: and B: are not remembered (they start empty). The
+  settings file's text (M2M exception 17, `cfgstr.asm`, already holding the
+  signature `menu=6`) keeps `hdc=SD1:/pc10/hd20.img`, the path with its card
+  (`SD0:` the bottom tray, `SD1:` the back slot; at most 127 characters). New
+  `CORE/m2m-rom/pc_hdc.asm`, after Megamiga's profiles (B2_PROF_*,
+  _PR_PATHOF, PROF_NAME):
+  - `HDC_SAVE`, called by `PREP_LOAD_IMAGE` for C:: mounted -> the path,
+    read back from the directories (the Shell keeps no path: the file's
+    entry by its first cluster in the browser's directory, then each folder
+    by its cluster in its parent through `f32_cd ..`, up to the root; the
+    browser's directory and the sector buffer are given back); refused (the
+    drive is off then) -> no key. SPACE on the mounted line removes it too.
+    The Shell writes the file when the menu closes (`ROSM_SAVE`,
+    `CFGS_DIRTY`): nothing to save by hand.
+  - `HDC_RESTORE`, at the end of `PREP_START` (the PC still in reset): the
+    card (`SDC$MOUNT`), `f32_fopen` of the path into the Shell's handle of
+    manual ROM 2, `PREP_LOAD_IMAGE` as for a menu mount (size, extent map,
+    JMP208: the BIOS finds the drive at its first probe), STATUS ok (the line
+    counts as loaded, SPACE ejects it). The key stays as written meanwhile
+    (`HDC_PEND` = 1 makes `HDC_SAVE` skip: FAT32$FILE_OPEN puts the current
+    directory back after opening by a path, so the walk would not find the
+    file - the first emulator run showed it).
+  - `HDC_PEND_APPLY` in `HANDLE_CORE_IO`: the name for the line " C:%s" once
+    the menu has been opened (OPTM_HEAP exists only then), before the Shell's
+    `CRTROM_MLST_GET` redraws the line.
+  - **Failures** (missing card or file, a bad prefix, the wrong size, a too
+    fragmented file): C: stays empty, a message for 5 s in the big window
+    before the PC starts (`C: not mounted:`, the path, `Not found` or
+    PREP_LOAD_IMAGE's own text), and the key is removed (saved at the next
+    menu close). The message cost 29 words + 30 of texts.
+- **Budget:** ROM 32740 of 32768 words (32357 before; `pc_hdc.asm` 363 words,
+  hooks 20; a first version with its own `..` scan was 71 words over the
+  limit). Variables 412 words (path 128, a directory entry 268, a handle
+  15), paid by `HEAP_SIZE` 19904 -> 19488: `HEAP` 0xA6CA, heap end 0xF72A,
+  422 words below the stack (418 before). The menu is unchanged (signature
+  `menu=6`). The next firmware feature needs code banks (an HDL change).
+- **Tests** (tb/shell, local): new `run_hdc.sh` + `hdc_test.asm`: the QNICE
+  emulator with a 64 MB FAT32 SD card image (mkfs.vfat, mtools; two 21,411,840
+  byte images, one under a long folder name, wrong sizes, an A: image, paths
+  of exactly 127 and 128 characters) and the monitor's FAT32 library, the
+  firmware's `PREP_LOAD_IMAGE` and `HANDLE_CORE_IO`, M2M's `cfgstr.asm`;
+  stubs for FD_SETUP, the slots, the CSR and the screen: 31 cases PASS (list
+  in doc/m2m-shell.md section 10). `run_prepload.sh` got an `HDC_SAVE` stub
+  (that clobbers R10: PREP_LOAD_IMAGE must restore it). `run.sh`: all PASS
+  (tb_glue, tb_fdd 49 transfers, drvsnd, chipset, tb_rtc, CFGSIG, PREPLOAD,
+  RTCWB, HDC, stub). `mut_hdc.py`: 40 of 40 killed (the first run left one,
+  R9 not cleared after FD_SETUP: the stub now clobbers R9 as its contract
+  allows); `mut.py` (fedora): pc_drvsnd 32/32, pc_chipset 14/14, pc_fdd_sd
+  27/27, signature 5/5, PREP_LOAD_IMAGE 9/9.
+- **Build** `pc10-hdc-a`: firmware only, `patch_firmware.sh patch` of
+  85eae0e's firmware into pc10-keys-b's checkpoint (fedora
+  `~/pcxt-fw/pc10-keys-b`; 16 block RAMs verified against the reference):
+  pc10-keys-b's netlist and timing (WNS +0.252, WHS +0.036). Kit
+  `~/pcxt-work/kits/pc10-hdc-a/pc10-hdc-a.bit` (SD files unchanged). Not on
+  hardware yet.
