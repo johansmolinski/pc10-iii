@@ -201,9 +201,9 @@ three; 230h (`cbm_cfg230.sv`) enables them: bits 1-0 LPT (off / 3BCh / 378h /
   and receive interrupts, the 8250's quirks rather than a 16450's) at 2F8h or
   3F8h as 230h selects, IRQ4 at 3F8h / IRQ3 at 2F8h. Clock 1.8432 MHz
   (a fractional enable from the core clock).
-- Outside: the MEGA65's PMOD header, as Megamiga's PMOD serial port (its pin
-  layout, pull-ups in CORE.xdc, pins high-Z and the header unpowered unless a
-  menu toggle "Serial port on PMOD" is on; Megamiga's M2M exception 13
+- Outside: the MEGA65's PMOD header only (decided 2026-10-26), as Megamiga's
+  PMOD serial port (its pin layout, pull-ups in CORE.xdc, pins high-Z and the
+  header unpowered unless the PMOD menu toggle is on; Megamiga's M2M exception 13
   `pmod-pins` for the board-top routing). TTL levels: an RS-232 level shifter
   module on the PMOD, as for Megamiga.
 - The BIOS's POST and DOS's MODE / COM1 should find it; tests: a TB with an
@@ -216,14 +216,19 @@ three; 230h (`cbm_cfg230.sv`) enables them: bits 1-0 LPT (off / 3BCh / 378h /
   (STROBE, AUTOFD, INIT, SELECTIN, IRQ enable) at 3BCh / 378h / 278h as 230h
   selects, IRQ7 when enabled. The PPC1's own details (bidirectional mode?)
   from its data sheet if found, else the IBM printer adapter.
-- Outside: the MEGA65 has no parallel port and a PMOD has 8 pins, too few for
-  a Centronics port. Options (to decide): (a) print to a file on the SD card
-  (bytes strobed by the PC go to e.g. `/pc10/print.prn`; the firmware writes it
-  in the background, as Megamiga's write-back); (b) a Covox Speech Thing DAC
-  on the data lines into the audio mixer (period software supports it; see the
-  Sound Blaster item); (c) a minimal PMOD printer port (8 data + STROBE on one
-  header, BUSY/ACK on the other) if the serial port leaves room. Status lines
-  read "printer ready" unless a real device is attached.
+- Outside (decided 2026-10-26): **on the PMOD headers only, else no parallel
+  port for now; no print to file.** The pin budget fits: the two PMOD headers
+  have 16 I/O pins (Megamiga's `p1lo/p1hi/p2lo/p2hi`, 4 each); serial takes
+  PMOD1 lo (TXD, RXD, RTS, CTS), the parallel port PMOD2 (D0-D7) and PMOD1 hi
+  (STROBE out, BUSY and ACK in, one more: INIT out or SELECT in). The other
+  status lines read "printer ready". Levels: the FPGA pins are 3.3 V; a
+  printer's 5 V outputs need series resistors or a buffer on the adapter
+  (document it, as Megamiga documents its serial level shifter). One menu
+  toggle powers the headers and drives the pins (high-Z and unpowered when off).
+- **Covox Speech Thing (for 0.1, decided 2026-10-26):** the parallel port's
+  data latch as an 8-bit DAC into the audio output, mixed with the PC speaker
+  (the mixer of the Sound Blaster item, in small). It works with or without
+  the PMOD toggle (it is inside the core). A few lines plus the mixer.
 
 ### Bus mouse (the 5720's, 9-pin port)
 
