@@ -70,8 +70,10 @@ it. You can make the same file yourself:
 - 8088 MPH hangs in its sprite part (being investigated; the demo is written
   for IBM's CGA card, which the PC10-III does not have).
 - Floppy images are not remembered across power-off; no 1.2M/1.44M disks.
-  <!-- intfd: keep the next item only if FORMAT B: still makes a 360K disk -->
-- `FORMAT B:` on the internal drive makes a 360K disk under MS-DOS 3.21.
+  <!-- intfd: cut the next item if intfd misses 0.1 -->
+- `FORMAT B:` on the internal drive makes a 360K disk: MS-DOS 3.21 sets up
+  the PC10-III's floppy drives as 360K drives, as on the real machine; 720K
+  disks formatted elsewhere work.
 - C: has the PC20-III's 20 MB only.
 - The monochrome display is shown on HDMI only.
 

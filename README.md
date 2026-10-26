@@ -291,10 +291,11 @@ drive sound is off while B: is the drive.
 - HD (1.44M) disks cannot be used: they need an AT's controller.
 - The PC sees the disk through the same floppy controller model as an image:
   standard DOS disks work; copy-protected disks and odd formats do not.
-<!-- intfd: keep the next item only if FORMAT B: still makes a 360K disk at the release -->
-- `FORMAT B:` under MS-DOS 3.21 makes a 360K disk (40 tracks): DOS takes B:
-  for a 360K drive, because the BIOS has no setting for the drive type.
-  Disks formatted as 720K elsewhere are read and written as 720K.
+<!-- intfd: FORMAT B: = 360K confirmed on hardware (pc10-intfd-c); the user's decision: no DRIVER.SYS route, this note -->
+- `FORMAT B:` under MS-DOS 3.21 makes a 360K disk (40 tracks), and
+  `FORMAT B: /T:80 /N:9` says "Parameters not supported": DOS 3.21 sets up
+  the PC10-III's floppy drives as 360K drives, as on the real machine. Disks
+  formatted as 720K elsewhere are read and written as 720K.
 
 ### The hard disk C:
 
