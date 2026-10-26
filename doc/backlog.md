@@ -53,16 +53,24 @@ a second hard disk: D: (C: when no C: image is mounted).
   pc_fdd_sd.vhd does for the images). Nothing is copied.
 - **Read-only:** writes end with a write-protect error (WD sense code); DOS
   reports it.
+- **Names (decided 2026-10-26):** long names become 8.3 aliases by the FAT
+  convention, `VeryLongName.file` -> `VERYLO~1.FIL`. The card's FAT32 already
+  stores such a short name in every directory entry (the long name sits in
+  extra LFN entries before it), so the first choice is to use the card's own
+  short name: unique per folder, and the same name a PC shows for the file.
+  Only where that is not usable, generate one: upper case, characters DOS does
+  not allow dropped or `_`, the first 6 characters + `~1` (`~2`.. on a clash,
+  then 5 characters + `~10`..), the first 3 characters of the last extension.
 - **Limits:** the size of one drive type of the BIOS table (21.4 MB like C:;
   the WD's "dynamic configuration", geometry from sector 0, might allow up to
-  DOS 3.21's 32 MB); 8.3 names only (others shortened or left out, with a
-  note); files that do not fit are left out; a snapshot at reset (changes on
-  the card appear after the next reset).
+  DOS 3.21's 32 MB); files that do not fit are left out; a snapshot at reset
+  (changes on the card appear after the next reset).
 - **Where the metadata lives:** FATs and directories of a 21 MB FAT16 disk
   are some 40-60 KB plus the per-file extent maps: block RAM if it fits,
   else the HyperRAM.
-- **Open:** whether the chosen folder is remembered across power-off (like
-  C:); the drive type in the 322h configuration register (bits 3-2); test
+- **Not remembered** across power-off (decided 2026-10-26): D: starts
+  empty, like the floppies.
+- **Open:** the drive type in the 322h configuration register (bits 3-2); test
   ready for drive 1 when nothing is mounted (today it answers OK,
   `DRV1_READY`); a menu line or a radio row next to C:.
 
