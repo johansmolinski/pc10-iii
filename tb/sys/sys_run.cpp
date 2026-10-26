@@ -59,6 +59,7 @@
 //   -w  warm start: the BIOS's warm-boot flag 0472h = 1234h is in the RAM at
 //       power-on (GLaBIOS-style BIOSes skip their memory test; the Commodore BIOS
 //       4.41 still tests it and then fails "Bad DMA port = 0004h": not for it)
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -128,6 +129,16 @@ static bool add_keys(std::vector<std::pair<unsigned long long, unsigned>> &keys,
                      const char *s) {
     for (const char *c = s; *c; c++) {
         char ch = *c;
+        // \#hh: one raw scan code (make or break as given), 40 ms to the next key
+        // (Ctrl-Alt-D: \#1d\#38\#20\#a0\#b8\#9d)
+        if (ch == '\\' && c[1] == '.') { ms += 250; c++; continue; }     // \. a pause of 250 ms
+        if (ch == '\\' && c[1] == '#' && isxdigit((unsigned char)c[2]) && isxdigit((unsigned char)c[3])) {
+            char hx[3] = {c[2], c[3], 0};
+            keys.push_back({(unsigned long long)(ms * 1e-3 * CLK_HZ), (unsigned)strtoul(hx, nullptr, 16)});
+            ms += 40;
+            c += 3;
+            continue;
+        }
         if (ch == '\\' && c[1]) {
             c++;
             ch = *c == 'n' ? '\n' : *c == 'e' ? 27 : *c == 'b' ? '\b' : *c == 't' ? '\t' : *c;
@@ -215,6 +226,10 @@ int main(int argc, char **argv) {
     bool woracle = false;
     int wmax = 20;
     int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 2)
+    bool cpurate = false;    // -cr: the CPU clocks per 50 ms, the wait states per speed
+    static unsigned long long cw_hist[4][3][16] = {};
+    bool cw_on = false, cw_dma = false;
+    int cw_tw = 0, cw_spd = 0, cw_cls = 0;
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
     unsigned cbm_dip = 1;    // PVC4: CONFIG switch 1 off (USA/Europe), switch 2 on (colour)
     const char *rtc_at = nullptr;
@@ -250,6 +265,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-jmp208") && i + 1 < argc) { i++; jmp208 = argv[i][0] == 'B' || argv[i][0] == 'b'; }
         else if (!strcmp(argv[i], "-xl")) xtalog = true;
         else if (!strcmp(argv[i], "-w")) warm = true;
+        else if (!strcmp(argv[i], "-cr")) cpurate = true;
         else if (!strcmp(argv[i], "-R") && i + 1 < argc) rtc_at = argv[++i];
         else if (!strcmp(argv[i], "-rl")) rtclog = true;
         else if (!strcmp(argv[i], "-k") && i + 1 < argc) {
@@ -580,6 +596,22 @@ int main(int argc, char **argv) {
         // sample before the edge (the BIU changes its pins on the edge)
         if (tb->cpu_step) {
             steps++;
+            // -cr: the wait states of every CPU cycle without a DMA wait, by
+            // speed and class (I/O, on-board RAM, other memory)
+            if (cpurate) {
+                auto *rp = tb->rootp;
+                unsigned bt = tb->bus_t & 7, ty = tb->bus_type & 7;
+                bool dmaw = rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__aen ||
+                            rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__dma_wait;
+                if (cw_on) {
+                    if (bt == 3 || bt == 4) { if (dmaw) cw_dma = true; if (bt == 4) cw_tw++; }
+                    else { if (!cw_dma && cw_tw < 16) cw_hist[cw_spd][cw_cls][cw_tw]++; cw_on = false; }
+                }
+                if (bt == 2 && ty != 0 && ty != 3 && ty != 7) {
+                    cw_on = true; cw_dma = dmaw; cw_tw = 0; cw_spd = rp->tb_sys__DOT__u_pc__DOT__spd & 3;
+                    cw_cls = (ty == 1 || ty == 2) ? 0 : tb->bus_addr < rp->tb_sys__DOT__u_pc__DOT__u_board__DOT__ram_top ? 1 : 2;
+                }
+            }
             if (PVC4_BUILD) {
                 auto *rp = tb->rootp;
                 unsigned bt = tb->bus_t & 7, ty = tb->bus_type & 7;
@@ -737,12 +769,44 @@ int main(int argc, char **argv) {
         tb->clk = 1; tb->eval();
         if (cyc % report == 0 && !quiet)
             printf("[%9.3f ms] CS:IP %04X:%04X\n", cyc / CLK_HZ * 1e3, tb->cs, tb->ip);
+        // the CPU clock (turbo, doc/turbo.md): every change, and with -cr the CPU
+        // clocks of each 50 ms
+        {
+            static unsigned spd_d = 0;
+            static unsigned long long rate_steps = 0, spd_steps = 0, spd_cyc = 0;
+            auto *rq = tb->rootp;
+            unsigned sp = rq->tb_sys__DOT__u_pc__DOT__spd;
+            if (sp != spd_d) {
+                static const char *mhz[4] = {"4.77", "7.16", "9.54", "?"};
+                printf("[%9.3f ms] CPU clock %s MHz (63h = %02X; %llu CPU clocks in %.3f ms at %s MHz)\n",
+                       cyc / CLK_HZ * 1e3, mhz[sp & 3], rq->tb_sys__DOT__u_pc__DOT__u_board__DOT__fe_cfg,
+                       steps - spd_steps, (cyc - spd_cyc) / CLK_HZ * 1e3, mhz[spd_d & 3]);
+                spd_d = sp; spd_steps = steps; spd_cyc = cyc;
+            }
+            if (cpurate && cyc % report == 0 && cyc) {
+                printf("[%9.3f ms] CPU clocks in 50 ms: %llu (%.4f MHz)\n", cyc / CLK_HZ * 1e3,
+                       steps - rate_steps, (steps - rate_steps) / 0.05 / 1e6);
+                rate_steps = steps;
+            }
+        }
         if (shot < shots.size() && cyc / CLK_HZ * 1e3 >= shots[shot]) {
             char t[64];
             snprintf(t, sizeof t, "screen at %.0f ms, CS:IP %04X:%04X", shots[shot], tb->cs, tb->ip);
             dump_screen(tb, t, mono);
             shot++;
         }
+    }
+    if (cpurate) {
+        static const char *mhz[3] = {"4.77", "7.16", "9.54"}, *cls[3] = {"I/O", "on-board RAM", "other memory"};
+        for (int sp = 0; sp < 3; sp++)
+            for (int k = 0; k < 3; k++) {
+                unsigned long long n = 0;
+                for (int t = 0; t < 16; t++) n += cw_hist[sp][k][t];
+                if (!n) continue;
+                printf("wait states at %s MHz, %s (%llu cycles without DMA wait):", mhz[sp], cls[k], n);
+                for (int t = 0; t < 16; t++) if (cw_hist[sp][k][t]) printf(" %d:%llu", t, cw_hist[sp][k][t]);
+                printf("\n");
+            }
     }
     if (tb->hdc_enable)
         printf("hard disk backend: %llu sector reads, %llu sector writes\n", hd_reads, hd_writes);

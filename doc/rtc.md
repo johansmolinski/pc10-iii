@@ -189,6 +189,21 @@ signature `PC10` at offset 1B0h and writes the word from 40:A1h to offset
 1B4h (F000:D7CD-D89E); the POST reads it from there into 40:A1h. A floppy
 system activates the configuration for the session only ("Press <F10>").
 An earlier note ("SETUP in RTC RAM") was wrong.
+**Entering SETUP: Ctrl-Alt-Esc**, at any time the BIOS's INT 9 runs (POST
+after the keyboard is up, DOS, programs that keep INT 9): INT 9 at F000:EAB9
+tests Alt (40:17h bit 3) and Ctrl (bit 2), and with both down the make code
+01h (Esc) acknowledges the keyboard and the 8259 (EC2A) and jumps to D762
+(SS:SP = 5000:029D, the video mode from the equipment word, the
+configuration from 40:A1h/40:A3h, the MBR, then the screen at DBFC). Nothing
+else reaches D762: there is no POST prompt and no documented DEBUG entry
+(`G=F000:D762` from DEBUG would do the same). With Alt and Ctrl, the make
+codes of S, T and D set the speed instead (doc/turbo.md section 5). The
+configuration word 40:A1h bits 1-0 are SETUP's default speed (0 4.77, 1 7.16,
+2 9.54 MHz). tb/sys (2026-10-26, 640 KB, hello360 booted, Ctrl-Alt-Esc at
+36 s): the screen "C O M M O D O R E   P C   S E T U P   U T I L I T Y" with
+Date, Time, "Default system speed 4.77 MHz", On Board COM 3F8H, LPT 3BCH,
+Mouse ENABLE, and the hard disk / floppy-only exit keys. SETUP's stack is at
+segment 5000h (320 KB): on a 256 KB machine it crashes (tb/sys, 256 KB).
 
 ## 6. SETCLOCK
 

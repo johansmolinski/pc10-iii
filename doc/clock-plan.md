@@ -6,8 +6,9 @@ and where it went beyond this plan). Sections 1-5 are the assessment of
 `clk` = 100.2273 MHz = 7 x OSC with clock enables. Since the 8088 is z8086's
 EU with biu88 at one step per 8088 clock (doc/z8086.md), nothing in the PC
 needs a clock faster than the real machine's. This note is what it takes to
-run the PC on the PC10-III's own master clock. Turbo (section 5, step 5) is
-still open.
+run the PC on the PC10-III's own master clock. Turbo (section 5, step 5) was
+done on 2026-10-26 (branch `turbo`): doc/turbo.md, which supersedes the
+FE2010A facts of sections 1-2 where they differ (section 7 below).
 
 ## 1. The master clock
 
@@ -218,3 +219,21 @@ section 5; turbo (step 5) is not part of it.
   `C` = 6), tb/shell (clock period, RAM latency 2, longer copy waits, the
   stand-in's constants).
 - Results: doc/history.md (2026-10-23).
+
+## 7. Step 5 done (2026-10-26, branch `turbo`): doc/turbo.md
+
+- The FE2010A facts: doc/turbo.md sections 1-3 (Kiselev's register and wait
+  states table of 2023-02-01, the Commodore BIOS 4.41 and SPEED.EXE). Beyond
+  section 1 here: bit 7 overrides bit 6 (9.54 MHz), bits 5-7 stay writable
+  after the lock, 7.16 MHz has a 50% duty cycle too, on-board RAM has no wait
+  states at any speed, I/O has 4 (7.16) or 6 (9.54; 4 with bit 6), the memory
+  bus 2 or 4 (0 with bit 5).
+- `pc_clocks.sv` as planned in sections 2-3: the CPU counter's period 6/4/3,
+  `cpu_fall` step + 2/2/1 (9.54 MHz: the 1.5 clk falling edge rounded down, so
+  that `rdy_ce` stays a separate clk), the switch where the modulo-24 counter
+  is 0 or 12. The keyboard's delays count a new fixed 4.77 MHz enable
+  (`ce_477`). The wait states: `xt_wait.sv`. `pc_ram`'s latency of 2 clk fits
+  a 9.54 MHz T3 (the board takes the data at `ram_ack`, long before the step
+  that ends T3).
+- The CGA's RD_LEAD/WR_LEAD were not recalibrated (no reference at turbo
+  speeds exists; the PC10-III has the PVC4, whose READY follows the strobe).

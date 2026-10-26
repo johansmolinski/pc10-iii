@@ -15,7 +15,7 @@ read_verilog -sv [concat \
     [list $rtl/cpu/z8086/alu.sv $rtl/cpu/z8086/z86_tables.sv $rtl/cpu/z8086/z86_eu.sv \
           $rtl/cpu/z8086/cpu_z86.sv $rtl/cpu/biu88.sv $rtl/cpu/cpu8088.sv] \
     [glob $kf/KF8237/*.sv] [glob $kf/KF8253/*.sv] [glob $kf/KF8255/*.sv] [glob $kf/KF8259/*.sv] \
-    [list $rtl/system/pc_clocks.sv $rtl/system/xt_board.sv $rtl/system/pc_system.sv \
+    [list $rtl/system/pc_clocks.sv $rtl/system/xt_wait.sv $rtl/system/xt_board.sv $rtl/system/pc_system.sv \
           $rtl/video/cga/cga_crtc.sv $rtl/video/cga/cga_card.sv $rtl/video/mda/mda_card.sv \
           $rtl/video/pvc4/pvc4.sv $rtl/system/cbm_cfg230.sv $rtl/system/msm6242.sv \
           $rtl/fdc/upd765.sv $rtl/fdc/fdc_secbuf.sv $rtl/fdc/fdc_card.sv \

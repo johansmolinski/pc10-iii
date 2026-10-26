@@ -27,7 +27,7 @@ MDASRC = $(RTL)/video/mda/mda_card.sv $(RTL)/video/pvc4/pvc4.sv $(RTL)/system/cb
 SRC  = $(CPUSRC) $(RTL)/cpu/cpu8088.sv \
        $(wildcard $(KF)/KF8237/*.sv) $(wildcard $(KF)/KF8253/*.sv) \
        $(wildcard $(KF)/KF8255/*.sv) $(wildcard $(KF)/KF8259/*.sv) \
-       $(RTL)/system/pc_clocks.sv $(RTL)/system/xt_board.sv $(RTL)/system/pc_system.sv \
+       $(RTL)/system/pc_clocks.sv $(RTL)/system/xt_wait.sv $(RTL)/system/xt_board.sv $(RTL)/system/pc_system.sv \
        $(CGA) $(MDASRC) $(RTL)/fdc/upd765.sv $(RTL)/fdc/fdc_secbuf.sv $(RTL)/fdc/fdc_card.sv \
        $(RTL)/hdc/hdc_secbuf.sv $(RTL)/hdc/ata_dev.sv $(RTL)/hdc/xtide_card.sv $(RTL)/hdc/xta_card.sv tb_sys.sv
 INC  = -I$(KF)/KF8237 -I$(KF)/KF8253 -I$(KF)/KF8255 -I$(KF)/KF8259

@@ -1931,3 +1931,102 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
 - Hardware (pc10-real-u): `setclock -w` (copied from the Colt DOS disk to C:)
   writes the RTC and the MEGA65's battery clock; the time persists across a
   power cycle. RTC write-back confirmed.
+
+## 2026-10-26 - Turbo: the FE2010A's 7.16 and 9.54 MHz (branch `turbo`)
+
+- **What:** in the PC10-III chipset mode, port 63h bits 7-6 run the 8088 at
+  7.16 MHz (master clock / 4) or 9.54 MHz (/ 3), and the FE2010A's turbo
+  wait states apply. The Commodore BIOS's Ctrl-Alt-S/T/D, SETUP's default
+  speed and SPEED.EXE work as on the real machine. The IBM XT (8255) choice
+  stays at 4.77 MHz. There is no menu change: the real machine has no other
+  speed control. Facts, sources, assumptions and open questions:
+  doc/turbo.md. doc/clock-plan.md step 5 is done (section 7 there).
+- **Research** (doc/turbo.md sections 1-5):
+  - Kiselev's FE2010A notes (the 2023 wait-state table: I/O 1/4/6, 4 at
+    9.54 MHz with bit 6; memory bus 0/2/4, 0 with bit 5; on-board RAM 0) and
+    their git history (bit 7 overrides bit 6; 50% duty except at 4.77 MHz).
+  - The FE2010 data sheet, GLaBIOS, Kiselev's 8088_bios, 86Box and MAME (no
+    turbo), the PC10-III manual (Ctrl-Alt-S/T/D, "pre set to the standard 4.77
+    MHz"), and TopBench on a real PC10-III (opcodes x 1.51 / x 2.01).
+  - The Commodore BIOS 4.41 (our disassembly): hot keys in INT 9 (EAB9 ->
+    D40F: 00h/40h/80h to 63h, a beep, 0040:0012 bits 7-6). Every BIOS service
+    exit (C6B5) writes (0040:0012 & C0h) | 01h to 63h. CA55 sets 0012 from
+    SETUP's word 40:A1h bits 1-0. The POST writes 45h/51h/41h (bit 6) during
+    the RAM sizing and locks with `| 48h`. SETUP is Ctrl-Alt-Esc (EACB ->
+    D762; doc/rtc.md section 5).
+  - SPEED.EXE V1.2 (PC1020-3.ZIP: `-s/-t/-d` = 01h/41h/81h) and V1.2c (Colt
+    disk: `-s/-t`) only write 0040:0012. The next BIOS service exit switches.
+- **pc_clocks.sv:** the CPU counter's period 6/4/3. `cpu_fall` is step + 2
+  (4.77: 1/3 duty; 7.16: 50%) or step + 1 (9.54: 50%, the 1.5 clk edge rounded
+  down). `rdy_ce`/`cpu_prestep` are the clk before the step. A new speed takes
+  effect where the modulo-24 counter is 0 or 12: no shortened clock, and the
+  phase to OSC/PCLK is kept. `ce_477` is a fixed 4.77 MHz enable for the
+  keyboard's delays, which were in CPU clocks.
+- **xt_wait.sv** (new): the board's wait states as a count (the table above),
+  with the DMA rule of 2026-10-22. For one wait state it is identical to the old
+  `io_wait`/`dma_ok` (checked in tb/wait).
+- **xt_board.sv:** the speed from 63h (FE mode only), `ce_477`, `xt_wait`.
+  - **FE mode: the DMA takes the bus only between CPU bus cycles.** The
+    FE2010 uses RQ/GT, which the 8088 grants in T4/Ti, so the hold flip-flop
+    takes a T3/Tw only when it is the last. The first build's tb/sys runs
+    (old rule) showed why it matters. A refresh in an I/O cycle's turbo wait
+    states split the CPU's IOW/IOR into two strobes: a doubled FDC command
+    byte or result read gave "Drive A: Bad" at 9.54 MHz, INT 13h status 20h
+    and wrong data at 7.16/9.54 MHz, and a DOS program loaded as garbage at
+    7.16 MHz. tb/sys `+cutlog` counted the split strobes of the floppy test
+    (fdtest, 256 KB): at the turbo speeds 3,002 MEMW, 2,492 MEMR, 25 IOW and 1
+    IOR, plus 3,276 PVC4 MEMW at 4.77 MHz. INT 13h returned status 20h for
+    cylinder 0 at 7.16 MHz and 3 at 9.54 MHz, and a wrong sum with status 00h
+    for cylinder 0 at 9.54 MHz. After the fix there are no split strobes at
+    any speed, and every read has status 00h with the same sums at 7.16, 9.54
+    and 4.77 MHz (6178h B6C7h 0B15h D589h).
+  - The 5160 mode is unchanged.
+- **Testbenches:**
+  - tb/clk (new): `ref` (speed 0 = the /6 counter in every clk), `fixed`,
+    `switch` (2M clk of random requests), PHASE 0 and 5: PASS. `mut.py` 16 of 16
+    killed (one equivalent mutant found and its redundant RTL term removed).
+  - tb/wait (new): 3 x 400,000 random bus cycles: PASS. `mut.py` 20 of 20
+    killed.
+  - tb/sst `-T 4`/`-T 3`.
+  - tb/sys: `-cr` (CPU clocks per 50 ms and a wait-state histogram per speed
+    and class), the log line `CPU clock x MHz` at every change, `\#hh` raw scan
+    codes and `\.` pauses in `-k`, `+cutlog`. The boot floppies
+    `tb/sys/turbo/speedtest.S` and `fdtest.S` (`mkspeedtest.py`).
+- **SST** (fedora, full suite): state 3,007,000, trace 3,006,693 at 4.77 MHz
+  (6 clk), 7.16 MHz (4) and 9.54 MHz (3). Every file's line is the same at the
+  three dividers and the same as clk28-a's (before: 3,007,000 / 3,006,693).
+- **Gates** (fedora `gates.sh turbo-a` and `turbo-b` vs `merge-c`): g_tr
+  a72753ca..., g_tre bd612823..., g_trL2 a72753ca...: identical. g_fd is
+  identical but for the wall time. tb/fdc 232, tb/hdc 3,182 checks, tb/cga,
+  tb/mda PASS. tb/pvc4 PASS (13,626 operations), tb/xta 2,742,243 checks,
+  tb/rtc PASS. tb/shell (local) PASS.
+- **tb/sys** (fedora, the Commodore BIOS 4.41, FE2010A + PVC4; doc/turbo.md
+  section 6):
+  - The POST runs at 7.16 MHz from 0.23 to 0.61 s and from 7.91 to 10.21 s
+    (the BIOS's own 45h/51h/41h). The boot sector is read at 34.005 s with
+    640 KB (38.205 before).
+  - The hot keys switch 1.2 ms after the letter: 7,158,861 / 9,545,152 /
+    4,773,054 CPU clocks in the following second.
+  - The speed test (loops between two timer ticks): register loop 1.501 /
+    2.002; 4 x IN 1.390 (7.16) / 1.761 (9.54) / 1.878 (9.54 with bit 6); 4 x ROM
+    1.440 / 1.820, 2.076 with bit 5. The wait-state histogram: I/O 1/4/6,
+    on-board RAM 0, ROM 0/2/4.
+  - The floppy test: the same data at all speeds.
+  - MS-DOS 3.21 booted at 9.54 MHz (640 KB): AUTOEXEC's `setclock -r` and
+    `speed -t` (7.16 MHz at 47.13 s), then `speed2 -d` (9.54, 50.69 s), `ver`,
+    `speed2 -s` (4.77, 55.07 s), `speed -t` (7.16, 59.04 s), all at `A>`
+    (5,980 s wall).
+  - SETUP with Ctrl-Alt-Esc (640 KB; with 256 KB SETUP crashes, its stack is
+    at 5000h).
+  - Logs: fedora `~/pcxt-work/turbo/sys/` (s1c, s2c, s3c, s5c, f1, f2).
+- **Build** pc10-turbo-a (RTL 23bcd36, REF=pc10-real-u): WNS +0.021, WHS
+  +0.036. It is superseded by **pc10-turbo-b** (8d35d5b, the DMA rule,
+  REF=pc10-turbo-a): WNS +0.021, WHS +0.036 (QNICE's paths, as pc10-real-u);
+  main_clk WNS +13.214, WHS +0.043; BRAM 260.5/365 and LUTs 30,292 unchanged.
+  Kit `~/pcxt-work/kits/pc10-turbo-b/` (pc10-real-u's SD files plus
+  `speedtest.img`, `fdtest.img` and `dos321-speed.img` = Colt disk 1 with the
+  PC10-III's SPEED.EXE V1.2 as SPEED2.EXE).
+- Not verified: hardware (speeds, wait states, the hot keys' beep pitch);
+  the PC20-III hard disk at the turbo speeds; SETUP's default speed through
+  the MBR.
+

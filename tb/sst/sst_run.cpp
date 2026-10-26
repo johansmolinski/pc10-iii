@@ -106,8 +106,10 @@ static bool read_test(std::istream &in, Test &t) {
 struct Sim {
     std::unique_ptr<Vtb_z86> top;
     // the PC's clock: 28.63636 MHz, an 8088 clock (4.77 MHz) every CPU_CLK
+    // (-T: 4 = 7.16 MHz, 3 = 9.54 MHz, the FE2010A's turbo dividers; CLK high
+    // for half of it there)
     // core clocks, CLK high for the first 2 (the 8284's 1/3 duty)
-    static constexpr int CPU_CLK = 6;
+    static inline int CPU_CLK = 6;
     int sub = 0;                      // core clock in the 8088 clock (0: CLK rose)
     uint64_t core_clocks = 0;
 
@@ -117,7 +119,7 @@ struct Sim {
     bool step() {
         sub = sub == CPU_CLK - 1 ? 0 : sub + 1;
         bool rose = sub == 0;
-        top->clk = sub < CPU_CLK / 3;
+        top->clk = sub < (CPU_CLK == 6 ? 2 : CPU_CLK / 2);
         top->step = rose;           // biu88 advances at the CLK rising edge
         top->core_clk = 0; top->eval();
         top->core_clk = 1; top->eval();
@@ -522,6 +524,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-P") && i + 1 < argc) g_phase = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-S") && i + 1 < argc) g_sweep = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-L")) g_lag = true;
+        else if (!strcmp(argv[i], "-T") && i + 1 < argc) Sim::CPU_CLK = atoi(argv[++i]);
         else if (argv[i][0] != '+') files.push_back(argv[i]);
     }
     Sim sim;
