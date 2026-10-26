@@ -170,15 +170,19 @@ module pc_system #(
 );
 
 // ------------------------------------------------------------ clocks
-logic ce_14m, cpu_step, cpu_fall, rdy_ce, cpu_prestep, ce_pclk, pit_clk;
+logic ce_14m, cpu_step, cpu_fall, rdy_ce, cpu_prestep, ce_477, ce_pclk, pit_clk;
+logic [1:0] speed, spd;                 // turbo: 63h's speed, the running one (doc/turbo.md)
 pc_clocks u_clocks (
     .clk        (clk),
     .reset      (reset),
+    .speed      (speed),
+    .spd        (spd),
     .ce_14m     (ce_14m),
     .cpu_step   (cpu_step),
     .cpu_fall   (cpu_fall),
     .rdy_ce     (rdy_ce),
     .cpu_prestep(cpu_prestep),
+    .ce_477     (ce_477),
     .ce_pclk    (ce_pclk),
     .pit_clk    (pit_clk)
 );
@@ -231,6 +235,9 @@ xt_board #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW)) u_board (
     .cpu_fall     (cpu_fall),
     .rdy_ce       (rdy_ce),
     .cpu_prestep  (cpu_prestep),
+    .ce_477       (ce_477),
+    .spd          (spd),
+    .speed        (speed),
     .pit_clk      (pit_clk),
     .cpu_ad       (cpu_ad),
     .cpu_din      (cpu_din),

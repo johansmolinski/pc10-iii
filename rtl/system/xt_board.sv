@@ -41,6 +41,9 @@ module xt_board #(
     input  logic        cpu_fall,
     input  logic        rdy_ce,         // 1 clk before cpu_step (pc_clocks)
     input  logic        cpu_prestep,    // the clk before cpu_step (the 8237's strobe end)
+    input  logic        ce_477,         // a fixed 4.77 MHz enable (pc_clocks; = cpu_step at 4.77)
+    input  logic [1:0]  spd,            // the speed the CPU clock runs at (pc_clocks)
+    output logic [1:0]  speed,          // the speed 63h selects (FE2010A; 0 on the 5160)
     input  logic        pit_clk,
 
     // the CPU
@@ -462,7 +465,7 @@ assign cpu_intr = pic_int;
 //        checker off, 1 8087 NMI, 2 and 4 on-board RAM size (00 640K, 01
 //        256K, 10 512K: RAM above it does not answer), 3 lock (bits 0-4 and
 //        the switch register until reset), 5 fast, 6 7.15 MHz, 7 9.54 MHz
-//        (the clock bits are kept, not used yet: the turbo is a later step).
+//        (bits 7-5 stay writable after the lock; the turbo: doc/turbo.md).
 // The Commodore BIOS reads the switches at F000:C5B2 (select 0 first), sizes
 // the RAM with 45h/51h/41h and writes the switch register (F000:C389).
 // Both port logics are present; fe_mode (fe2010a, taken in reset) picks one.
@@ -482,6 +485,9 @@ logic [7:0] fe_sw;                       // FE2010A switch register (bits 5-4 un
 assign fe_pc_in = {1'b0, 1'b0, out2, 1'b0,
                    fe_pb[2] ? fe_sw[3:0] : {fe_sw[7:6], dip_sw1[5:4]}};
 wire   fe_lock  = fe_cfg[3];
+// the CPU clock (pc_clocks): 63h bit 7 9.54 MHz, else bit 6 7.16 MHz, else
+// 4.77 MHz (both bits: 9.54 MHz [A]); the 5160 has no turbo
+assign speed = !fe_mode ? 2'd0 : fe_cfg[7] ? 2'd2 : fe_cfg[6] ? 2'd1 : 2'd0;
 always_ff @(posedge clk)
     if (reset) begin
         fe_pb <= 8'h00;  fe_cfg <= 8'h00;  fe_sw <= dip_sw1 & 8'hCF;
@@ -544,13 +550,15 @@ logic [7:0] kfifo [16];
 logic [3:0] kf_rd, kf_wr;
 logic [4:0] kf_n;
 logic       kbd_full;
-logic [15:0] kbd_delay;                  // cpu clocks until the next code lands
-logic [16:0] kbd_hold;                   // cpu clocks PB6 has been low
+logic [15:0] kbd_delay;                  // 4.77 MHz clocks until the next code lands
+logic [16:0] kbd_hold;                   // 4.77 MHz clocks PB6 has been low
 logic       kbd_selftest;
 wire        pb6 = pb_drv ? pb[6] : 1'b1;
 wire        pb7 = pb_drv ? pb[7] : 1'b0;
 localparam int KBD_SEND  = 4773;         // ~1 ms: 11 bits at ~11 kHz
 localparam int KBD_RESET = 47727;        // ~10 ms
+// pc10-iii (turbo): the delays are real time, counted on ce_477 (a fixed
+// 4.77 MHz enable, = cpu_step at 4.77 MHz), not in CPU clocks
 
 assign kbd_busy = kf_n == 5'd16;
 assign kbd_irq  = kbd_full;
@@ -559,7 +567,7 @@ wire kf_push = kbd_valid && kf_n != 5'd16;
 logic kf_pop;
 always_comb begin
     kf_pop = 1'b0;
-    if (!reset && cpu_step && pb6 && !kbd_full && !pb7 && !kbd_selftest &&
+    if (!reset && ce_477 && pb6 && !kbd_full && !pb7 && !kbd_selftest &&
         kf_n != 5'd0 && kbd_delay == 16'd0)
         kf_pop = 1'b1;
 end
@@ -581,7 +589,7 @@ always_ff @(posedge clk) begin
             kbd_full <= 1'b0;
             kbd_data <= 8'h00;
         end
-        if (cpu_step) begin
+        if (ce_477) begin
             if (!pb6) begin
                 if (kbd_hold != 17'h1FFFF) kbd_hold <= kbd_hold + 17'd1;
                 kbd_delay <= 16'(KBD_SEND);
@@ -836,8 +844,7 @@ always_ff @(posedge clk)
 // The DMA wait (aen | dma_wait) changes only on cpu_step, so sampling it on
 // rdy_ce gives the value it had at cpu_fall: from the CPU clock where AEN
 // rises (S1) to one clock after it falls. CAL: MartyPC (DMA wait states from
-// S1). Every CPU I/O cycle gets one wait state (the T2 term, decided at the
-// step that ends T2, and io_wait below when a DMA wait held that state).
+// S1). Every CPU I/O cycle gets one wait state (at 4.77 MHz; xt_wait.sv).
 logic rdy_sync, dma_rdy_sync;
 always_ff @(posedge clk)
     if (reset) begin
@@ -846,25 +853,24 @@ always_ff @(posedge clk)
         rdy_sync     <= isa_ready & ~(aen | dma_wait);
         dma_rdy_sync <= ~(aen | dma_wait);
     end
-wire io_cycle = cpu_bus_type == ST_IOR || cpu_bus_type == ST_IOW;
-// The I/O wait state counts only where the DMA wait is over (AEN keeps the
-// 8288's I/O command off, and the wait state starts with the command):
-// io_wait is the pending wait state, set in T2; a sample leaving T3/Tw uses
-// it up if the state it leaves was not held by the DMA wait (dma_ok, the DMA
-// part of the sample that decided that state). Without DMA: T3, Tw (last).
-// CAL: MartyPC (cycle.rs: the I/O wait states are not decremented while DMA
-// wait states remain), first seen at reference clock 1,042,013 (an OUT with
-// the refresh in its T1).
-logic io_wait, dma_ok;
-wire  io_wait_n = io_wait && !dma_ok;
-always_ff @(posedge clk)
-    if (reset) begin
-        io_wait <= 1'b0;  dma_ok <= 1'b1;
-    end else if (cpu_step) begin
-        dma_ok  <= dma_rdy_sync;
-        io_wait <= cpu_bus_t == T2 ? io_cycle : in_t3tw && io_wait_n;
-    end
-assign cpu_ready = rdy_sync && !(cpu_bus_t == T2 && io_cycle) && !(in_t3tw && io_wait_n);
+// The board's own wait states (one on every CPU I/O cycle; the FE2010A's
+// turbo table) and when they count: xt_wait.sv. pc10-iii (turbo, 2026-10-26):
+// before, one I/O wait state here (io_wait/dma_ok), now a count.
+wire  cpu_onboard = cpu_addr < ram_top;    // the on-board RAM (no memory bus wait states)
+xt_wait u_wait (
+    .clk          (clk),
+    .reset        (reset),
+    .cpu_step     (cpu_step),
+    .cpu_bus_t    (cpu_bus_t),
+    .cpu_bus_type (cpu_bus_type),
+    .onboard      (cpu_onboard),
+    .spd          (spd),
+    .cfg          (fe_mode ? fe_cfg[6:5] : 2'b00),
+    .rdy_sync     (rdy_sync),
+    .dma_rdy_sync (dma_rdy_sync),
+    .cpu_ready    (cpu_ready),
+    .ws_n         ()
+);
 
 `ifndef SYNTHESIS
 // the DMA term on rdy_ce equals its value at cpu_fall (it changes on cpu_step
