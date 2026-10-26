@@ -34,6 +34,38 @@ mounted or ejected (SPACE), applied at start-up before the PC leaves reset
 (the extent map through PREP_LOAD_IMAGE's path); a missing or wrong-size file
 leaves C: empty with a message.
 
+## D: from a folder of the SD card, read-only (asked 2026-10-26)
+
+A folder of the SD card as a hard disk that DOS reads without a driver: the
+WD93024-X's **drive 1** on the same controller (the Commodore disk BIOS probes
+drive 1 at every boot and counts it, doc/xta.md section 6), so DOS 3.21 sees
+a second hard disk: D: (C: when no C: image is mounted).
+
+- **Choosing the folder:** the menu line opens the file browser and the user
+  picks a **subdirectory** (not the whole card or `pc10`, because of the size
+  limit). The M2M browser selects files and enters folders, so it needs a
+  "use this folder" entry: the core callback `BROWSE_EXTRA` (M2M exception 17,
+  already used by Megamiga for partitions) can list one behind `<..>`.
+- **A virtual FAT16 disk:** at the PC's reset the firmware walks the folder
+  (and its subfolders) and builds the metadata of a FAT16 disk: MBR with one
+  partition, boot sector, two FATs, root and subdirectories. The data sectors
+  are the files themselves, read from the SD card through extent maps (as
+  pc_fdd_sd.vhd does for the images). Nothing is copied.
+- **Read-only:** writes end with a write-protect error (WD sense code); DOS
+  reports it.
+- **Limits:** the size of one drive type of the BIOS table (21.4 MB like C:;
+  the WD's "dynamic configuration", geometry from sector 0, might allow up to
+  DOS 3.21's 32 MB); 8.3 names only (others shortened or left out, with a
+  note); files that do not fit are left out; a snapshot at reset (changes on
+  the card appear after the next reset).
+- **Where the metadata lives:** FATs and directories of a 21 MB FAT16 disk
+  are some 40-60 KB plus the per-file extent maps: block RAM if it fits,
+  else the HyperRAM.
+- **Open:** whether the chosen folder is remembered across power-off (like
+  C:); the drive type in the 322h configuration register (bits 3-2); test
+  ready for drive 1 when nothing is mounted (today it answers OK,
+  `DRV1_READY`); a menu line or a radio row next to C:.
+
 ## Other open items
 
 - A changed SD card is not noticed (Megamiga re-checks the card generation).
