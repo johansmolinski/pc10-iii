@@ -231,7 +231,7 @@ never gives).
 - if every field is valid BCD in range (else it is ignored: an RTC without a
   battery reads zeros; M2M itself retries a read with day and month 0),
 - not while HOLD is set (it waits: a CPU access in progress),
-- and not after the PC has set the clock since power-up (section 7.1 below:
+- and not after the PC has set the clock since power-up (the write-back below:
   the PC owns the time then, and the battery RTC already holds it) **[A]**.
 Years: PC10 = (M2M + 20) mod 100: 2000-2079 are 20-99, **2080-2099 become
 1980-1999** (the chip's own wrap); the weekday: W = M2M + 1 mod 7 (Sunday =
