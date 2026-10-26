@@ -36,7 +36,11 @@
 ; Firmware: Main Code
 ; ----------------------------------------------------------------------------
 
-START_FIRMWARE  RBRA    START_SHELL, 1
+START_FIRMWARE  MOVE    PC_UNMNT_PREV, R0       ; the eject's state (HANDLE_CORE_IO)
+                MOVE    0, @R0
+                MOVE    PC_SUB_ACTIVE, R0
+                MOVE    0, @R0
+                RBRA    START_SHELL, 1
 
 ; ----------------------------------------------------------------------------
 ; Core specific constants
@@ -541,11 +545,15 @@ ERR_UCODE       .ASCII_W "/pc10/ucode.bin is not a valid 8088 microcode bundle (
 ; unselects the item again (M2M$FORCE_MENU), like Megamiga's reload item.
 ; ----------------------------------------------------------------------------
 
-OSM_SEL_PRE     XOR     R8, R8
+OSM_SEL_PRE     MOVE    PC_SUB_ACTIVE, R8       ; a browser/help page may run now:
+                MOVE    1, @R8                  ; no SPACE eject (HANDLE_CORE_IO)
+                XOR     R8, R8
                 XOR     R9, R9
                 RET
 
 OSM_SEL_POST    INCRB
+                MOVE    PC_SUB_ACTIVE, R0       ; (every path out of OPTM_CB_SEL)
+                MOVE    0, @R0
                 CMP     PC_OPTM_G_RESET, R8
                 RBRA    _PCOSP_RET, !Z
 
@@ -581,8 +589,92 @@ CUSTOM_MSG      XOR     R8, R8
                 RET
 
 ; HANDLE_CORE_IO (M2M-UPSTREAM core-io-hook): the Shell's time slice for
-; background work; nothing yet. Must preserve all registers.
-HANDLE_CORE_IO  RET
+; background work. Must preserve all registers.
+;
+; SPACE on a mounted " A:"/" B:"/" C:" line ejects the disk (Megamiga's
+; HANDLE_UNMOUNT_KEY): the Shell has no unmount path for manual ROM loads (it
+; opens the browser), so the key is taken here. The Shell calls this at the top
+; of every menu key-wait iteration, before its KEYB$SCAN, so setting the SPACE
+; bit in KEYB_PRESSED hides the press from the menu. All gates must hold: the
+; menu open, no browser/help page running (PC_SUB_ACTIVE, set by OSM_SEL_PRE),
+; the cursor on the drive's line, the drive mounted (PARSEST = PT_OK; an empty
+; drive lets SPACE open the browser as before), and a new press (PC_UNMNT_PREV).
+HANDLE_CORE_IO  MOVE    R8, @--SP
+                MOVE    R9, @--SP
+                MOVE    R10, @--SP
+                INCRB
+
+                MOVE    M2M$KEYBOARD, R0        ; SPACE now (low active), latched
+                MOVE    @R0, R0                 ; every call, so opening the menu
+                NOT     R0, R0                  ; with SPACE held is no new press
+                AND     M2M$KEY_SPACE, R0
+                MOVE    R0, R4                  ; R4: SPACE now
+                MOVE    PC_UNMNT_PREV, R1
+                MOVE    @R1, R5                 ; R5: SPACE at the last call
+                MOVE    R4, @R1
+
+                MOVE    M2M$CSR, R0             ; the menu open?
+                MOVE    @R0, R0
+                AND     M2M$CSR_OSM, R0
+                RBRA    _HCIO_RET_NS, Z
+                MOVE    PC_SUB_ACTIVE, R0       ; no browser/help page?
+                CMP     0, @R0
+                RBRA    _HCIO_RET_NS, !Z
+
+                MOVE    OPTM_CUR_SEL, R0        ; the cursor on A:, B: or C:?
+                MOVE    @R0, R0
+                XOR     R2, R2                  ; R2: drive
+                CMP     PC_OSM_FDA_LN, R0
+                RBRA    _HCIO_D, Z
+                MOVE    1, R2
+                CMP     PC_OSM_FDB_LN, R0
+                RBRA    _HCIO_D, Z
+                MOVE    2, R2                   ; or C:
+                CMP     PC_OSM_HDC_LN, R0
+                RBRA    _HCIO_RET_NS, !Z
+
+_HCIO_D         MOVE    M2M$RAMROM_DEV, R0      ; keep the RAMROM selection
+                MOVE    @R0, R6
+                MOVE    M2M$RAMROM_4KWIN, R0
+                MOVE    @R0, R7
+
+                MOVE    FD_DEV_TAB, R8          ; mounted?
+                ADD     R2, R8
+                MOVE    @R8, R8
+                MOVE    R8, R3                  ; R3: the drive's device
+                MOVE    CRTROM_CSR_PARSEST, R9
+                RSUB    CRTROM_CSR_R, 1
+                CMP     CRTROM_CSR_PT_OK, R10
+                RBRA    _HCIO_RET, !Z
+
+                MOVE    KEYB_PRESSED, R0        ; hide the SPACE from the menu
+                OR      M2M$KEY_SPACE, @R0      ; (every call: no read skew)
+                CMP     0, R4                   ; a new press?
+                RBRA    _HCIO_RET, Z
+                CMP     0, R5
+                RBRA    _HCIO_RET, !Z
+
+                MOVE    R2, R8                  ; eject: the drive off (no disk; C:
+                                                ; then has no JMP208 either: the
+                                                ; drive is gone at the next reset)..
+                MOVE    FD_REGWIN, R9
+                RSUB    FD_SEL, 1
+                MOVE    FD_MODE, R0
+                MOVE    0, @R0
+                MOVE    R3, R8                  ; ..and the load status idle: the
+                MOVE    CRTROM_CSR_STATUS, R9   ; Shell shows the line empty again
+                MOVE    CRTROM_CSR_ST_IDLE, R10
+                RSUB    CRTROM_CSR_W, 1
+
+_HCIO_RET       MOVE    M2M$RAMROM_DEV, R0
+                MOVE    R6, @R0
+                MOVE    M2M$RAMROM_4KWIN, R0
+                MOVE    R7, @R0
+_HCIO_RET_NS    DECRB
+                MOVE    @SP++, R10
+                MOVE    @SP++, R9
+                MOVE    @SP++, R8
+                RET
 
 ; CFG_SIGCHECK (M2M-UPSTREAM cfg-strings): C=1 = the settings file R8 (open,
 ; its text loaded by CFGS_LOAD) belongs to this menu: its text has the line
@@ -655,6 +747,9 @@ END_OF_ROM      .DW 0
 #endif
 
 #include "../../M2M/rom/shell_vars.asm"
+
+PC_UNMNT_PREV   .BLOCK 1                        ; SPACE at the last HANDLE_CORE_IO
+PC_SUB_ACTIVE   .BLOCK 1                        ; 1: a browser/help page runs
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
 ; for this 50-line menu the demand is 1058 words: 20 + 596 item characters

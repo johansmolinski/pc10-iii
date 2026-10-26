@@ -342,6 +342,9 @@ architecture synthesis of MEGA65_Core is
 -- scrapes them into osm_const.asm as PC_OSM_*)
 ---------------------------------------------------------------------------------------------
 
+constant C_MENU_FDA_LN        : natural := 2;   -- " A:%s" (the firmware's SPACE eject)
+constant C_MENU_FDB_LN        : natural := 3;   -- " B:%s"
+constant C_MENU_HDC_LN        : natural := 4;   -- " C:%s" (the hard disk image)
 constant C_MENU_WP_A          : natural := 5;
 constant C_MENU_WP_B          : natural := 6;
 constant C_MENU_DRV_SOUND     : natural := 7;

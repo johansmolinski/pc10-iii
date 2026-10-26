@@ -663,8 +663,10 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
   FONT_START, PREP_LOAD_IMAGE/FD_SETUP, the menu; the M2M CSR handshake of
   the floppy devices; the SD engine port with the real `sdhost.vhd` (the
   bench uses a model of its protocol).
-- **Floppy images:** no eject (Megamiga ejects with SPACE in the menu; here a
-  drive keeps its image until another is chosen); the images are not
+- **Floppy images:** SPACE on a mounted " A:"/" B:" line ejects the disk
+  (2026-10-26, Megamiga's HANDLE_UNMOUNT_KEY in `HANDLE_CORE_IO`: the drive's
+  MODE goes 0, its load status idle; on an empty drive SPACE opens the browser
+  as before); the images are not
   remembered across power-up (Megamiga's profiles keep paths in the settings
   file text, M2M exception 17); a changed SD card is not noticed (Megamiga
   re-checks the card generation, `ADF_SD_GEN`); 1.2M/1.44M need the AT
