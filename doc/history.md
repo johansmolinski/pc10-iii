@@ -1760,3 +1760,12 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   wall for 125 s). Not exercised: DOS on the drive (no DOS here), the
   dynamic/virtual configurations, bad-track formats through the BIOS, an
   INT 13h error path on the real BIOS.
+
+## 2026-10-26 - Hardware: the Commodore character ROM (build pc10-real-r)
+
+- Build `pc10-real-r` (5dfd2d9, WNS +0.263, WHS +0.036) with 318086-03 as
+  `/pc10/char.rom`: the user confirmed the Commodore banner the right way round
+  (the bit-reversed data lines) and the live "Scandinavian charset" switch.
+  Found on the way: SPACE on a mounted floppy line opened the browser (no
+  eject); fixed in 362e019 (build `pc10-real-s`). DOS 3.21's `setclock -r`
+  printed "RTC timeout": no clock chip at 2C0h yet (branch `rtc`).
