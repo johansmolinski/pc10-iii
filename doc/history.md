@@ -1659,3 +1659,104 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   (`make_cbm`) holds the real bit order. tb/pvc4 PASS; mutants "CBM data not
   reversed" (cbm: 39,394 dots differ) and "IBM data reversed too" (cmode3:
   78,796) killed.
+
+
+## 2026-10-25 - The PC20-III's hard disk: the specification (branch `xta`, step 1)
+
+- **What:** doc/xta.md, the plan's guesses replaced by facts: the
+  disassembly of the disk BIOS in Commodore BIOS 4.41 (WD "IDE SuperBIOS
+  Rev. 1.0", F8000-F9FFF; listings in `~/pcxt-work/xta/`, not in the
+  repository), the PC10-III schematic of CN202 (sheet "FDD_HDD_BIOS"), WD's
+  WD93024/34/44-X technical reference (via the PC-DISK database), kobolt's
+  PC 20-III emulator (MIT), 86Box `hdc_xta.c`, MartyPC `xebec.rs`.
+- **Findings:**
+  - the drive is a WD93024-X (Commodore 312711-01): 782/2/27 physical (RLL),
+    **615/4/17 in translate mode**, **3329 rpm**, seek 5/39/63 ms, one-sector
+    buffer (WD: 3:1 interleave with single-transfer DMA, 2:1 in demand mode);
+  - CN202 is only buffered I/O channel lines (SA0-1, IOR, IOW, DACK3,
+    -HDCS, RESET, D0-7, IRQ via JMP206, DRQ via JMP207); **JMP208 gates the
+    data buffer** (position A: the ports read FFh, the BIOS's "Hard disk not
+    found" of today);
+  - port 322h is the drive's configuration register: **FFh** for the
+    PC20-III (translate, type 3 = 615/4, IRQ5, XT); bits 5-4 pick one of two
+    4-entry drive tables, bit 7 = 0 would make the BIOS program the AT's
+    second 8237 (the D4h/D6h accesses);
+  - the BIOS's handshake, CCB (0-based sectors), all opcodes it uses, the
+    sense-code mapping, DMA channel 3 (47h/4Bh, no TC to the drive), the
+    status-bit-5 polling, and the detection sequence: reset, recalibrate,
+    E4, test ready with a spin-up wait to tick 446, reset (initialize must
+    succeed for drive 1 too), recalibrate;
+  - the formatter is **`G=F800:5`** in 4.41 (the manual's FA00:5 and "WX2
+    1.08" are an older ROM's), default interleave 4.
+- **Open:** whether drive 1's test ready fails (4.9 s cold / ~14 s warm
+  boot wait) or succeeds (kobolt); the real drive's command overhead,
+  spin-up and reset times; the translation and interleave on 27-sector
+  tracks (doc/xta.md section 11).
+- Steps 2-4 (RTL, unit bench, tb/sys) not started (priority moved to the
+  Paradise PVC4).
+
+## 2026-10-25 - The PC20-III's hard disk: the card and its tests (branch `xta`, steps 2-4)
+
+- **What:** `rtl/hdc/xta_card.sv`, the PC10-III main board's CN202 host side
+  and the Western Digital WD93024-X with its embedded controller as one card
+  (doc/xta.md section 9): 320h-323h behind JMP208 (`enable`; off = the ports
+  float, no IRQ, no DRQ), the XT bus phases, the CCB, every command the
+  Commodore BIOS 4.41 and its WD formatter use (00, 01, 03, 04, 05, 06, 07,
+  08, 0A, 0B, 0C, 0D, 0E, 0F, E0, E3, E4, E5, E6), completion and sense
+  bytes, DRQ3/DACK3 (no TC) and IRQ5 with the mask, a medium input
+  (`present`), the LED (`active`), the sector port of the XTIDE card on a
+  4-slot `hdc_secbuf` (read ahead, write behind, write-through at the end
+  of each command).
+- **Timing** (the drive's, not the backend's): 3329 rpm as 27 slots of
+  exactly 516,124 clk per revolution, logical sector L = physical sector L
+  (linear translation), the format's interleave as the usual slot layout,
+  seeks 2760 + 140 x isqrt(256 d) us (5.0 / 38.9 / 65.3 ms), a one-sector
+  buffer (the next read waits for the host, the next write's data come at
+  the end of the previous slot), command overheads (300 us), 1.08 us per
+  host byte, 5 s spin-up. All assumptions are [A] in doc/xta.md 9.2-9.4,
+  the parameters configurable.
+- **pc_system:** `XTA_FIT` (default 0: not built), ports `xta_enable`,
+  `xta_present`, `xta_active`, `xta_sp_*`; the stand-in, `pc_system_flat`
+  and the OOC top tie them off. tb/sys: `make XTA=1`, `sys_run -A image
+  -jmp208 A|B -WA out -xl` (command log), `-k ms:keys` (typed scan codes),
+  `-w` (warm-boot flag; the Commodore BIOS still tests its memory).
+  `tb/sys/hd/fmtboot.S` + `mkfmtboot.py`: a boot floppy that starts the WD
+  formatter at F800:0005 with a 5-function INT 21h instead of DOS/DEBUG.
+- **Two bus faults, found in tb/sys** (doc/xta.md 9.7, 10.2): (1) the
+  board's DACK3 outlasts AEN into the CPU's next I/O cycle, and the card
+  took the BIOS's status poll for a DMA read (the boot sector read hung): a
+  DMA cycle is now DACK3 with AEN. (2) The board fixes a cycle's wait states
+  one state ahead and its DMA wait reaches READY with AEN, so the 8237 can
+  take the bus in the last Tw of a CPU read; AEN cut the IOR and the CPU
+  took the open bus (FFh = "interrupt"), and the resumed strobe moved a
+  second data byte. `xt_board.sv` now gives the CPU the data its command had
+  when AEN cut it (timing unchanged; on the 5160 the CPU would wait), and
+  the card moves one data byte per CPU bus cycle (ALE). The drive's byte
+  time now counts from a strobe's start (it overlapped nothing before: 2.8
+  instead of ~2.2 us per byte).
+- **tb/xta:** 2,742,243 checks, 0 failed (7.5 s of PC time; the full
+  format with `-f`: 56.40 s, as the timing model says); `mut.py` 45 of 45
+  killed.
+- **tb/sys, Commodore BIOS 4.41, cold boot** (`make FE=1 PVC4=1 XTA=1`,
+  `sys_run -d 5D -A hdtest.img -xl -s 60`, fedora, 5,535 s wall): the disk
+  BIOS finds the drive (test ready loop until the 5 s spin-up, reset,
+  initialize, recalibrate; drive 1 fails recalibrate), no "Hard disk not
+  found"; at 45.6 s it boots the MBR test from C:, which prints `AH=08 CX DX
+  6591 0301` (613 / 17 / 4 / 1 drive), reads 1 and 20 sectors (sum F600
+  OK), writes and reads back 3 (OK), writes 1; `mkhdimg.py check` OK. With
+  `-jmp208 A`: "Hard disk not found", no drive command. A test ROM
+  (`tb/sys/hd/xtadma.S`) runs 32 DMA commands with refresh and a PIO read
+  in 0.08 s of PC time.
+- **Gates** (`gates.sh xta-f` vs merge-a): g_tr/g_tre/g_trL2 identical,
+  g_fd identical but for the wall time, tb/fdc, tb/hdc, tb/cga, tb/mda
+  PASS with identical logs; tb/shell and tb/pvc4 PASS locally.
+- **Open** ([Q] in doc/xta.md 13): drive 1's test ready, the translation and
+  interleave on the 27-sector tracks, the overheads and spin-up, the
+  board's DMA/READY timing (the 5160 would add wait states).
+- **The WD formatter** (`fmtboot.img` in A:, a blank image, `-k` answers
+  Enter, Enter, N, y, N): "IDE Superbios Rev. 1.0", write sector buffer,
+  format drive at interleave 4 in 56.36 s of PC time (the model: 56.4 s),
+  "Format Successful"; all 41,820 sectors written with the buffer (11,377 s
+  wall for 125 s). Not exercised: DOS on the drive (no DOS here), the
+  dynamic/virtual configurations, bad-track formats through the BIOS, an
+  INT 13h error path on the real BIOS.

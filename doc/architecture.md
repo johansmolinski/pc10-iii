@@ -70,6 +70,8 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
      |               configuration register 230h, the 5720's)
      +- fdc_card    rtl/fdc/fdc_card.sv: the diskette adapter (765), doc/fdc.md
      +- xtide_card  rtl/hdc/xtide_card.sv: XTIDE hard disk card + option ROM socket, doc/hdc.md
+     +- xta_card    rtl/hdc/xta_card.sv           (XTA_FIT: the PC20-III's hard disk, a
+     |               WD93024-X on CN202, doc/xta.md)
      +- later: COM/LPT
 ```
 
@@ -103,7 +105,8 @@ Memory map of the cards: CGA B8000-BBFFF (mirrored to BFFFF); the PVC4
 B8000-BFFFF (colour) or B0000-B7FFF and, with 3BF bit 1, B8000-BFFFF
 (mono), I/O 3D0-3DF or 3B0-3BF, and 230h; the XTIDE
 card's option ROM C8000-CBFFF (16 KB; the BIOS's option ROM scan finds it).
-I/O: FDC 3F0-3F7, XTIDE 300-31F (variant 0) or 300-30F (variants 1/2).
+I/O: FDC 3F0-3F7, XTIDE 300-31F (variant 0) or 300-30F (variants 1/2), the
+PC20-III's hard disk 320-323 (DMA 3, IRQ 5).
 
 Bus timing (`xt_board.sv`, the 8288 function; marked CAL there, cards such as
 the CGA depend on it):
@@ -170,7 +173,8 @@ module pc_system #(
     parameter int MDA_FIT = 0,        // 0 none, 1 IBM MDA, 2 Hercules (doc/mda.md)
     parameter int DRQ0_SKEW = 0,      // simulation only
     parameter bit FE2010A = 1'b0,     // the PC10-III's FE2010A port logic (xt_board)
-    parameter bit PVC4_FIT = 1'b0     // the PC10-III's onboard PVC4 and 230h (doc/pvc4.md)
+    parameter bit PVC4_FIT = 1'b0,    // the PC10-III's onboard PVC4 and 230h (doc/pvc4.md)
+    parameter bit XTA_FIT = 1'b0      // the PC20-III's hard disk on CN202 (doc/xta.md)
 ) (
     input  logic        clk,          // 28.63636 MHz
     input  logic        reset,        // synchronous, active high, >= 1 CPU clock
@@ -273,6 +277,18 @@ module pc_system #(
     output logic        hd_sp_wr_valid,  output logic [7:0] hd_sp_wr_data,
     input  logic        hd_sp_wr_ready, hd_sp_done, hd_sp_err,
 
+    // The PC20-III's hard disk (XTA_FIT, rtl/hdc/xta_card.sv, doc/xta.md):
+    // JMP208, the medium (a raw image of 41,820 sectors), the drive's LED,
+    // its sector port (the hd_sp_* protocol, LBA < 41820, no drive bit)
+    input  logic        xta_enable,       // JMP208 in position B (0: 320-323 float)
+    input  logic        xta_present,      // an image is mounted
+    output logic        xta_active,       // LED: busy or writing back
+    output logic        xta_sp_req, xta_sp_write,
+    output logic [27:0] xta_sp_lba,
+    input  logic        xta_sp_rd_valid,  input logic [7:0] xta_sp_rd_data,
+    output logic        xta_sp_wr_valid,  output logic [7:0] xta_sp_wr_data,
+    input  logic        xta_sp_wr_ready, xta_sp_done, xta_sp_err,
+
     // Keyboard: XT (set 1) scan codes from the glue
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,    // one-clk strobe; dropped if kbd_busy
@@ -334,6 +350,13 @@ Notes (2026-10-25, PVC4):
 - The PVC4's power-up straps come from `cbm_dip[1]` (DIP switch 2) and are
   sampled at `reset`.
 
+Notes (2026-10-25, PC20-III hard disk):
+- `XTA_FIT` = 0 (the default) removes the card; the shell's
+  `pc_system_flat` keeps it at 0 and ties the `xta_*` ports off until the
+  SD backend exists (doc/xta.md section 11).
+- `tb/sys` serves the drive from an image file (`make XTA=1`, `-A`,
+  `-jmp208`, `-WA`, `-xl`).
+
 Not yet in the contract: serial/parallel, composite video, turbo. They get
 added here when their module exists.
 
@@ -344,4 +367,4 @@ added here when their module exists.
   runs a BIOS, dumps CGA frames as PNG and a bus trace. The bus trace is the
   thing to compare cycle by cycle against MartyPC.
 - Cards: each card has its own TB under `tb/` (`tb/cga`, `tb/mda`,
-  `tb/fdc`).
+  `tb/fdc`, `tb/hdc`, `tb/xta`).

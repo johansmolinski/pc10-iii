@@ -5,6 +5,7 @@
 //           [-X xub.bin] [-H disk.img] [-J slave.img] [-G c,h,s] [-V variant]
 //           [-W out.img] [-K backend_us] [-S ms,ms,...]
 //           [-F font.bin] [-m] [-v] [-o image] [-C [max]] [-f]
+//           [-A xta.img] [-jmp208 A|B] [-WA out.img] [-xl] [-k ms:keys] [-w]
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
 //
@@ -37,6 +38,18 @@
 //       T2 (doc/cga.md section 4); cycles that a DMA wait stretched are
 //       counted apart. Prints the first [max] (default 20) mismatches and a
 //       summary; the exit code is 3 if any cycle differs.
+//   PC20-III hard disk (make XTA=1, doc/xta.md): -A attaches the drive's image
+//       (raw, 615 x 4 x 17 x 512 = 21,411,840 bytes; a shorter file is padded
+//       with zeros), -jmp208 sets the jumper (B = the drive connected, the default
+//       with -A; A = the ports float), -WA writes the image to a file at the end,
+//       -xl logs the drive's commands and completion bytes; the backend's latency
+//       per sector is -K's
+//   -k ms:keys  types keys from ms on, one every 80 ms (XT scan codes, set 1;
+//       \n Enter, \e Esc, \b Backspace, \t Tab; capitals and symbols with Shift);
+//       may be given more than once
+//   -w  warm start: the BIOS's warm-boot flag 0472h = 1234h is in the RAM at
+//       power-on (GLaBIOS-style BIOSes skip their memory test; the Commodore BIOS
+//       4.41 still tests it and then fails "Bad DMA port = 0004h": not for it)
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -105,11 +118,42 @@ static void dump_screen(Vtb_sys *tb, const char *title, bool mono = false) {
     }
 }
 
+// XT scan code (set 1) of an ASCII character; shift: with the left Shift key
+static bool ascii_sc(char c, unsigned &sc, bool &shift) {
+    static const char *lo = "1234567890-=";                 // 02..0D
+    static const char *hi = "!@#$%^&*()_+";
+    static const char *r1 = "qwertyuiop[]", *r1s = "QWERTYUIOP{}";   // 10..1B
+    static const char *r2 = "asdfghjkl;'`", *r2s = "ASDFGHJKL:\"~"; // 1E..29
+    static const char *r3 = "\\zxcvbnm,./", *r3s = "|ZXCVBNM<>?";    // 2B..35
+    shift = false;
+    const char *p;
+    if ((p = strchr(lo, c)) && c) { sc = 0x02 + (p - lo); return true; }
+    if ((p = strchr(hi, c)) && c) { sc = 0x02 + (p - hi); shift = true; return true; }
+    if ((p = strchr(r1, c)) && c) { sc = 0x10 + (p - r1); return true; }
+    if ((p = strchr(r1s, c)) && c) { sc = 0x10 + (p - r1s); shift = true; return true; }
+    if ((p = strchr(r2, c)) && c) { sc = 0x1E + (p - r2); return true; }
+    if ((p = strchr(r2s, c)) && c) { sc = 0x1E + (p - r2s); shift = true; return true; }
+    if ((p = strchr(r3, c)) && c) { sc = 0x2B + (p - r3); return true; }
+    if ((p = strchr(r3s, c)) && c) { sc = 0x2B + (p - r3s); shift = true; return true; }
+    switch (c) {
+        case ' ': sc = 0x39; return true;
+        case '\n': sc = 0x1C; return true;
+        case 27: sc = 0x01; return true;
+        case '\b': sc = 0x0E; return true;
+        case '\t': sc = 0x0F; return true;
+    }
+    return false;
+}
+
 static bool fdclog = false;     // -f
 int main(int argc, char **argv) {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
     const char *xub = nullptr, *hdimg[2] = {nullptr, nullptr}, *hdgeo = nullptr, *hdout = nullptr;
+    const char *xtaimg = nullptr, *xtaout = nullptr;
+    int jmp208 = -1;                    // -1: B with an image, else A
+    bool xtalog = false, warm = false;
+    std::vector<std::pair<unsigned long long, unsigned>> keys;     // (clk, scan code)
     unsigned variant = 0;
     double hd_lat_us = 20;
     std::vector<double> shots;
@@ -148,6 +192,32 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-V") && i + 1 < argc) variant = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-W") && i + 1 < argc) hdout = argv[++i];
         else if (!strcmp(argv[i], "-K") && i + 1 < argc) hd_lat_us = atof(argv[++i]);
+        else if (!strcmp(argv[i], "-A") && i + 1 < argc) xtaimg = argv[++i];
+        else if (!strcmp(argv[i], "-WA") && i + 1 < argc) xtaout = argv[++i];
+        else if (!strcmp(argv[i], "-jmp208") && i + 1 < argc) { i++; jmp208 = argv[i][0] == 'B' || argv[i][0] == 'b'; }
+        else if (!strcmp(argv[i], "-xl")) xtalog = true;
+        else if (!strcmp(argv[i], "-w")) warm = true;
+        else if (!strcmp(argv[i], "-k") && i + 1 < argc) {
+            // ms:keys, one key every 80 ms: make, break 30 ms later
+            char *t = argv[++i], *colon = strchr(t, ':');
+            if (!colon) { fprintf(stderr, "-k ms:keys\n"); return 1; }
+            double ms = atof(t);
+            for (char *c = colon + 1; *c; c++) {
+                char ch = *c;
+                if (ch == '\\' && c[1]) {
+                    c++;
+                    ch = *c == 'n' ? '\n' : *c == 'e' ? 27 : *c == 'b' ? '\b' : *c == 't' ? '\t' : *c;
+                }
+                unsigned sc; bool sh;
+                if (!ascii_sc(ch, sc, sh)) { fprintf(stderr, "-k: no scan code for '%c'\n", ch); return 1; }
+                unsigned long long t0 = (unsigned long long)(ms * 1e-3 * CLK_HZ), d = (unsigned long long)(0.03 * CLK_HZ);
+                if (sh) keys.push_back({t0, 0x2A});
+                keys.push_back({t0 + 1, sc});
+                keys.push_back({t0 + d, sc | 0x80});
+                if (sh) keys.push_back({t0 + d + 1, 0xAA});
+                ms += 80;
+            }
+        }
         else if (!strcmp(argv[i], "-S") && i + 1 < argc) {
             for (char *t = strtok(argv[++i], ","); t; t = strtok(nullptr, ",")) shots.push_back(atof(t));
             std::sort(shots.begin(), shots.end());
@@ -202,6 +272,8 @@ int main(int argc, char **argv) {
     int nv = 0;
     vargs[nv++] = argv[0]; vargs[nv++] = plus.c_str(); vargs[nv++] = plat.c_str();
     if (xub) vargs[nv++] = xplus.c_str();
+    if (xtalog) vargs[nv++] = "+xtalog";
+    if (warm) vargs[nv++] = "+warm";
     for (auto &x : extra) if (nv < 32) vargs[nv++] = x.c_str();
     Verilated::commandArgs(nv, vargs);
     Vtb_sys *tb = new Vtb_sys;
@@ -276,6 +348,26 @@ int main(int argc, char **argv) {
     unsigned hlba = 0;
     bool herr = false;
     size_t shot = 0;
+    // the PC20-III's hard disk: the image, JMP208
+    const size_t XTA_BYTES = 615u * 4 * 17 * 512;
+    std::vector<unsigned char> xta;
+    if (xtaimg) {
+        FILE *xf = fopen(xtaimg, "rb");
+        if (!xf) { perror(xtaimg); return 1; }
+        xta.assign(XTA_BYTES, 0);
+        size_t xn = fread(xta.data(), 1, XTA_BYTES, xf);
+        fclose(xf);
+        printf("XTA image %s: %zu bytes%s\n", xtaimg, xn, xn < XTA_BYTES ? " (padded with zeros)" : "");
+    }
+    if (jmp208 < 0) jmp208 = xtaimg != nullptr;
+    tb->xta_enable  = jmp208;
+    tb->xta_present = xtaimg != nullptr;
+    int xs = 0, xn = 0;                 // backend: 0 idle, 1 latency, 2 data, 3 write latency, 4 wait for req low
+    unsigned long long xwhen = 0, xta_reads = 0, xta_writes = 0;
+    unsigned xlba = 0;
+    bool xerr = false;
+    std::sort(keys.begin(), keys.end());
+    size_t key_i = 0;
     tb->kbd_valid = 0;
     tb->reset = 1;
     for (int i = 0; i < 200; i++) { tb->clk = 0; tb->eval(); tb->clk = 1; tb->eval(); }
@@ -363,6 +455,42 @@ int main(int argc, char **argv) {
             tb->hd_sp_done = 1; tb->hd_sp_err = herr; hs = 4;
         } else if (hs == 4 && !tb->hd_sp_req)
             hs = 0;
+        // the XTA backend (the same latency as the XTIDE's)
+        tb->xta_sp_rd_valid = 0; tb->xta_sp_wr_ready = 0; tb->xta_sp_done = 0; tb->xta_sp_err = 0;
+        if (xs == 0 && tb->xta_sp_req) {
+            xlba = tb->xta_sp_lba; xn = 0;
+            xerr = (size_t)xlba * 512 + 512 > xta.size();
+            xs = tb->xta_sp_write ? 2 : 1;
+            xwhen = cyc + (unsigned long long)(hd_lat_us * 1e-6 * CLK_HZ);
+            (tb->xta_sp_write ? xta_writes : xta_reads)++;
+        }
+        if (xs == 1 && cyc >= xwhen) {
+            if (xerr) { tb->xta_sp_done = 1; tb->xta_sp_err = 1; xs = 4; }
+            else {
+                tb->xta_sp_rd_valid = 1; tb->xta_sp_rd_data = xta[(size_t)xlba * 512 + xn];
+                if (++xn == 512) { tb->xta_sp_done = 1; xs = 4; }
+            }
+        } else if (xs == 2) {
+            tb->xta_sp_wr_ready = 1;
+            if (tb->xta_sp_wr_valid) {
+                if (!xerr) xta[(size_t)xlba * 512 + xn] = tb->xta_sp_wr_data;
+                if (++xn == 512) { xs = 3; xwhen = cyc + (unsigned long long)(hd_lat_us * 1e-6 * CLK_HZ); }
+            }
+        } else if (xs == 3 && cyc >= xwhen) {
+            tb->xta_sp_done = 1; tb->xta_sp_err = xerr; xs = 4;
+        } else if (xs == 4 && !tb->xta_sp_req)
+            xs = 0;
+        // typed keys: one code per strobe, when the board has taken the last
+        tb->kbd_valid = 0;
+        static unsigned long long key_last = 0;
+        if (key_i < keys.size() && cyc >= keys[key_i].first && !tb->kbd_busy &&
+            cyc >= key_last + (unsigned long long)(0.002 * CLK_HZ)) {
+            tb->kbd_code = keys[key_i].second; tb->kbd_valid = 1;
+            key_last = cyc;
+            if (!quiet && !(keys[key_i].second & 0x80))
+                printf("[%9.3f ms] key %02X\n", cyc / CLK_HZ * 1e3, keys[key_i].second);
+            key_i++;
+        }
         tb->eval();
         // sample before the edge (the BIU changes its pins on the edge)
         if (tb->cpu_step) {
@@ -519,6 +647,14 @@ int main(int argc, char **argv) {
     }
     if (tb->hdc_enable)
         printf("hard disk backend: %llu sector reads, %llu sector writes\n", hd_reads, hd_writes);
+    if (xtaimg)
+        printf("XTA backend: %llu sector reads, %llu sector writes\n", xta_reads, xta_writes);
+    if (xtaout && xtaimg) {
+        FILE *o = fopen(xtaout, "wb");
+        if (!o || fwrite(xta.data(), 1, xta.size(), o) != xta.size()) perror(xtaout);
+        if (o) fclose(o);
+        printf("XTA image written to %s\n", xtaout);
+    }
     if (hdout && hdimg[0]) {
         FILE *o = fopen(hdout, "wb");
         if (!o || fwrite(hd[0].d.data(), 1, hd[0].d.size(), o) != hd[0].d.size()) perror(hdout);

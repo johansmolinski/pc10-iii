@@ -107,6 +107,11 @@ pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2), .PVC4_FIT(1'b1)) u_pc (
     .hd_sp_req, .hd_sp_write, .hd_sp_drive, .hd_sp_lba,
     .hd_sp_rd_valid, .hd_sp_rd_data, .hd_sp_wr_valid, .hd_sp_wr_data,
     .hd_sp_wr_ready, .hd_sp_done, .hd_sp_err,
+    // the PC20-III's hard disk is not fitted here (XTA_FIT = 0)
+    .xta_enable(1'b0), .xta_present(1'b0), .xta_active(),
+    .xta_sp_req(), .xta_sp_write(), .xta_sp_lba(),
+    .xta_sp_rd_valid(1'b0), .xta_sp_rd_data(8'h00), .xta_sp_wr_valid(), .xta_sp_wr_data(),
+    .xta_sp_wr_ready(1'b0), .xta_sp_done(1'b0), .xta_sp_err(1'b0),
     .kbd_code, .kbd_valid, .kbd_busy, .speaker, .dip_sw1
 );
 

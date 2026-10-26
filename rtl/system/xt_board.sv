@@ -749,13 +749,34 @@ assign isa_tc     = !dma_eop;              // the 8237's EOP is active low
 //   else if (cpu_memr && (sel_ram || sel_rom)) cpu_din = mem_rdata;
 //   else if (isa_dsel)                     cpu_din = isa_din;
 //   else                                   cpu_din = 8'hFF;
+//
+// pc10-iii (a DMA transfer in the last wait state): the wait states are fixed
+// one state ahead (biu88, MartyPC), and the DMA wait reaches READY with AEN,
+// so the 8237 can take the bus (AEN) in the last Tw of a CPU read: AEN cuts
+// the read command, the card stops driving, and the CPU would take the open
+// bus (FFh) at the step that starts T4. On the 5160 the DMA wait goes to the
+// 8284 with HOLDA, one clock before AEN, and the CPU waits instead. Without
+// changing that timing (the MartyPC traces): the board keeps the data the
+// command had when AEN cut it and gives them to the CPU at that step. Found
+// with the PC20-III hard disk (doc/xta.md), whose BIOS polls the drive's
+// status during its DMA transfers: the poll read FFh ("interrupt").
+logic [7:0] rd_keep;
+logic       rd_cut;                     // AEN cut the running CPU read
+always_ff @(posedge clk)
+    if (reset || !in_cycle || cyc_end)
+        rd_cut <= 1'b0;
+    else if ((cpu_ior || cpu_memr) && aen_next) begin
+        rd_cut  <= 1'b1;
+        rd_keep <= cpu_din;             // (aen is still low: the live data)
+    end
 localparam logic [1:0] DIN_ROM = 2'd0, DIN_RAM = 2'd1, DIN_ISA = 2'd2, DIN_REG = 2'd3;
 logic [1:0] din_src;
 logic [7:0] din_reg;
 always_comb begin
     din_src = DIN_REG;
     din_reg = 8'hFF;
-    if (inta)                              din_reg = pic_dout;
+    if (rd_cut && aen && cyc_end)          din_reg = rd_keep;
+    else if (inta)                         din_reg = pic_dout;
     else if (cpu_ior && cs_dma)            din_reg = dma_dout;
     else if (cpu_ior && cs_pic)            din_reg = pic_dout;
     else if (cpu_ior && cs_pit)            din_reg = pit_dout;
@@ -774,7 +795,8 @@ always_comb
 `ifndef SYNTHESIS
 logic [7:0] cpu_din_ref;
 always_comb begin
-    if (inta)                              cpu_din_ref = pic_dout;
+    if (rd_cut && aen && cyc_end)          cpu_din_ref = rd_keep;
+    else if (inta)                         cpu_din_ref = pic_dout;
     else if (cpu_ior && cs_dma)            cpu_din_ref = dma_dout;
     else if (cpu_ior && cs_pic)            cpu_din_ref = pic_dout;
     else if (cpu_ior && cs_pit)            cpu_din_ref = pit_dout;

@@ -14,7 +14,11 @@ module pc_system #(
     // Commodore configuration register 230h; the CGA/MDA parameters above are
     // then expansion cards (0 for the PC10-III as built). The vid_* outputs
     // come from the PVC4.
-    parameter bit PVC4_FIT = 1'b0
+    parameter bit PVC4_FIT = 1'b0,
+    // the PC20-III's hard disk on CN202 (rtl/hdc/xta_card.sv, doc/xta.md):
+    // 0 = not built (the PC10-III), 1 = the drive's connector and logic exist;
+    // xta_enable is then JMP208
+    parameter bit XTA_FIT = 1'b0
 ) (
     input  logic        clk,
     input  logic        reset,
@@ -126,6 +130,25 @@ module pc_system #(
     input  logic        hd_sp_wr_ready,
     input  logic        hd_sp_done,
     input  logic        hd_sp_err,
+
+    // the PC20-III's hard disk (XTA_FIT, rtl/hdc/xta_card.sv, doc/xta.md): a
+    // WD93024-X on CN202 at 320h-323h, DMA 3, IRQ 5. xta_enable = JMP208 in
+    // position B (0: the ports read FFh, as on a PC10-III), xta_present = a
+    // medium: a raw image of 41,820 sectors (615 x 4 x 17, 21,411,840 bytes)
+    // behind the sector port (the hd_sp_* protocol, xta_sp_lba < 41820)
+    input  logic        xta_enable,
+    input  logic        xta_present,
+    output logic        xta_active,     // the drive's LED
+    output logic        xta_sp_req,
+    output logic        xta_sp_write,
+    output logic [27:0] xta_sp_lba,
+    input  logic        xta_sp_rd_valid,
+    input  logic [7:0]  xta_sp_rd_data,
+    output logic        xta_sp_wr_valid,
+    output logic [7:0]  xta_sp_wr_data,
+    input  logic        xta_sp_wr_ready,
+    input  logic        xta_sp_done,
+    input  logic        xta_sp_err,
 
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
@@ -528,12 +551,55 @@ xtide_card u_hdc (
     .sp_err      (hd_sp_err)
 );
 
+// The PC20-III's hard disk (doc/xta.md): the drive on CN202, JMP206/207 fitted
+// (IRQ5, DRQ3), JMP208 = xta_enable
+logic [7:0] xta_din;
+logic       xta_dsel;
+logic [7:2] xta_irq;
+logic [3:1] xta_drq;
+
+generate if (XTA_FIT) begin : g_xta
+    xta_card u_xta (
+        .clk         (clk),
+        .reset       (reset),
+        .isa_addr    (isa_addr),
+        .isa_dout    (isa_dout),
+        .isa_din     (xta_din),
+        .isa_dsel    (xta_dsel),
+        .isa_ior_n   (isa_ior_n),
+        .isa_iow_n   (isa_iow_n),
+        .isa_aen     (isa_aen),
+        .isa_ale     (isa_ale),
+        .isa_irq     (xta_irq),
+        .isa_drq     (xta_drq),
+        .isa_dack_n  (isa_dack_n),
+        .enable      (xta_enable),
+        .present     (xta_present),
+        .active      (xta_active),
+        .sp_req      (xta_sp_req),
+        .sp_write    (xta_sp_write),
+        .sp_lba      (xta_sp_lba),
+        .sp_rd_valid (xta_sp_rd_valid),
+        .sp_rd_data  (xta_sp_rd_data),
+        .sp_wr_valid (xta_sp_wr_valid),
+        .sp_wr_data  (xta_sp_wr_data),
+        .sp_wr_ready (xta_sp_wr_ready),
+        .sp_done     (xta_sp_done),
+        .sp_err      (xta_sp_err)
+    );
+end else begin : g_no_xta
+    assign xta_din = 8'h00;  assign xta_dsel = 1'b0;  assign xta_irq = 6'b000000;  assign xta_drq = 3'b000;
+    assign xta_active = 1'b0;  assign xta_sp_req = 1'b0;  assign xta_sp_write = 1'b0;  assign xta_sp_lba = 28'd0;
+    assign xta_sp_wr_valid = 1'b0;  assign xta_sp_wr_data = 8'h00;
+end endgenerate
+
 assign isa_din   = (cga_dsel ? cga_din : 8'h00) | (mda_dsel ? mda_din : 8'h00) |
                    (fdc_dsel ? fdc_din : 8'h00) | (hdc_dsel ? hdc_din : 8'h00) |
-                   (pvc_dsel ? pvc_din : 8'h00) | (cfg_dsel ? cfg_din : 8'h00);
-assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel | pvc_dsel | cfg_dsel;
+                   (pvc_dsel ? pvc_din : 8'h00) | (cfg_dsel ? cfg_din : 8'h00) |
+                   (xta_dsel ? xta_din : 8'h00);
+assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel | pvc_dsel | cfg_dsel | xta_dsel;
 assign isa_ready = cga_ready & mda_ready & fdc_ready & hdc_ready & pvc_ready;
-assign isa_irq   = fdc_irq | hdc_irq;
-assign isa_drq   = fdc_drq;
+assign isa_irq   = fdc_irq | hdc_irq | xta_irq;
+assign isa_drq   = fdc_drq | xta_drq;
 
 endmodule
