@@ -363,12 +363,14 @@ constant C_MENU_DISP_GREEN    : natural := 37;
 constant C_MENU_DISP_AMBER    : natural := 38;
 constant C_MENU_DISP_WHITE    : natural := 39;
 constant C_MENU_CHARSET_SCAN  : natural := 42;
+constant C_MENU_PMOD          : natural := 46;  -- "PMOD: serial + printer" (pc_ports.vhd)
+constant C_MENU_MOUSE_ATARI   : natural := 48;  -- "Mouse: Atari ST" (else Amiga)
 constant C_MENU_HDMI_720P     : natural := 28;
 constant C_MENU_HDMI_480P     : natural := 29;
 constant C_MENU_HDMI_720P50   : natural := 30;
-constant C_MENU_ANALOG_15KHZ  : natural := 43;
-constant C_MENU_ANALOG_CSYNC  : natural := 44;
-constant C_MENU_RESET         : natural := 47;
+constant C_MENU_ANALOG_15KHZ  : natural := 51;
+constant C_MENU_ANALOG_CSYNC  : natural := 52;
+constant C_MENU_RESET         : natural := 55;
 
 -- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
 -- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
@@ -836,8 +838,8 @@ begin
       port map (
          clk_i                => main_clk,
          rst_i                => main_pc_reset,
-         pmod_on_i            => '0',          -- (the menu's items follow)
-         atari_i              => '0',
+         pmod_on_i            => main_osm_control_i(C_MENU_PMOD),
+         atari_i              => main_osm_control_i(C_MENU_MOUSE_ATARI),
          ser_txd_i            => main_ser_txd,
          ser_rts_n_i          => main_ser_rts_n,
          ser_dtr_n_i          => main_ser_dtr_n,
