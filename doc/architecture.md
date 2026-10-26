@@ -41,14 +41,21 @@ that ends that `clk`.
   executes one microinstruction per 8088 clock, at `cpu_step` + 1 `clk` (its
   clock enable, `EU_DELAY`). Both change state only there; every path between
   them is an ordinary single-clock path (no multicycle constraints).
-- Turbo (FE2010A 7.16/9.54 MHz: the CPU clock divided by 4 and 3 instead of
-  6) is not part of this contract yet; `pc_clocks.sv` is structured for it.
+- Turbo (doc/turbo.md, 2026-10-26): in the PC10-III chipset mode the
+  FE2010A's port 63h bits 7-6 divide the CPU clock by 4 (7.16 MHz, CLK high
+  2 `clk`, `cpu_fall` step + 2) or by 3 (9.54 MHz, `cpu_fall` step + 1);
+  `rdy_ce`/`cpu_prestep` stay the `clk` before the step. A new speed starts
+  where the modulo-24 counter is 0 or 12 (every period starts there: no
+  shortened clock, OSC and PCLK keep their phase). `ce_477` is a fixed
+  4.77 MHz enable (= `cpu_step` at 4.77 MHz) for real-time logic that used to
+  count CPU clocks (the keyboard's delays). Everything else that is real time
+  (8253, OSC, dot clocks, FDC/XTIDE timers) was on the fixed enables already.
 
 ## 2. Module tree
 
 ```
 pc_system          (rtl/system/pc_system.sv)  the PC: everything below
- +- pc_clocks       clock enables
+ +- pc_clocks       clock enables (and the FE2010A's turbo divider)
  +- cpu8088         rtl/cpu/cpu8088.sv: z8086 EU (Intel's 8088 microcode, loaded at
  |                   start-up) + biu88 behind 8088 max-mode pins (doc/z8086.md)
  +- xt_board        rtl/system/xt_board.sv: the 5160 system board logic
@@ -57,7 +64,8 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
  |   +- 8253 PIT, 8259 PIC, NMI mask, speaker
  |   +- ports 60-63: the 5160's 8255 PPI or the PC10-III's FE2010A port logic
  |       (input fe2010a, taken in reset; the menu's "Chipset")
- |   +- ready / wait-state logic (DMA hold, IOCHRDY)
+ |   +- ready / wait-state logic (DMA hold, IOCHRDY; xt_wait.sv: the board's
+ |       wait states, the FE2010A's turbo table)
  |   +- keyboard interface (shift register, IRQ1, clear via PB7)
  +- the "ISA slots": modules on the card bus (section 3)
      +- system RAM (planar, behind the abstract memory port)
@@ -142,10 +150,17 @@ the CGA depend on it):
   valid address and a read or write command"). Until 2026-10-22 IOCHRDY was
   sampled at `cpu_fall` in T2, the edge where MEMW starts: no write could
   wait (the CGA and MDA wrote at the strobe end as a workaround).
-- The DMA wait (`aen | dma_wait`) and the I/O wait state are unchanged: the
-  DMA term changes only on `cpu_step`, so `rdy_ce` sees the value `cpu_fall`
-  saw (checked in simulation); every CPU I/O cycle gets one wait state,
-  counted only where the DMA wait is over (MartyPC's cycle.rs).
+- The DMA wait (`aen | dma_wait`) and the board's wait states: the DMA term
+  changes only on `cpu_step`, so `rdy_ce` sees the value `cpu_fall` saw
+  (checked in simulation). The board's wait states (`xt_wait.sv`) count only
+  where the DMA wait is over (MartyPC's cycle.rs): one on every CPU I/O cycle
+  at 4.77 MHz; at the FE2010A's turbo speeds its table (doc/turbo.md section
+  3): I/O 4 (7.16) or 6 (9.54; 4 with 63h bit 6), memory cycles outside the
+  on-board RAM 2 or 4 (none with 63h bit 5), on-board RAM none.
+- In the FE2010A mode the DMA takes the bus only between CPU bus cycles (the
+  FE2010's RQ/GT): the hold flip-flop takes a T3/Tw only when it is the last.
+  Otherwise the turbo wait states let a refresh split a CPU command into two
+  strobes (doc/turbo.md section 3). The 5160 mode keeps MartyPC's rule.
 - After a DMA transfer the CPU's commands come back with AEN low (`cmd_en`
   in `xt_board.sv`). AEN falls at the CLK edge that ends S4, and the 8237
   ends its strobes one `clk` before that edge (`cpu_prestep`, KF8237), so a
