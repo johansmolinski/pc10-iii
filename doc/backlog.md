@@ -196,6 +196,66 @@ and the analog RGB output, as emulators do (doc/plan.md section 4).
 - **Cost:** a few DSPs for the filter and the YIQ matrix, a little logic; no
   extra memory.
 
+## Before release 0.1: serial port, parallel port, bus mouse (asked 2026-10-26)
+
+The PC10-III's on-board I/O that the core does not have yet. The user wants
+them in release 0.1. Facts: the 8088-line research
+(`~/pcxt-work/research/models/commodore-8088-models.md`, PC10-III service
+manual parts list, PC-1 Technical Manual for the 5720). The 5720 decodes all
+three; 230h (`cbm_cfg230.sv`) enables them: bits 1-0 LPT (off / 3BCh / 378h /
+278h), bits 3-2 COM (off / 2F8h / 3F8h / off), bit 4 mouse + its IRQ.
+
+### Serial port (8250, U402)
+
+- An 8250 UART (INS8250 behaviour: divisor latch, LCR/LSR/MSR/IER/IIR, THRE
+  and receive interrupts, the 8250's quirks rather than a 16450's) at 2F8h or
+  3F8h as 230h selects, IRQ4 at 3F8h / IRQ3 at 2F8h. Clock 1.8432 MHz
+  (a fractional enable from the core clock).
+- Outside: the MEGA65's PMOD header, as Megamiga's PMOD serial port (its pin
+  layout, pull-ups in CORE.xdc, pins high-Z and the header unpowered unless a
+  menu toggle "Serial port on PMOD" is on; Megamiga's M2M exception 13
+  `pmod-pins` for the board-top routing). TTL levels: an RS-232 level shifter
+  module on the PMOD, as for Megamiga.
+- The BIOS's POST and DOS's MODE / COM1 should find it; tests: a TB with an
+  8250 reference behaviour (loopback via MCR bit 4, baud divisors, interrupt
+  identification), then a terminal program and a null-modem link on hardware.
+
+### Parallel port (Paradise PPC1, U403)
+
+- Data 8 bits (read back), status (BUSY, ACK, PE, SELECT, ERROR), control
+  (STROBE, AUTOFD, INIT, SELECTIN, IRQ enable) at 3BCh / 378h / 278h as 230h
+  selects, IRQ7 when enabled. The PPC1's own details (bidirectional mode?)
+  from its data sheet if found, else the IBM printer adapter.
+- Outside: the MEGA65 has no parallel port and a PMOD has 8 pins, too few for
+  a Centronics port. Options (to decide): (a) print to a file on the SD card
+  (bytes strobed by the PC go to e.g. `/pc10/print.prn`; the firmware writes it
+  in the background, as Megamiga's write-back); (b) a Covox Speech Thing DAC
+  on the data lines into the audio mixer (period software supports it; see the
+  Sound Blaster item); (c) a minimal PMOD printer port (8 data + STROBE on one
+  header, BUSY/ACK on the other) if the serial port leaves room. Status lines
+  read "printer ready" unless a real device is attached.
+
+### Bus mouse (the 5720's, 9-pin port)
+
+- Registers (PC-1 Technical Manual, BIOS 4.41 F000:CD30-CD71): 23Ch read:
+  counter nibble (bits 3-0) and buttons (bits 7-5, 0 = pressed); 23Dh
+  read/write latch (the Microsoft driver and the BIOS detect the mouse by
+  writing it and reading it back); 23Eh write: bit 4 interrupt disable,
+  bit 5 nibble select, bit 6 counter select (X/Y), bit 7 hold (its falling
+  edge clears the counters); 23Eh read: bits 2-0 = 1, bit 3 the periodic
+  interrupt (a 32.8 ms square wave on IRQ2). The BIOS enables it with 230h
+  bit 4; SETUP offers the IRQ (2/3/4: "On Board Mouse Interrupt") - check
+  how the IRQ choice reaches the hardware (231h is the open question of the
+  research; without it IRQ2).
+- Outside: the PC10-III's mouse was an Amiga-style quadrature mouse (the 1352)
+  on a 9-pin port, so an Amiga or Atari mouse in the MEGA65's joystick port 1
+  is authentic: raw quadrature into X/Y counters (Megamiga's M2M exception 6
+  `raw-joyports` removes the 1 ms debouncer that swallows quadrature pulses;
+  port it). Maybe also the MEGA65's 1351 in proportional mode later.
+- Tests: the BIOS finds it (its POST/SETUP), Microsoft MOUSE.COM loads and a
+  mouse program (e.g. GW-BASIC with a mouse demo, or a game) moves the pointer;
+  a TB with a quadrature model.
+
 ## Other open items
 
 - A changed SD card is not noticed (Megamiga re-checks the card generation).

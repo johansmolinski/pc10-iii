@@ -382,7 +382,9 @@ unused by an RGBI monitor) **(SM 9-6)**.
 - MD7, 6, 4, 2, 1, 0 pulled up, MD3 pulled down, MD5 open (1 **[A]**):
   **Configuration register = F7h**: one 64K bank, IBM 200 lines, composite
   sync on CSYNCN, mono video on the MONO pin, border on, printer decode off
-  (the PC10-III's parallel port is the 5720's, not a PPC chip).
+  (the PC10-III's parallel port is a separate Paradise PPC1, U403
+  318091-01 in the SM's parts list, selected by the 5720; corrected
+  2026-10-26, research `~/pcxt-work/research/models/`).
 
 **The Commodore configuration register 230h** (SM 5-4, 5-5; in the 5720
 gate array U602 on SM 9-6, `rtl/system/cbm_cfg230.sv`):
@@ -400,8 +402,9 @@ and, through Q602, the PVC4's READY onto IOREADY (jumper JMPS12 can force
 it on). Bits 6-0 read back what was written; they enable the onboard RTC
 (02C0h), bus mouse (023Ch), serial port (com1/com0: off, 2F8h, 3F8h,
 reserved) and parallel port (lpt1/lpt0: off, 3BCh, 378h, 278h). The model
-builds the register, not the peripherals. Its reset value is not documented:
-00h **[A]** (the BIOS writes it before anything depends on it).
+builds the register, not the peripherals. Its reset value is 00h: the PC-1
+Technical Manual (the same 5720) says "all bits are cleared to 0 by applying
+/RESET = L" (the BIOS writes it before anything depends on it anyway).
 
 With venb' = 1 the model's PVC4 sees no strobes at all **[A]**: on the board
 it still sees them (only its data buffer and READY are cut) and would store
