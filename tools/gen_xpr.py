@@ -21,7 +21,7 @@ def rtl(pattern):
 
 VHDL = ["vhdl/globals.vhd", "vhdl/config.vhd", "vhdl/clk.vhd", "vhdl/keyboard.vhd",
         "vhdl/pc_ram.vhd", "vhdl/pc_bios.vhd", "vhdl/pc_font.vhd", "vhdl/pc_ucode.vhd", "vhdl/pc_fdd_sd.vhd",
-        "vhdl/pc_drvsnd.vhd", "vhdl/pc_chipset.vhd",
+        "vhdl/pc_drvsnd.vhd", "vhdl/pc_chipset.vhd", "vhdl/pc_rtc.vhd",
         "vhdl/main.vhd", "vhdl/mega65.vhd"]
 KF_DIRS = ["KF8237", "KF8253", "KF8255", "KF8259"]
 # the PC (rtl/, doc/architecture.md section 2); --stub: the shell-only stand-in instead
@@ -32,7 +32,7 @@ PC = (["../rtl/cpu/biu88.sv",
       + ["../rtl/system/pc_clocks.sv", "../rtl/system/xt_board.sv", "../rtl/system/pc_system.sv",
          "../rtl/video/cga/cga_crtc.sv", "../rtl/video/cga/cga_card.sv",
          "../rtl/video/mda/mda_card.sv",
-         "../rtl/video/pvc4/pvc4.sv", "../rtl/system/cbm_cfg230.sv",
+         "../rtl/video/pvc4/pvc4.sv", "../rtl/system/cbm_cfg230.sv", "../rtl/system/msm6242.sv",
          "../rtl/fdc/upd765.sv", "../rtl/fdc/fdc_secbuf.sv", "../rtl/fdc/fdc_card.sv",
          "../rtl/hdc/hdc_secbuf.sv", "../rtl/hdc/ata_dev.sv", "../rtl/hdc/xtide_card.sv",
          "../rtl/hdc/xta_card.sv"])

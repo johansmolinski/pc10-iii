@@ -23,7 +23,7 @@ CPUDEF = -I$(Z86) -CFLAGS -DZ86_UCODE='\"$(Z86_UCODE)\"' -CFLAGS -I$(abspath ../
 CGA  ?= $(RTL)/video/cga/cga_crtc.sv $(RTL)/video/cga/cga_card.sv
 MDA  ?= 0
 VJ   ?= 0
-MDASRC = $(RTL)/video/mda/mda_card.sv $(RTL)/video/pvc4/pvc4.sv $(RTL)/system/cbm_cfg230.sv
+MDASRC = $(RTL)/video/mda/mda_card.sv $(RTL)/video/pvc4/pvc4.sv $(RTL)/system/cbm_cfg230.sv $(RTL)/system/msm6242.sv
 SRC  = $(CPUSRC) $(RTL)/cpu/cpu8088.sv \
        $(wildcard $(KF)/KF8237/*.sv) $(wildcard $(KF)/KF8253/*.sv) \
        $(wildcard $(KF)/KF8255/*.sv) $(wildcard $(KF)/KF8259/*.sv) \

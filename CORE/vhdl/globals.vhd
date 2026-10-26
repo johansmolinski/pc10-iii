@@ -96,6 +96,9 @@ constant C_DEV_PC_HDC         : std_logic_vector(15 downto 0) := x"0105";
 constant C_DEV_PC_FONT        : std_logic_vector(15 downto 0) := x"0103";
 -- The 8088's microcode bundle (pc_ucode.vhd): windows 0..1 the 6 KB image, window 0x0100 control.
 constant C_DEV_PC_UCODE       : std_logic_vector(15 downto 0) := x"0104";
+-- The real-time clock's write-back (pc_rtc.vhd): window 0, offset 0 status/acknowledge, 1..8 the
+-- time for M2M's RTC device (0x0105 is the hard disk's on the branch xta-shell)
+constant C_DEV_PC_RTC         : std_logic_vector(15 downto 0) := x"0106";
 
 ----------------------------------------------------------------------------------------------------------
 -- Virtual Drive Management System: not used (yet)

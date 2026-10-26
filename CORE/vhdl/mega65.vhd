@@ -18,6 +18,9 @@
 --   (xta_enable) follows the image: no image = no drive, the PC10-III
 
 -- * pc_chipset.vhd: the menu's chipset (FE2010A / 8255), its switches, the restart on a change
+-- * pc_rtc.vhd: the PC10-III's real-time clock (rtl/system/msm6242.sv, seeded from main_rtc_i)
+--   writes the time back into the MEGA65's battery RTC when the PC sets it (QNICE device
+--   C_DEV_PC_RTC, the firmware's HANDLE_CORE_IO; doc/rtc.md)
 -- * pc_drvsnd.vhd: the drive LED (yellow while A: or B: is selected) and the drive sound (the
 --   MEGA65's internal drive follows the motors and head steps of A: and B:)
 -- * the OSM settings (config.vhd): floppy images and write protection, drive sound, chipset
@@ -400,6 +403,10 @@ signal main_cbm_dip           : std_logic_vector(1 downto 0);   -- CONFIG switch
 signal main_mono              : std_logic;             -- the menu's display: mono
 signal main_mono_tint         : std_logic_vector(1 downto 0);
 signal main_charset           : std_logic;             -- CONFIG switch 1: 1 = off = USA/Europe
+signal main_rtc_set           : std_logic;             -- the PC has set its clock (pc_rtc.vhd)
+signal main_rtc_time          : std_logic_vector(63 downto 0);
+signal qnice_rtc_data         : std_logic_vector(15 downto 0);
+signal qnice_rtc_ce           : std_logic;
 
 ---------------------------------------------------------------------------------------------
 -- PC memory ports
@@ -776,6 +783,9 @@ begin
          xta_sp_wr_ready_i    => main_xta_sp_wr_ready,
          xta_sp_done_i        => main_xta_sp_done,
          xta_sp_err_i         => main_xta_sp_err,
+         rtc_i                => main_rtc_i,
+         rtc_set_o            => main_rtc_set,
+         rtc_time_o           => main_rtc_time,
 
          dip_sw1_i            => main_dip_sw1
       ); -- i_main
@@ -835,6 +845,7 @@ begin
       qnice_fdd_ce     <= '0';
       qnice_fdd_we     <= '0';
       qnice_fdd_drive  <= "00";
+      qnice_rtc_ce     <= '0';
 
       case qnice_dev_id_i is
          when C_DEV_PC_BIOS =>
@@ -862,9 +873,27 @@ begin
             end if;
             qnice_dev_data_o <= qnice_fdd_data;
 
+         when C_DEV_PC_RTC =>
+            qnice_rtc_ce     <= qnice_dev_ce_i;
+            qnice_dev_data_o <= qnice_rtc_data;
+
          when others => null;
       end case;
    end process core_specific_devices;
+
+   -- the real-time clock's write-back into the MEGA65's RTC (doc/rtc.md section 5)
+   i_pc_rtc : entity work.pc_rtc
+      port map (
+         qnice_clk_i          => qnice_clk_i,
+         qnice_addr_i         => qnice_dev_addr_i,
+         qnice_data_i         => qnice_dev_data_i,
+         qnice_data_o         => qnice_rtc_data,
+         qnice_ce_i           => qnice_rtc_ce,
+         qnice_we_i           => qnice_dev_we_i,
+         main_clk_i           => main_clk,
+         set_i                => main_rtc_set,
+         time_i               => main_rtc_time
+      ); -- i_pc_rtc
 
    i_pc_bios : entity work.pc_bios
       port map (

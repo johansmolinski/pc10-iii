@@ -82,6 +82,10 @@ module pc_system_flat #(
     input  logic        xta_sp_wr_ready,
     input  logic        xta_sp_done,
     input  logic        xta_sp_err,
+    // the real-time clock (doc/rtc.md): seed from main_rtc_i, write-back
+    input  logic [64:0] rtc_seed,
+    output logic        rtc_set,
+    output logic [63:0] rtc_time,
 
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
@@ -127,6 +131,7 @@ pc_system #(.RAM_KB(RAM_KB), .PVC4_FIT(1'b1), .CGA_FIT(1'b0), .XTA_FIT(1'b1)) u_
     .xta_sp_req, .xta_sp_write, .xta_sp_lba,
     .xta_sp_rd_valid, .xta_sp_rd_data, .xta_sp_wr_valid, .xta_sp_wr_data,
     .xta_sp_wr_ready, .xta_sp_done, .xta_sp_err,
+    .rtc_seed, .rtc_set, .rtc_time,
     .kbd_code, .kbd_valid, .kbd_busy,
     .speaker,
     .dip_sw1
