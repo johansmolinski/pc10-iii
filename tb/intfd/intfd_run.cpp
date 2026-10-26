@@ -44,7 +44,6 @@ static const double CLK_HZ = 28636363.64;
 static const double CLK_NS = 1e9 / CLK_HZ;
 static const int C = 6;                           // clk per 4.77 MHz CPU clock
 static uint64_t us2clk(double us) { return (uint64_t)(us * CLK_HZ / 1e6 + 0.5); }
-static double clk2us(uint64_t c) { return c * 1e6 / CLK_HZ; }
 static double clk2ms(uint64_t c) { return c * 1e3 / CLK_HZ; }
 
 static int fails = 0, checks = 0;
