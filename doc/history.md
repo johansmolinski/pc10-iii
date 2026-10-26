@@ -2120,3 +2120,5 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   pc10-keys-b's netlist and timing (WNS +0.252, WHS +0.036). Kit
   `~/pcxt-work/kits/pc10-hdc-a/pc10-hdc-a.bit` (SD files unchanged). Not on
   hardware yet.
+- Hardware (pc10-hdc-a): the user confirmed C: is remembered across power-off
+  (mounted again at start-up, DOS boots from it).
