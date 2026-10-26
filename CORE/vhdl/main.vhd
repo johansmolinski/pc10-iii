@@ -107,6 +107,12 @@ entity main is
       sp_done_i               : in  std_logic;
       sp_err_i                : in  std_logic;
 
+      -- The real-time clock (doc/rtc.md): seeded from M2M's main_rtc_i; rtc_set_o = one clock
+      -- when the PC has set the clock, rtc_time_o = the clock for the MEGA65's RTC (pc_rtc.vhd)
+      rtc_i                   : in  std_logic_vector(64 downto 0);
+      rtc_set_o               : out std_logic;
+      rtc_time_o              : out std_logic_vector(63 downto 0);
+
       -- Configuration
       dip_sw1_i               : in  std_logic_vector(7 downto 0)
    );
@@ -173,6 +179,9 @@ architecture synthesis of main is
          sp_wr_ready : in  std_logic;
          sp_done     : in  std_logic;
          sp_err      : in  std_logic;
+         rtc_seed    : in  std_logic_vector(64 downto 0);
+         rtc_set     : out std_logic;
+         rtc_time    : out std_logic_vector(63 downto 0);
          kbd_code    : in  std_logic_vector(7 downto 0);
          kbd_valid   : in  std_logic;
          kbd_busy    : out std_logic;
@@ -310,6 +319,9 @@ begin
          sp_wr_ready => sp_wr_ready_i,
          sp_done     => sp_done_i,
          sp_err      => sp_err_i,
+         rtc_seed    => rtc_i,
+         rtc_set     => rtc_set_o,
+         rtc_time    => rtc_time_o,
          dip_sw1     => dip_sw1_i
       ); -- i_pc_system
 

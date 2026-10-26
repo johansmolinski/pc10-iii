@@ -581,7 +581,8 @@ CUSTOM_MSG      XOR     R8, R8
 ; menu open, no browser/help page running (PC_SUB_ACTIVE, set by OSM_SEL_PRE),
 ; the cursor on the drive's line, the drive mounted (PARSEST = PT_OK; an empty
 ; drive lets SPACE open the browser as before), and a new press (PC_UNMNT_PREV).
-HANDLE_CORE_IO  MOVE    R8, @--SP
+HANDLE_CORE_IO  RSUB    PC_RTC_WB, 1            ; first the RTC's write-back (pc_rtc.asm)
+                MOVE    R8, @--SP
                 MOVE    R9, @--SP
                 MOVE    R10, @--SP
                 INCRB
@@ -652,6 +653,8 @@ _HCIO_RET_NS    DECRB
                 MOVE    @SP++, R9
                 MOVE    @SP++, R8
                 RET
+
+#include "pc_rtc.asm"
 
 ; CFG_SIGCHECK (M2M-UPSTREAM cfg-strings): C=1 = the settings file R8 (open,
 ; its text loaded by CFGS_LOAD) belongs to this menu: its text has the line
