@@ -24,8 +24,11 @@ and optionally the 8086 microcode of nand2mario's z8086
 8086 bit images. The decoding follows Jenner's XTCE (xtce_microcode.h, The
 Unlicense) and his disassembler.
 
-  mkucode.py --jenner DIR [--cpu 8088|8086] [--ucode-hex FILE] -o OUT
+  mkucode.py --jenner DIR|ZIP [--cpu 8088|8086] [--ucode-hex FILE] -o OUT
   mkucode.py --check FILE
+
+--jenner takes the unpacked archive or 8086_microcode_v2.zip itself (read in
+place, nothing is unpacked).
 
 --cpu 8088 (default) builds the genuine 8088 bundle (flag bit 0 set: the
 EU's interrupt overlay is off). --cpu 8086 builds an 8086 bundle; the EU then
@@ -54,6 +57,7 @@ import argparse
 import os
 import struct
 import sys
+import zipfile
 
 MAGIC = b"PC10UCOD"
 VERSION = 1
@@ -61,13 +65,22 @@ SIZE = 0x1800
 OFF_TRANS, OFF_GROUP, OFF_PACK, OFF_UCODE = 0x200, 0x400, 0x800, 0x1000
 FLAG_8088, FLAG_8086 = 1, 2
 
+ZIP = None      # the archive, when --jenner names the zip file itself
+
 
 def read_text(path):
+    if ZIP is not None:
+        return ZIP.read(path.replace(os.sep, "/")).decode("latin1").replace("\r", "")
     with open(path, "rb") as f:
         return f.read().decode("latin1").replace("\r", "")
 
 
 def roms_dir(d):
+    if ZIP is not None:
+        for n in ZIP.namelist():
+            if n == "group.txt" or n.endswith("/group.txt"):
+                return n[:-len("group.txt")]
+        sys.exit("%s: no roms/group.txt in the archive" % d)
     return os.path.join(d, "roms") if os.path.isdir(os.path.join(d, "roms")) else d
 
 
@@ -237,7 +250,7 @@ def check(path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--jenner", help="Jenner's 8086_microcode_v2 directory (or its roms/)")
+    ap.add_argument("--jenner", help="Jenner's 8086_microcode_v2 directory (or its roms/), or the zip file")
     ap.add_argument("--cpu", choices=["8088", "8086"], default="8088")
     ap.add_argument("--ucode-hex", help="z8086's ucode.hex (8086 microcode) instead of the 8086 bit images")
     ap.add_argument("-o", "--out")
@@ -247,6 +260,9 @@ def main():
         sys.exit(check(a.check))
     if not a.jenner or not a.out:
         ap.error("--jenner and -o are required")
+    global ZIP
+    if os.path.isfile(a.jenner) and zipfile.is_zipfile(a.jenner):
+        ZIP = zipfile.ZipFile(a.jenner)
     d = roms_dir(a.jenner)
     ucode = decode_rom(d, a.cpu)
     src = "jenner-v2 %s" % a.cpu
