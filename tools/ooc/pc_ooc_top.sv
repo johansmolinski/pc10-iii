@@ -60,6 +60,9 @@ module pc_ooc_top (
     output logic        hd_sp_wr_valid,
     output logic [7:0]  hd_sp_wr_data,
     input  logic        hd_sp_wr_ready, hd_sp_done, hd_sp_err,
+    input  logic [64:0] rtc_seed,
+    output logic        rtc_set,
+    output logic [63:0] rtc_time,
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -112,6 +115,7 @@ pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2), .PVC4_FIT(1'b1)) u_pc (
     .xta_sp_req(), .xta_sp_write(), .xta_sp_lba(),
     .xta_sp_rd_valid(1'b0), .xta_sp_rd_data(8'h00), .xta_sp_wr_valid(), .xta_sp_wr_data(),
     .xta_sp_wr_ready(1'b0), .xta_sp_done(1'b0), .xta_sp_err(1'b0),
+    .rtc_seed, .rtc_set, .rtc_time,
     .kbd_code, .kbd_valid, .kbd_busy, .speaker, .dip_sw1
 );
 

@@ -150,6 +150,16 @@ module pc_system #(
     input  logic        xta_sp_done,
     input  logic        xta_sp_err,
 
+    // the PC10-III's real-time clock (PVC4_FIT: the board's MSM6242B at 2C0h,
+    // rtl/system/msm6242.sv, doc/rtc.md): seeded from the MEGA65's battery RTC
+    // (M2M's main_rtc_i: MiSTer's 65-bit format, years since 2000, bit 64 a
+    // toggle per new value); rtc_set = one clk when the PC has set the clock,
+    // rtc_time = the clock in M2M's RTC register order (hundredths, seconds,
+    // minutes, hours, day, month, year since 2000, weekday 0 = Monday)
+    input  logic [64:0] rtc_seed,
+    output logic        rtc_set,
+    output logic [63:0] rtc_time,
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -385,6 +395,9 @@ assign mda_vblank = !mda_on || mda_vb_c;
 logic [7:0] pvc_din_c, cfg_din_c, pvc_din, cfg_din;
 logic       pvc_dsel_c, cfg_dsel_c, pvc_dsel, cfg_dsel, pvc_ready_c, pvc_ready;
 logic       venb_n;
+logic [6:0] cfg_bits;                   // 230h bits 6-0 (bit 6: the RTC)
+logic [7:0] rtc_din;
+logic       rtc_dsel;
 wire        pvc_on = PVC4_FIT;
 
 generate if (PVC4_FIT) begin : g_pvc4
@@ -404,7 +417,28 @@ generate if (PVC4_FIT) begin : g_pvc4
         .isa_aen       (isa_aen),
         .sw_mono       (cbm_dip[1]),
         .venb_n        (venb_n),
-        .cfg           ()
+        .cfg           (cfg_bits)
+    );
+
+    // the MSM6242B at 2C0h-2CFh, selected by the 5720 while 230h bit 6 is set
+    // (doc/rtc.md); battery backed: no reset
+    msm6242 u_rtc (
+        .clk           (clk),
+        .isa_addr      (isa_addr),
+        .isa_addr_next (isa_addr_next),
+        .isa_aen_next  (isa_aen_next),
+        .isa_ior_n_next(isa_ior_n_next),
+        .isa_iow_n_next(isa_iow_n_next),
+        .isa_dout      (isa_dout),
+        .isa_din       (rtc_din),
+        .isa_dsel      (rtc_dsel),
+        .isa_ior_n     (isa_ior_n),
+        .isa_iow_n     (isa_iow_n),
+        .isa_aen       (isa_aen),
+        .enable        (cfg_bits[6]),
+        .seed          (rtc_seed),
+        .clk_set       (rtc_set),
+        .now           (rtc_time)
     );
 
     pvc4 u_pvc4 (
@@ -448,7 +482,8 @@ generate if (PVC4_FIT) begin : g_pvc4
         .vid_monomode   (pvc_mm)
     );
 end else begin : g_no_pvc4
-    assign cfg_din_c = 8'h00;  assign cfg_dsel_c = 1'b0;  assign venb_n = 1'b1;
+    assign cfg_din_c = 8'h00;  assign cfg_dsel_c = 1'b0;  assign venb_n = 1'b1;  assign cfg_bits = 7'd0;
+    assign rtc_din = 8'h00;  assign rtc_dsel = 1'b0;  assign rtc_set = 1'b0;  assign rtc_time = 64'd0;
     assign pvc_din_c = 8'h00;  assign pvc_dsel_c = 1'b0;  assign pvc_ready_c = 1'b1;
     assign pvc_ce = 1'b0;  assign pvc_rgbi = 4'h0;  assign pvc_mono = 1'b0;  assign pvc_mm = 1'b0;
     assign pvc_hs = 1'b0;  assign pvc_vs = 1'b0;  assign pvc_hb = 1'b1;  assign pvc_vb = 1'b1;
@@ -596,8 +631,8 @@ end endgenerate
 assign isa_din   = (cga_dsel ? cga_din : 8'h00) | (mda_dsel ? mda_din : 8'h00) |
                    (fdc_dsel ? fdc_din : 8'h00) | (hdc_dsel ? hdc_din : 8'h00) |
                    (pvc_dsel ? pvc_din : 8'h00) | (cfg_dsel ? cfg_din : 8'h00) |
-                   (xta_dsel ? xta_din : 8'h00);
-assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel | pvc_dsel | cfg_dsel | xta_dsel;
+                   (xta_dsel ? xta_din : 8'h00) | (rtc_dsel ? rtc_din : 8'h00);
+assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel | pvc_dsel | cfg_dsel | xta_dsel | rtc_dsel;
 assign isa_ready = cga_ready & mda_ready & fdc_ready & hdc_ready & pvc_ready;
 assign isa_irq   = fdc_irq | hdc_irq | xta_irq;
 assign isa_drq   = fdc_drq | xta_drq;

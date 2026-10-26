@@ -6,6 +6,11 @@
 //           [-W out.img] [-K backend_us] [-S ms,ms,...]
 //           [-F font.bin] [-m] [-v] [-o image] [-C [max]] [-f]
 //           [-A xta.img] [-jmp208 A|B] [-WA out.img] [-xl] [-k ms:keys] [-w]
+//           [-R "YYYY-MM-DD hh:mm:ss"] [-rl]
+// The real-time clock (PVC4 builds, doc/rtc.md): -R seeds it like M2M's
+// main_rtc_i 1 ms after the start (years 2000-2099, the weekday from the
+// date); the PC's write-backs are printed; -rl logs the CPU's writes to
+// 2C0h-2CFh and 230h.
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
 //
@@ -56,6 +61,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <ctime>
 #include "Vtb_sys.h"
 #include "Vtb_sys___024root.h"
 #include "verilated.h"
@@ -166,6 +172,8 @@ int main(int argc, char **argv) {
     int ramlat = 1;          // -L: RAM answer after n clk (1..16; the MEGA65 glue: 2)
     unsigned dip = 0x6D;     // 5160 SW1 as read: 2 floppies, CGA 80x25, 640K, POST loop off
     unsigned cbm_dip = 1;    // PVC4: CONFIG switch 1 off (USA/Europe), switch 2 on (colour)
+    const char *rtc_at = nullptr;
+    bool rtclog = false;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-b") && i + 1 < argc) bios = argv[++i];
         else if (!strcmp(argv[i], "-s") && i + 1 < argc) secs = atof(argv[++i]);
@@ -197,6 +205,8 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-jmp208") && i + 1 < argc) { i++; jmp208 = argv[i][0] == 'B' || argv[i][0] == 'b'; }
         else if (!strcmp(argv[i], "-xl")) xtalog = true;
         else if (!strcmp(argv[i], "-w")) warm = true;
+        else if (!strcmp(argv[i], "-R") && i + 1 < argc) rtc_at = argv[++i];
+        else if (!strcmp(argv[i], "-rl")) rtclog = true;
         else if (!strcmp(argv[i], "-k") && i + 1 < argc) {
             // ms:keys, one key every 80 ms: make, break 30 ms later
             char *t = argv[++i], *colon = strchr(t, ':');
@@ -366,6 +376,23 @@ int main(int argc, char **argv) {
     unsigned long long xwhen = 0, xta_reads = 0, xta_writes = 0;
     unsigned xlba = 0;
     bool xerr = false;
+    // the RTC seed: MiSTer/M2M format, BCD, years since 2000, weekday 0 = Monday
+    uint64_t rtc_seed = 0;
+    if (rtc_at) {
+        struct tm tm{};
+        if (sscanf(rtc_at, "%d-%d-%d %d:%d:%d", &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min,
+                   &tm.tm_sec) != 6 || tm.tm_year < 2000 || tm.tm_year > 2099) {
+            fprintf(stderr, "-R \"YYYY-MM-DD hh:mm:ss\" (2000-2099)\n"); return 1;
+        }
+        tm.tm_year -= 1900; tm.tm_mon -= 1;
+        time_t tt = timegm(&tm);
+        gmtime_r(&tt, &tm);
+        auto bcd = [](int v) { return uint64_t(((v / 10) << 4) | (v % 10)); };
+        rtc_seed = bcd(tm.tm_sec) | bcd(tm.tm_min) << 8 | bcd(tm.tm_hour) << 16 | bcd(tm.tm_mday) << 24 |
+                   bcd(tm.tm_mon + 1) << 32 | bcd(tm.tm_year - 100) << 40 | uint64_t((tm.tm_wday + 6) % 7) << 48 |
+                   uint64_t(0x40) << 56;
+    }
+    tb->rtc_seed[0] = tb->rtc_seed[1] = tb->rtc_seed[2] = 0;
     std::sort(keys.begin(), keys.end());
     size_t key_i = 0;
     tb->kbd_valid = 0;
@@ -581,7 +608,21 @@ int main(int argc, char **argv) {
             in_prefix = pre;
         }
         disp_d = disp;
+        if (rtc_at && cyc == (unsigned long long)(0.001 * CLK_HZ)) {
+            tb->rtc_seed[0] = uint32_t(rtc_seed); tb->rtc_seed[1] = uint32_t(rtc_seed >> 32); tb->rtc_seed[2] = 1;
+            printf("[%9.3f ms] RTC seed %016llX (%s)\n", cyc / CLK_HZ * 1e3, (unsigned long long)rtc_seed, rtc_at);
+        }
+        if (tb->rtc_set) {
+            uint64_t t = tb->rtc_time;
+            printf("[%9.3f ms] RTC write-back: 20%02llX-%02llX-%02llX %02llX:%02llX:%02llX.%02llX weekday %llu (0 = Monday)\n",
+                   cyc / CLK_HZ * 1e3, (unsigned long long)(t >> 48 & 0xFF), (unsigned long long)(t >> 40 & 0xFF),
+                   (unsigned long long)(t >> 32 & 0xFF), (unsigned long long)(t >> 24 & 0xFF),
+                   (unsigned long long)(t >> 16 & 0xFF), (unsigned long long)(t >> 8 & 0xFF),
+                   (unsigned long long)(t & 0xFF), (unsigned long long)(t >> 56));
+        }
         if (tb->io_wr) {
+            if (rtclog && ((tb->io_addr & 0x3F0) == 0x2C0 || (tb->io_addr & 0x3FF) == 0x230))
+                printf("[%9.3f ms] OUT %03X %02X\n", cyc / CLK_HZ * 1e3, tb->io_addr & 0x3FF, tb->io_data);
             if ((tb->io_addr & 0xFFFF) == 0x80 && !quiet)
                 printf("[%9.3f ms] POST %02X\n", cyc / CLK_HZ * 1e3, tb->io_data);
             if (vidlog && ((tb->io_addr & 0x3F0) == 0x3B0 || (tb->io_addr & 0x3F0) == 0x3D0 ||

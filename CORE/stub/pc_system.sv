@@ -126,6 +126,10 @@ module pc_system #(
     input  logic        xta_sp_done,
     input  logic        xta_sp_err,
 
+    input  logic [64:0] rtc_seed,
+    output logic        rtc_set,
+    output logic [63:0] rtc_time,
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -227,6 +231,8 @@ module pc_system #(
     // nor the PC20-III's hard disk
     assign {xta_active, xta_sp_req, xta_sp_write, xta_sp_wr_valid} = '0;
     assign {xta_sp_lba, xta_sp_wr_data} = '0;
+    // no real-time clock
+    assign {rtc_set, rtc_time} = '0;
 
     function automatic logic [7:0] hexc(input logic [3:0] n);
         hexc = (n < 4'd10) ? (8'h30 + {4'h0, n}) : (8'h37 + {4'h0, n});
