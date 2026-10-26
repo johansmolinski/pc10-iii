@@ -485,7 +485,10 @@ with an expansion CGA.
   usable only on a multisync CRT. Options: a frame buffer for analog (ascal's
   output on the VGA connector at 31 kHz), or a dedicated 720 x 350 x 70 Hz
   VGA-like path (the IBM VGA's mono text mode timing) from a line buffer.
-  **[Q]** the user's choice.
+  **Decided (2026-10-26):** none of them. With "Analog: 15 kHz RGB" on, the
+  analog output carries the PVC4's own timing unchanged (15.7 kHz in colour,
+  the real 18.43 kHz / 49.8 Hz in mono) for monitors that take it; with it
+  off, mono on the analog output is not supported (HDMI shows it).
 
 ## 9. Verification
 
