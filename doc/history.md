@@ -1920,3 +1920,6 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   `~/pcxt-fw/pc10-real-u`). Kit `~/pcxt-work/kits/pc10-real-u` (Commodore BIOS
   4.41, char ROM, DOS 3.21, hd20.img, hd20-wdfmt.img, fmtboot.img). Loaded on
   the MEGA65. Gates of the merged tree: fedora `clk/merge-c`.
+- Hardware (pc10-real-u): the user confirmed the RTC (date and time correct
+  from the MEGA65's battery clock); the hard disk was formatting at the time,
+  "all seems good so far".
