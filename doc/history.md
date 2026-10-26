@@ -2050,3 +2050,8 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
 - **Tests:** tb/shell run.sh all PASS; tb_glue's keyboard check grows from 8
   to 20 codes (the six MEGA keys, the last break after MEGA is up). A
   mutant End -> 4E fails ("code 8: 4E").
+- Build `pc10-keys-a` (REF=pc10-turbo-b): Vivado segfaulted in incremental
+  synthesis (`HARTNDb::dumpUnoptimizedCache`, as pc10-real-k once did), not a
+  design error. `pc10-keys-b` (NO_REF_SYNTH=1, REF=pc10-turbo-b for the
+  implementation): WNS +0.252, WHS +0.036. Loaded on the MEGA65; kit
+  `~/pcxt-work/kits/pc10-keys-b` (the bitstream; SD files as pc10-turbo-b).
