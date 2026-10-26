@@ -13,8 +13,10 @@
 --   C_DEV_PC_FONT, copied into pc_system's font port
 -- * pc_ucode.vhd: the 8088's microcode bundle (/pc10/ucode.bin, tools/mkucode.py), QNICE
 --   device C_DEV_PC_UCODE, copied into the CPU's tables; the PC stays in reset until then
--- * pc_fdd_sd.vhd: floppy A: and B: from image files on the SD card (QNICE devices
---   C_DEV_PC_FDA/FDB, the SD host's engine port)
+-- * pc_fdd_sd.vhd: floppy A: and B: and the hard disk C: from image files on the SD card (QNICE
+--   devices C_DEV_PC_FDA/FDB/HDC, the SD host's engine port); JMP208 of the PC20-III's hard disk
+--   (xta_enable) follows the image: no image = no drive, the PC10-III
+
 -- * pc_chipset.vhd: the menu's chipset (FE2010A / 8255), its switches, the restart on a change
 -- * pc_drvsnd.vhd: the drive LED (yellow while A: or B: is selected) and the drive sound (the
 --   MEGA65's internal drive follows the motors and head steps of A: and B:)
@@ -340,25 +342,25 @@ architecture synthesis of MEGA65_Core is
 -- scrapes them into osm_const.asm as PC_OSM_*)
 ---------------------------------------------------------------------------------------------
 
-constant C_MENU_WP_A          : natural := 4;
-constant C_MENU_WP_B          : natural := 5;
-constant C_MENU_DRV_SOUND     : natural := 6;
-constant C_MENU_CHIP_PC10     : natural := 11;
-constant C_MENU_CHIP_XT       : natural := 12;
-constant C_MENU_MEM_640       : natural := 18;
-constant C_MENU_MEM_512       : natural := 19;
-constant C_MENU_MEM_256       : natural := 20;
-constant C_MENU_MEM_128       : natural := 21;
-constant C_MENU_DISP_GREEN    : natural := 36;
-constant C_MENU_DISP_AMBER    : natural := 37;
-constant C_MENU_DISP_WHITE    : natural := 38;
-constant C_MENU_CHARSET_SCAN  : natural := 41;
-constant C_MENU_HDMI_720P     : natural := 27;
-constant C_MENU_HDMI_480P     : natural := 28;
-constant C_MENU_HDMI_720P50   : natural := 29;
-constant C_MENU_ANALOG_15KHZ  : natural := 42;
-constant C_MENU_ANALOG_CSYNC  : natural := 43;
-constant C_MENU_RESET         : natural := 46;
+constant C_MENU_WP_A          : natural := 5;
+constant C_MENU_WP_B          : natural := 6;
+constant C_MENU_DRV_SOUND     : natural := 7;
+constant C_MENU_CHIP_PC10     : natural := 12;
+constant C_MENU_CHIP_XT       : natural := 13;
+constant C_MENU_MEM_640       : natural := 19;
+constant C_MENU_MEM_512       : natural := 20;
+constant C_MENU_MEM_256       : natural := 21;
+constant C_MENU_MEM_128       : natural := 22;
+constant C_MENU_DISP_GREEN    : natural := 37;
+constant C_MENU_DISP_AMBER    : natural := 38;
+constant C_MENU_DISP_WHITE    : natural := 39;
+constant C_MENU_CHARSET_SCAN  : natural := 42;
+constant C_MENU_HDMI_720P     : natural := 28;
+constant C_MENU_HDMI_480P     : natural := 29;
+constant C_MENU_HDMI_720P50   : natural := 30;
+constant C_MENU_ANALOG_15KHZ  : natural := 43;
+constant C_MENU_ANALOG_CSYNC  : natural := 44;
+constant C_MENU_RESET         : natural := 47;
 
 -- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
 -- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
@@ -425,7 +427,7 @@ signal qnice_ucode_we         : std_logic;
 signal qnice_fdd_data         : std_logic_vector(15 downto 0);
 signal qnice_fdd_ce           : std_logic;
 signal qnice_fdd_we           : std_logic;
-signal qnice_fdd_drive        : std_logic;
+signal qnice_fdd_drive        : std_logic_vector(1 downto 0);   -- 0 A:, 1 B:, 2 C:
 
 ---------------------------------------------------------------------------------------------
 -- font port, floppy drives and the sector port (main clock)
@@ -456,6 +458,19 @@ signal main_sp_wr_data        : std_logic_vector(7 downto 0);
 signal main_sp_wr_ready       : std_logic;
 signal main_sp_done           : std_logic;
 signal main_sp_err            : std_logic;
+-- the PC20-III's hard disk (xta_card.sv) and its sector port
+signal main_xta_present       : std_logic;
+signal main_xta_active        : std_logic;
+signal main_xta_sp_req        : std_logic;
+signal main_xta_sp_write      : std_logic;
+signal main_xta_sp_lba        : std_logic_vector(27 downto 0);
+signal main_xta_sp_rd_valid   : std_logic;
+signal main_xta_sp_rd_data    : std_logic_vector(7 downto 0);
+signal main_xta_sp_wr_valid   : std_logic;
+signal main_xta_sp_wr_data    : std_logic_vector(7 downto 0);
+signal main_xta_sp_wr_ready   : std_logic;
+signal main_xta_sp_done       : std_logic;
+signal main_xta_sp_err        : std_logic;
 
 begin
 
@@ -602,7 +617,8 @@ begin
    ---------------------------------------------------------------------------------------------
 
    -- Power LED: green; blue while the reset button is held long. Drive LED (pc_drvsnd.vhd):
-   -- yellow while drive A: or B: is selected (DOR select + its motor bit, the drive's own LED).
+   -- yellow while drive A: or B: is selected (DOR select + its motor bit, the drive's own LED),
+   -- else red while the hard disk is active.
    main_power_led_o     <= '1';
    main_power_led_col_o <= x"0000FF" when main_reset_m2m_i else x"00FF00";
 
@@ -615,6 +631,7 @@ begin
          drv_select_i         => main_drv_select,
          drv_step_i           => main_drv_step,
          drv_step_in_i        => main_drv_step_in,
+         hd_active_i          => main_xta_active,
          led_o                => main_drive_led_o,
          led_col_o            => main_drive_led_col_o,
          f_motora_o           => f_motora_o,
@@ -741,6 +758,22 @@ begin
          sp_done_i            => main_sp_done,
          sp_err_i             => main_sp_err,
 
+         -- JMP208 follows the image (doc/xta.md section 11): without one the PC10-III, which
+         -- has no drive ("Hard disk not found" at once)
+         xta_enable_i         => main_xta_present,
+         xta_present_i        => main_xta_present,
+         xta_active_o         => main_xta_active,
+         xta_sp_req_o         => main_xta_sp_req,
+         xta_sp_write_o       => main_xta_sp_write,
+         xta_sp_lba_o         => main_xta_sp_lba,
+         xta_sp_rd_valid_i    => main_xta_sp_rd_valid,
+         xta_sp_rd_data_i     => main_xta_sp_rd_data,
+         xta_sp_wr_valid_o    => main_xta_sp_wr_valid,
+         xta_sp_wr_data_o     => main_xta_sp_wr_data,
+         xta_sp_wr_ready_i    => main_xta_sp_wr_ready,
+         xta_sp_done_i        => main_xta_sp_done,
+         xta_sp_err_i         => main_xta_sp_err,
+
          dip_sw1_i            => main_dip_sw1
       ); -- i_main
 
@@ -798,7 +831,7 @@ begin
       qnice_ucode_we   <= '0';
       qnice_fdd_ce     <= '0';
       qnice_fdd_we     <= '0';
-      qnice_fdd_drive  <= '0';
+      qnice_fdd_drive  <= "00";
 
       case qnice_dev_id_i is
          when C_DEV_PC_BIOS =>
@@ -816,11 +849,13 @@ begin
             qnice_ucode_we   <= qnice_dev_we_i;
             qnice_dev_data_o <= qnice_ucode_data;
 
-         when C_DEV_PC_FDA | C_DEV_PC_FDB =>
+         when C_DEV_PC_FDA | C_DEV_PC_FDB | C_DEV_PC_HDC =>
             qnice_fdd_ce     <= qnice_dev_ce_i;
             qnice_fdd_we     <= qnice_dev_we_i;
             if qnice_dev_id_i = C_DEV_PC_FDB then
-               qnice_fdd_drive <= '1';
+               qnice_fdd_drive <= "01";
+            elsif qnice_dev_id_i = C_DEV_PC_HDC then
+               qnice_fdd_drive <= "10";
             end if;
             qnice_dev_data_o <= qnice_fdd_data;
 
@@ -909,6 +944,17 @@ begin
          sp_wr_ready_o        => main_sp_wr_ready,
          sp_done_o            => main_sp_done,
          sp_err_o             => main_sp_err,
+         hd_present_o         => main_xta_present,
+         hd_sp_req_i          => main_xta_sp_req,
+         hd_sp_write_i        => main_xta_sp_write,
+         hd_sp_lba_i          => main_xta_sp_lba,
+         hd_sp_rd_valid_o     => main_xta_sp_rd_valid,
+         hd_sp_rd_data_o      => main_xta_sp_rd_data,
+         hd_sp_wr_valid_i     => main_xta_sp_wr_valid,
+         hd_sp_wr_data_i      => main_xta_sp_wr_data,
+         hd_sp_wr_ready_o     => main_xta_sp_wr_ready,
+         hd_sp_done_o         => main_xta_sp_done,
+         hd_sp_err_o          => main_xta_sp_err,
          main_busy_o          => open
       ); -- i_pc_fdd_sd
 

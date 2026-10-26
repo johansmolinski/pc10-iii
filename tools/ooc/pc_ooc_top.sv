@@ -1,5 +1,6 @@
 // pc_ooc_top.sv - the PC side for an out-of-context Vivado run at 28.63636 MHz
-// (tools/ooc/pc_ooc.tcl): pc_system with every card (CGA, Hercules, FDC, XTIDE) and the PVC4
+// (tools/ooc/pc_ooc.tcl): pc_system with every card (CGA, Hercules, FDC, XTIDE, the PC20-III's
+// hard disk) and the PVC4
 // and the shell's system RAM (CORE/vhdl/pc_ram.vhd, latency 2), the BIOS ROM and
 // the XTIDE option ROM as block RAMs read in 1 clk. The rest of pc_system's ports
 // are the top's; out of context they are not timed, the paths inside are.
@@ -60,6 +61,15 @@ module pc_ooc_top (
     output logic        hd_sp_wr_valid,
     output logic [7:0]  hd_sp_wr_data,
     input  logic        hd_sp_wr_ready, hd_sp_done, hd_sp_err,
+    input  logic        xta_enable, xta_present,
+    output logic        xta_active,
+    output logic        xta_sp_req, xta_sp_write,
+    output logic [27:0] xta_sp_lba,
+    input  logic        xta_sp_rd_valid,
+    input  logic [7:0]  xta_sp_rd_data,
+    output logic        xta_sp_wr_valid,
+    output logic [7:0]  xta_sp_wr_data,
+    input  logic        xta_sp_wr_ready, xta_sp_done, xta_sp_err,
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -90,7 +100,7 @@ pc_ram u_ram (
     .ram_wdata_i(ram_wdata), .ram_rdata_o(ram_rdata), .ram_ack_o(ram_ack)
 );
 
-pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2), .PVC4_FIT(1'b1)) u_pc (
+pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2), .PVC4_FIT(1'b1), .XTA_FIT(1'b1)) u_pc (
     .clk, .reset, .fe2010a, .ucl_we, .ucl_addr, .ucl_data,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,
@@ -107,11 +117,10 @@ pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2), .PVC4_FIT(1'b1)) u_pc (
     .hd_sp_req, .hd_sp_write, .hd_sp_drive, .hd_sp_lba,
     .hd_sp_rd_valid, .hd_sp_rd_data, .hd_sp_wr_valid, .hd_sp_wr_data,
     .hd_sp_wr_ready, .hd_sp_done, .hd_sp_err,
-    // the PC20-III's hard disk is not fitted here (XTA_FIT = 0)
-    .xta_enable(1'b0), .xta_present(1'b0), .xta_active(),
-    .xta_sp_req(), .xta_sp_write(), .xta_sp_lba(),
-    .xta_sp_rd_valid(1'b0), .xta_sp_rd_data(8'h00), .xta_sp_wr_valid(), .xta_sp_wr_data(),
-    .xta_sp_wr_ready(1'b0), .xta_sp_done(1'b0), .xta_sp_err(1'b0),
+    .xta_enable, .xta_present, .xta_active,
+    .xta_sp_req, .xta_sp_write, .xta_sp_lba,
+    .xta_sp_rd_valid, .xta_sp_rd_data, .xta_sp_wr_valid, .xta_sp_wr_data,
+    .xta_sp_wr_ready, .xta_sp_done, .xta_sp_err,
     .kbd_code, .kbd_valid, .kbd_busy, .speaker, .dip_sw1
 );
 

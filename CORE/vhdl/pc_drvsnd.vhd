@@ -2,11 +2,13 @@
 -- PC10-III for MEGA65
 --
 -- The PC's floppy drives A: and B: on the MEGA65's drive LED and its internal 3.5" drive
--- (doc/m2m-shell.md section 4, "Drive LED" and "Drive sound").
+-- (doc/m2m-shell.md section 4, "Drive LED" and "Drive sound"), and the hard disk C: on the LED.
 --
 -- Drive LED: yellow (as Megamiga's floppy LED) while drive A: or B: is selected, i.e. the
 -- DOR selects it and its motor bit is set: the select line of a PC10-III drive, which
--- lights the drive's front-panel LED.
+-- lights the drive's front-panel LED. Red while the PC20-III's hard disk is active
+-- (xta_card.sv's LED: busy, or a write still going to the image) and no floppy drive is
+-- selected: a floppy wins. The hard disk makes no drive sound.
 --
 -- Drive sound (Megamiga 0.7's "Virtual Drive Sound", ported; the menu's "Drive sound"): the
 -- internal drive plays the sounds of the image drives. Its motor runs while the motor bit
@@ -65,6 +67,7 @@ port (
    drv_select_i     : in  std_logic_vector(1 downto 0);    -- A:/B: selected (fdc_card.sv)
    drv_step_i       : in  std_logic;    -- the selected drive's head moved (one clock)
    drv_step_in_i    : in  std_logic;    -- ... inward
+   hd_active_i      : in  std_logic;    -- the hard disk's LED (xta_card.sv)
 
    -- the MEGA65's drive LED
    led_o            : out std_logic;
@@ -114,8 +117,9 @@ architecture synthesis of pc_drvsnd is
 
 begin
 
-   led_o     <= drv_select_i(0) or drv_select_i(1);
-   led_col_o <= x"FFFF00";                              -- yellow (Megamiga's floppy colour)
+   led_o     <= drv_select_i(0) or drv_select_i(1) or hd_active_i;
+   -- yellow (Megamiga's floppy colour) for A:/B:, red for the hard disk
+   led_col_o <= x"FFFF00" when (drv_select_i(0) or drv_select_i(1)) = '1' else x"FF0000";
 
    f_motora_o  <= motor_n;
    f_selecta_o <= sel_n;

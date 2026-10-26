@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # mut.py - mutants of CORE/vhdl/pc_drvsnd.vhd against tb_drvsnd.vhd (ghdl), of
 # CORE/vhdl/pc_chipset.vhd against tb_chipset.vhd, of CORE/vhdl/pc_fdd_sd.vhd (floppies, hard
-# disk, the arbiter) against tb_fdd.vhd and of the
-# firmware's settings file signature (CORE/m2m-rom/m2m-rom.asm) against run_cfgsig.sh (QNICE
+# disk, the arbiter) against tb_fdd.vhd and of the firmware (CORE/m2m-rom/m2m-rom.asm): the
+# settings file signature against run_cfgsig.sh, PREP_LOAD_IMAGE against run_prepload.sh (QNICE
 # emulator). Every mutant must be killed: the bench reports FAIL, or the simulation stops
 # with an error (a counter leaving its range counts as killed). Run from anywhere.
 import os, subprocess, sys, tempfile
@@ -45,8 +45,19 @@ MUT = [
     ('dsk_noabort',   "               if sound_i = '0' or v_disk = '1' or", "               if sound_i = '0' or"),
     ('off_motor',     "         v_mot := sound_i and (", "         v_mot := ("),
     ('off_select',    "         v_sel := v_sel and sound_i;", "         null;"),
-    ('led_a_only',    "   led_o     <= drv_select_i(0) or drv_select_i(1);", "   led_o     <= drv_select_i(0);"),
-    ('led_green',     "   led_col_o <= x\"FFFF00\";", "   led_col_o <= x\"00FF00\";"),
+    ('led_a_only',    "   led_o     <= drv_select_i(0) or drv_select_i(1) or hd_active_i;",
+                      "   led_o     <= drv_select_i(0) or hd_active_i;"),
+    ('led_no_hd',     "   led_o     <= drv_select_i(0) or drv_select_i(1) or hd_active_i;",
+                      "   led_o     <= drv_select_i(0) or drv_select_i(1);"),
+    ('led_green',     "   led_col_o <= x\"FFFF00\" when", "   led_col_o <= x\"00FF00\" when"),
+    ('led_hd_yellow', "(drv_select_i(0) or drv_select_i(1)) = '1' else x\"FF0000\";",
+                      "(drv_select_i(0) or drv_select_i(1)) = '1' else x\"FFFF00\";"),
+    ('led_hd_wins',   "   led_col_o <= x\"FFFF00\" when (drv_select_i(0) or drv_select_i(1)) = '1' else",
+                      "   led_col_o <= x\"FFFF00\" when (drv_select_i(0) or drv_select_i(1)) = '1' and hd_active_i = '0' else"),
+    ('led_a_only_col',"   led_col_o <= x\"FFFF00\" when (drv_select_i(0) or drv_select_i(1)) = '1' else",
+                      "   led_col_o <= x\"FFFF00\" when drv_select_i(0) = '1' else"),
+    ('hd_sound',      "         v_mot := sound_i and (drv_motor_i(0) or drv_motor_i(1)) and not disk;",
+                      "         v_mot := sound_i and (drv_motor_i(0) or drv_motor_i(1) or hd_active_i) and not disk;"),
 ]
 
 CS = os.path.join(R, 'CORE', 'vhdl', 'pc_chipset.vhd')
@@ -158,6 +169,29 @@ FW_MUT = [
     ('sig_no_leave',  "_CFGSC_OK       SYSCALL(leave, 1)", "_CFGSC_OK       NOP"),
 ]
 
+# PREP_LOAD_IMAGE (the image checks) against run_prepload.sh
+PL_MUT = [
+    ('pl_hd_size_lo',  "                CMP     0xB800, R2", "                CMP     0xB600, R2"),
+    ('pl_hd_size_hi',  "                CMP     0x0146, R3", "                CMP     0x0147, R3"),
+    ('pl_hd_hi_skip',  "                CMP     0x0146, R3\n                RBRA    _PCPL_HBAD, !Z",
+                       "                CMP     0x0146, R3\n                NOP"),
+    ('pl_hd_as_fd',    "                RBRA    _PCPL_FD, !Z", "                RBRA    _PCPL_FD, 1"),
+    ('pl_hd_drive',    "                MOVE    2, R1\n                CMP     PC_OPTM_G_HDC, R10",
+                       "                MOVE    1, R1\n                CMP     PC_OPTM_G_HDC, R10"),
+    ('pl_hd_ignored',  "                CMP     PC_OPTM_G_HDC, R10\n                RBRA    _PCPL_OK, !Z",
+                       "                CMP     PC_OPTM_G_HDC, R10\n                RBRA    _PCPL_OK, 1"),
+    ('pl_hd_device',   "FD_DEV_TAB      .DW     PC_DEV_FDA, PC_DEV_FDB, PC_DEV_HDC",
+                       "FD_DEV_TAB      .DW     PC_DEV_FDA, PC_DEV_FDB, PC_DEV_FDB"),
+    ('pl_hd_message',  "                MOVE    ERR_HD_SIZE, R9", "                MOVE    ERR_FD_SIZE, R9"),
+    ('pl_fdb_as_hd',   "                CMP     PC_OPTM_G_FDB, R10\n                RBRA    _PCPL_D, Z",
+                       "                CMP     PC_OPTM_G_FDB, R10\n                NOP"),
+]
+
+
+def run_pl(path):
+    p = subprocess.run([os.path.join(H, 'run_prepload.sh'), path], capture_output=True, text=True)
+    return 'PREPLOAD TEST: PASS' in p.stdout
+
 
 def run_fw(path):
     p = subprocess.run([os.path.join(H, 'run_cfgsig.sh'), path], capture_output=True, text=True)
@@ -228,7 +262,20 @@ def main():
             print('%-15s %s' % (name, 'SURVIVED' if ok else 'killed'))
             fk += not ok
         print('firmware signature mutants: %d of %d killed' % (fk, len(FW_MUT)))
-        return 0 if killed == len(MUT) and ck == len(CS_MUT) and dk == len(FD_MUT) and fk == len(FW_MUT) else 1
+        if not run_pl(FW):
+            print('the PREP_LOAD_IMAGE test does not pass'); return 1
+        pk = 0
+        for name, a, b in PL_MUT:
+            if fsrc.count(a) != 1:
+                print('%-15s pattern found %d times' % (name, fsrc.count(a))); return 1
+            p = os.path.join(tmp, name + '.asm')
+            open(p, 'w').write(fsrc.replace(a, b))
+            ok = run_pl(p)
+            print('%-15s %s' % (name, 'SURVIVED' if ok else 'killed'))
+            pk += not ok
+        print('firmware PREP_LOAD_IMAGE mutants: %d of %d killed' % (pk, len(PL_MUT)))
+        return 0 if (killed == len(MUT) and ck == len(CS_MUT) and dk == len(FD_MUT) and
+                     fk == len(FW_MUT) and pk == len(PL_MUT)) else 1
 
 
 sys.exit(main())
