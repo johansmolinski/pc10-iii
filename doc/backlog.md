@@ -78,6 +78,42 @@ a second hard disk: D: (C: when no C: image is mounted).
   ready for drive 1 when nothing is mounted (today it answers OK,
   `DRV1_READY`); a menu line or a radio row next to C:.
 
+## Sound Blaster 2.0 with the CMS chips (asked 2026-10-26)
+
+An 8-bit ISA Sound Blaster 2.0 (DSP 2.01) with the two Philips SAA1099 in its
+C/MS sockets (the SB 1.0 shipped with them; the 1.5 and 2.0 kept the sockets
+for an upgrade kit). One card gives AdLib music, Game Blaster music and digital
+sound: nearly every sound option of the 1987-1991 games that run on an 8088.
+
+- **Ports** (base 220h, as the card's default):
+  - CMS: 220h-223h (chip 1 data/address, chip 2 data/address);
+  - DSP: 226h reset, 22Ah read data, 22Ch write command/data + write status,
+    22Eh read-buffer status (reading it acknowledges the interrupt);
+  - FM (OPL2): 388h-389h (AdLib) and 228h-229h.
+- **IRQ 7** (IRQ 5 is the hard disk controller's), **DMA channel 1** (free:
+  0 = refresh, 2 = floppy, 3 = hard disk; `isa_drq[1]` of xt_board.sv).
+- **DSP:** the 2.01 command set: direct DAC (10h), single-cycle and auto-init
+  8-bit DMA (14h, 1Ch, 48h block size), high-speed DMA (90h/91h), time
+  constant (40h), the ADPCM modes (74h-7Fh, a few games use them), halt/continue
+  (D0h/D4h), speaker on/off (D1h/D3h), version E1h = 2.01, E0h, F2h (IRQ test);
+  direct ADC (20h) returns silence (no input). The SB's own MIDI port (30h-38h)
+  only if it is cheap: almost no game uses it.
+- **Clocks, exact from the core clock:** OPL2 3.579545 MHz = 28.63636 MHz / 8,
+  SAA1099 7.15909 MHz = / 4.
+- **Cores to look at** (licence check first; the core is GPLv3): Jotego's jtopl
+  (OPL2, GPL-3), the SAA1099 and the Sound Blaster DSP of the MiSTer cores
+  (ao486, PCXT).
+- **Mixer:** PC speaker + OPL2 + CMS (the SAA1099s are stereo; check whether
+  the SB 1.x/2.0 output mixes them to mono) + DAC into main.vhd's 16-bit
+  outputs, without clipping. The PC speaker's low-pass (the framework's audio
+  filter, today off) is a separate small item.
+- **Menu:** a line to switch the card on/off (a card that is off answers
+  nothing, like an empty slot).
+- **Tests:** a TB per part (OPL2 register/timer/status reads, as games detect
+  the AdLib by its timers; DSP reset/version/DMA/IRQ; SAA1099 registers), then
+  on the hardware: a game's setup that probes the card (Sierra SCI0: AdLib,
+  Game Blaster and Sound Blaster drivers), digital sound by DMA.
+
 ## Other open items
 
 - A changed SD card is not noticed (Megamiga re-checks the card generation).
