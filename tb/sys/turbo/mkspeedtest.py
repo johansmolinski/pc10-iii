@@ -18,7 +18,10 @@ def main(out):
     with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(out))) as t:
         o, b = os.path.join(t, 'speedtest.o'), os.path.join(t, 'speedtest.bin')
         subprocess.run(['as', '--32', '-o', o, os.path.join(HERE, 'speedtest.S')], check=True)
-        subprocess.run(['ld', '-m', 'elf_i386', '-Ttext', '0x7c00', '--oformat', 'binary', '-o', b, o], check=True)
+        e = os.path.join(t, 'speedtest.elf')
+        # (an ELF first and only .text out of it: newer binutils add note sections)
+        subprocess.run(['ld', '-m', 'elf_i386', '-Ttext', '0x7c00', '-o', e, o], check=True)
+        subprocess.run(['objcopy', '-O', 'binary', '-j', '.text', e, b], check=True)
         code = open(b, 'rb').read()
     if len(code) > 510:
         sys.exit('boot sector code is %d bytes (max 510)' % len(code))
