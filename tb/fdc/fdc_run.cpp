@@ -71,6 +71,8 @@ struct Sim {
         int phase = 0;
         uint64_t t0 = 0;
         bool tc = false;
+        int merge_every = 0;    // dir 2: every n-th cycle a CPU OUT 20h,20h follows at once,
+        int merged = 0;         // its IOW joining the DMA's into one low level (as xt_board)
     } dma;
     bool cpu_busy = false;      // a CPU bus cycle is running
     std::vector<uint64_t> drq_rise;
@@ -230,7 +232,9 @@ struct Sim {
         case 3:                                 // S3, Sw, end of S4
             if (cyc - m.t0 >= 3 * C) {
                 if (m.dir == 1) mem[m.addr & 0xFFFFF] = t->isa_din;
-                t->isa_ior_n = 1; t->isa_iow_n = 1;
+                bool merge = m.dir == 2 && m.merge_every && (m.done + 1) % m.merge_every == 0;
+                t->isa_ior_n = 1;
+                if (!merge) t->isa_iow_n = 1;   // merged: IOW stays low into the CPU's cycle
                 m.phase = 4; m.t0 = cyc;
             }
             break;
@@ -240,7 +244,20 @@ struct Sim {
                 m.addr++; m.done++;
                 if (m.count == 0) m.armed = false; else m.count--;
                 m.phase = 5; m.t0 = cyc;
+                if (m.dir == 2 && m.merge_every && m.done % m.merge_every == 0) {
+                    // the held CPU cycle: AEN falls, its IOW (port 20h, data 20h) goes low in
+                    // the same clk the DMA's would rise: one low level on the bus
+                    t->isa_aen = 0; t->isa_addr = 0x20; t->isa_dout = 0x20; t->isa_iow_n = 0;
+                    m.merged++;
+                    m.phase = 6;
+                }
             }
+            break;
+        case 6:
+            if (cyc - m.t0 >= 2 * C) { t->isa_iow_n = 1; m.phase = 7; m.t0 = cyc; }
+            break;
+        case 7:
+            if (cyc - m.t0 >= C) m.phase = 0;
             break;
         case 5:
             if (cyc - m.t0 >= C) { t->isa_aen = 0; m.phase = 0; }
@@ -531,6 +548,18 @@ int main(int argc, char **argv) {
     res = rw(s, 0xE6, 0, 10, 1, 5, 9, 1, 0x50000, 1024);
     expect_res(res, { 0x04, 0x00, 0x00, 10, 1, 7, 2 }, "read back");
     CHECK(memcmp(&s.mem[0x50000], &s.mem[0x40000], 1024) == 0, "read-back mismatch");
+
+    // a CPU OUT held behind a DMA cycle whose IOW joins the DMA's into one low level
+    // (xt_board: the held cycle's strobe comes when AEN falls; e.g. the timer handler's EOI,
+    // OUT 20h,20h): the byte is the memory's, not the CPU's 20h (2026-10-26: DOS COPY to a
+    // floppy in tb/sys had one byte 20h in 15 KB)
+    for (int i = 0; i < 1024; i++) s.mem[0x40000 + i] = (uint8_t)(i * 5 + 1);
+    s.dma.merge_every = 7; s.dma.merged = 0;
+    res = rw(s, 0xC5, 0, 10, 1, 5, 9, 2, 0x40000, 1024);
+    s.dma.merge_every = 0;
+    expect_res(res, { 0x04, 0x00, 0x00, 10, 1, 7, 2 }, "WRITE C10 H1 R5-6, merged strobes");
+    CHECK(s.dma.merged > 100, "%d merged strobes", s.dma.merged);
+    CHECK(memcmp(s.img[0].sec(10, 1, 5), &s.mem[0x40000], 1024) == 0, "merged strobes: written data differ");
 
     // TC inside a sector: the rest is zero
     res = rw(s, 0xC5, 0, 10, 1, 8, 9, 2, 0x40000, 100);

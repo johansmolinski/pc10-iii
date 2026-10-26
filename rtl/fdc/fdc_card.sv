@@ -161,7 +161,9 @@ always_ff @(posedge clk)
 always_ff @(posedge clk) begin
     ior_d <= isa_ior_n;
     iow_d <= isa_iow_n;
-    if (!isa_iow_n) wdat_q <= isa_dout;     // the last value seen during the strobe
+    // the last value seen during the strobe; in a DMA write cycle only while DACK2 is low
+    // (pc10-iii, 2026-10-26: see dma_wend below)
+    if (!isa_iow_n && (dack2 || !dma_wr_cyc)) wdat_q <= isa_dout;
 end
 
 // ------------------------------------------------------------ DOR
@@ -200,10 +202,19 @@ always_ff @(posedge clk) begin
 end
 wire        vfy_end = dack_d && !dack2 && !dack_strb;
 
+// pc10-iii (2026-10-26): a DMA cycle ends with its strobe or with DACK2, whichever comes
+// first. xt_board gives a CPU cycle that the DMA held its strobe when AEN falls, right
+// after the 8237's, so a held I/O write (the timer handler's EOI, OUT 20h,20h) joins the
+// DMA's IOW into one low level: the card took the byte at the end of that level, i.e. the
+// CPU's 20h (tb/sys, DOS COPY to B:: one byte 20h in 15 KB). On a PC the 765 takes the
+// byte at WR's rise while DACK is active.
+wire        dack_off = dack_d && !dack2;
+wire        dma_wend = dma_wr_cyc && (iow_rise || dack_off);
+wire        dma_rend = dma_rd_cyc && (ior_rise || dack_off);
+
 assign dma_ack = ((ior_fall || iow_fall) && dack2) || vfy_end;
-assign dma_wr  = iow_rise && dma_wr_cyc;
-assign tc_pulse = (iow_rise && dma_wr_cyc && tc_q) || (ior_rise && dma_rd_cyc && tc_q) ||
-                  (vfy_end && dack_tc);
+assign dma_wr  = dma_wend;
+assign tc_pulse = (dma_wend && tc_q) || (dma_rend && tc_q) || (vfy_end && dack_tc);
 
 always_ff @(posedge clk) begin
     if (reset) begin
@@ -231,7 +242,7 @@ always_ff @(posedge clk) begin
             if (!isa_ior_n) isa_din <= dma_rdata;
         end else if ((dma_rd_cyc || dma_wr_cyc) && dack2 && isa_tc)
             tc_q <= 1'b1;
-        if ((ior_rise && dma_rd_cyc) || (iow_rise && dma_wr_cyc)) begin
+        if (dma_rend || dma_wend) begin
             dma_rd_cyc <= 1'b0;
             dma_wr_cyc <= 1'b0;
             tc_q <= 1'b0;
