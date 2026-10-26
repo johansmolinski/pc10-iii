@@ -98,11 +98,24 @@ module KF8253_Counter #(
     end
 
     assign update_counter_config = (internal_data_bus[5:4] != `RL_COUNTER_LATCH) & write_control;
-    assign update_select_read_write = (select_read_write != internal_data_bus[5:4]) & update_counter_config;
+    // pc10-iii: every control word (not a latch command) restarts the byte
+    // sequence of reads and writes, as on the 8253/8254 ("all control logic is
+    // immediately reset"; MartyPC's set_mode: read_state NoRead, load_state
+    // WaitingForLsb). The original did it only when the RL bits changed, so one
+    // odd read (or write) left every later LSB/MSB access of the counter
+    // byte-swapped until a control word with other RL bits came: the Zen timer
+    // (8088 MPH, CGA_COMP) writes 34h, the BIOS 36h, the same RL = 11.
+    //   assign update_select_read_write = (select_read_write != internal_data_bus[5:4]) & update_counter_config;
+    assign update_select_read_write = update_counter_config;
 
     // Read latch
     always_ff @(posedge clock, posedge reset) begin
         if (reset)
+            count_latched_flag <= 1'b0;
+        // pc10-iii: a control word releases a latched count that was not read
+        // (8254: "latched until read by the CPU or the counter is reprogrammed";
+        // MartyPC set_mode: count_is_latched = false)
+        else if (update_counter_config)
             count_latched_flag <= 1'b0;
         else if ((write_control) && (internal_data_bus[5:4] == `RL_COUNTER_LATCH))
             count_latched_flag <= 1'b1;

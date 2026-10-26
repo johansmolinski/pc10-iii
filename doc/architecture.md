@@ -120,7 +120,7 @@ PC20-III's hard disk 320-323 (DMA 3, IRQ 5).
 
 Bus timing (`xt_board.sv`, the 8288 function; marked CAL there, cards such as
 the CGA depend on it):
-- MEMR/IOR/INTA go low at the CLK falling edge (`cpu_fall`) in T1, MEMW/IOW
+- MEMR/INTA go low at the CLK falling edge (`cpu_fall`) in T1, MEMW/IOW/IOR
   at the falling edge in T2; all go high at the CLK edge where T4 begins
   (`cyc_end`: the board knows in the `clk` before that edge that the CPU
   enters T4, from READY at the edge that started the running T3/Tw; on the
@@ -132,9 +132,12 @@ the CGA depend on it):
   `I:.A.` from T2), and its CGA table gives reads and writes the same wait
   states from the phase at T2. Our MEMW/IOW are "from T2" in that sense; the
   normal commands would start at the falling edge in T3, after the RDY sample
-  that decides T3. Our reads start one CPU clock earlier than MRDC/IORC (in
+  that decides T3. Our memory reads start one CPU clock earlier than MRDC (in
   T1): a deviation, kept because the cards' wait logic and the MartyPC trace
-  are calibrated on it (open point).
+  are calibrated on it (open point). IOR starts in T2 like IORC since
+  2026-10-26: in T1 a refresh granted in Ti (AEN from the start of T2) cut
+  the strobe and it came back after the transfer, two read strobes for one
+  IN (the 8253's LSB/MSB sequence went out of step; doc/history.md).
 - READY: the 5160's 8284 synchronizes RDY in two stages (rising CLK edge,
   then falling edge) and the 8088 samples READY at the next rising edge, the
   one that ends T3/Tw. So RDY at the rising edge that ends T2 decides whether
@@ -145,7 +148,7 @@ the CGA depend on it):
   clock (biu88 reads it there). biu88 decides at that step whether the T3/Tw
   it enters is the last (MartyPC: wait states fixed at T2).
 - A card that pulls IOCHRDY low on the strobe therefore stretches both kinds
-  of cycle: MEMR/IOR are 9 `clk` old at the first sample, MEMW/IOW 3
+  of cycle: MEMR is 9 `clk` old at the first sample, MEMW/IOW/IOR 3
   (IBM's rule for the I/O channel: "drive it low immediately upon detecting a
   valid address and a read or write command"). Until 2026-10-22 IOCHRDY was
   sampled at `cpu_fall` in T2, the edge where MEMW starts: no write could
