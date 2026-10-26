@@ -38,6 +38,9 @@ PC = (["../rtl/cpu/biu88.sv",
          "../rtl/hdc/xta_card.sv"])
 STUB = ["stub/pc_system.sv"]
 FLAT = ["sv/pc_system_flat.sv"]
+# glue outside pc_system (mega65.vhd): drive B: as the internal drive (doc/fdc.md section 10)
+GLUE = ["../rtl/fdc/fdd_mfm_rd.sv", "../rtl/fdc/fdd_mfm_wr.sv", "../rtl/fdc/fdd_phys.sv",
+        "../rtl/fdc/fdd_intdrv.sv"]
 
 def sftype(path):
     if path.endswith(".vhd"):
@@ -48,7 +51,7 @@ def sftype(path):
 
 stub = "--stub" in sys.argv
 args = [a for a in sys.argv[1:] if a != "--stub"]
-CORE_FILES = [(f, sftype(f)) for f in VHDL + (STUB if stub else PC) + FLAT]
+CORE_FILES = [(f, sftype(f)) for f in VHDL + (STUB if stub else PC) + FLAT + GLUE]
 
 src, dst = args[0], args[1]
 x = open(src).read()
