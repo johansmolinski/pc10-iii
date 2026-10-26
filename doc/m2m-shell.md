@@ -237,8 +237,9 @@ same backend as the floppies (doc/xta.md section 11 has the details):
   ejects it). The menu line shows the file's name once the menu is opened
   (`HDC_PEND`, `HDC_PEND_APPLY` in `HANDLE_CORE_IO`, before the Shell's
   `CRTROM_MLST_GET` redraws the line; Megamiga's `PROF_PEND` way). The key
-  stays as written during the start-up mount (a key in other case, e.g.
-  `sd1:/PC10/HD20.IMG`, works and is kept). **A missing card or file, a bad
+  stays as written during the start-up mount (a path in other case, e.g.
+  `SD1:/PC10/HD20.IMG`, works and is kept; the card prefix must be `SD0:` or
+  `SD1:` in capitals). **A missing card or file, a bad
   prefix, a wrong size or a too fragmented file leave C: empty**: the
   reason is shown for 5 s in the big window (`C: not mounted:`, the path,
   `Not found` or PREP_LOAD_IMAGE's message), the PC still in reset, and the
