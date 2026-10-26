@@ -2057,3 +2057,7 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   `~/pcxt-work/kits/pc10-keys-b` (the bitstream; SD files as pc10-turbo-b).
 - Hardware (pc10-keys-b): SETUP (Ctrl-Alt-Esc) saves and exits with
   MEGA + CLR/HOME (End). DOS 3.21 boots from the hard disk (C:) at 9.54 MHz.
+- Hardware (pc10-keys-b, the rest of doc/turbo.md's test list): the user
+  reports "everything works as supposed": `dos321-speed.img` with `speed2`
+  (-s/-t/-d) and `speed -t`, `fdtest.img` (with its results now on the
+  screen, 4170253) at all three speeds. The turbo is HW-confirmed.
