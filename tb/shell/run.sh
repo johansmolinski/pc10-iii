@@ -3,7 +3,8 @@
 # tb_fdd.vhd: the floppy backend against an engine-port model; tb_drvsnd.vhd: the drive LED and
 # the drive sound against a model of the internal drive; tb_chipset.vhd: the menu's chipset,
 # its switches and the restart), the firmware's settings file
-# signature on the QNICE emulator (run_cfgsig.sh) and a Verilator run of the stand-in
+# signature and PREP_LOAD_IMAGE on the QNICE emulator (run_cfgsig.sh, run_prepload.sh) and a
+# Verilator run of the stand-in
 # pc_system (tb_stub.sv). Run from anywhere: tb/shell/run.sh. Mutants: tb/shell/mut.py
 set -e
 H=$(cd "$(dirname "$0")" && pwd)
@@ -27,6 +28,7 @@ ghdl -r --std=08 -frelaxed tb_drvsnd --ieee-asserts=disable 2>&1 | grep -E "PASS
 ghdl -e --std=08 -frelaxed tb_chipset
 ghdl -r --std=08 -frelaxed tb_chipset --ieee-asserts=disable 2>&1 | grep -E "PASS|FAIL|error|failure" || true
 "$H/run_cfgsig.sh"
+"$H/run_prepload.sh"
 verilator --binary -j 0 -Wno-fatal -Wno-lint -Wno-style --top-module tb_stub \
     "$R/CORE/stub/pc_system.sv" "$H/tb_stub.sv" -o tb_stub > /dev/null
 ./obj_dir/tb_stub
