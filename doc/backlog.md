@@ -24,10 +24,29 @@ Open: the drive type as the FDC sees it (40 vs 80 tracks, today taken from
 the image size: `drv_80trk`), what B:'s image line shows for the internal
 drive, the settings file signature and the menu heap (doc/m2m-shell.md).
 
+## Mono on the analog output (decided 2026-10-26)
+
+The user: mono must work properly on the analog output too, not only on HDMI.
+Today it cannot (doc/pvc4.md section 8.1): the mono personality is an
+18.4 kHz / 49.8 Hz signal; M2M's VGA line doubler needs the video clock at
+least twice the dot rate (28.64 / 16.26 = 1.76) and would give 36.9 kHz,
+which few monitors take; "Analog 15 kHz" passes the raw 18.4 kHz (multisync
+CRTs only). A frame-rate change (49.8 Hz in, a standard VGA mode out) needs a
+frame buffer, so the likely way is the analog output fed from the scaler
+(ascal's frame buffer, as HDMI) while mono is on, e.g. 720x400 or 640x480 at
+60/70 Hz; to be designed (an M2M change: the VGA DAC follows the digital
+pipeline). Colour keeps today's analog paths.
+
+## Remember the hard disk across power-off (decided 2026-10-26)
+
+The C: image is mounted again at power-up; **the floppies are not** (A: and
+B: start empty, as today). Megamiga keeps such paths in the settings file's
+text (M2M exception 17, `CFGS_*`, already in this project's M2M for the
+menu signature): a key like `hdc=SD1:/pc10/hd20.img`, written when C: is
+mounted or ejected (SPACE), applied at start-up before the PC leaves reset
+(the extent map through PREP_LOAD_IMAGE's path); a missing or wrong-size file
+leaves C: empty with a message.
+
 ## Other open items
 
-- Mono on the analog output (doc/pvc4.md section 8.1): the frame buffer to
-  VGA, a native 720x350 70 Hz path, or HDMI only.
-- Remember the floppy and hard disk images across power-off (Megamiga keeps
-  paths in the settings file's text, M2M exception 17).
 - A changed SD card is not noticed (Megamiga re-checks the card generation).
