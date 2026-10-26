@@ -3,26 +3,32 @@
 Features asked for but not started, in no fixed order unless noted. Work in
 progress and finished increments are in `doc/history.md`.
 
-## Drive B: type selector (asked 2026-10-26)
+## Drive B: image or the internal drive (asked 2026-10-26, simplified)
 
-Drive B: selectable on one menu line, as a horizontal radio row like the
-Megamiga menus (Megamiga's "menu rows", M2M exception 21: `M2M/rom/menu_rows.asm`,
-`OPTM_ROWS` in config.vhd, Megamiga main cb4e6c3; this project's M2M copy
-predates it and needs that port first):
+The drive type of an image needs no choice: pc_fdd_sd.vhd already sets the
+drive's tracks from the image size (`drv_80trk`: 40 tracks for 160K-360K, 80
+for 720K), live at every mount, no reset. What remains is a choice of two,
+as a horizontal radio row like the Megamiga menus (Megamiga's "menu rows",
+M2M exception 21: `M2M/rom/menu_rows.asm`, `OPTM_ROWS` in config.vhd, Megamiga
+main cb4e6c3; this project's M2M copy predates it and needs that port first)
+or a plain toggle:
 
-    B:  v. 5.25"   v. 3.5"   int. drive
+    B:  image   int. drive
 
-- **v. 5.25":** a virtual 40-track drive with an image file (160K-360K), as B:
-  is today when it holds a 40-track image.
-- **v. 3.5":** a virtual 80-track 720K drive with an image file.
+- **image:** as today (the " B:%s" line).
 - **int. drive:** the MEGA65's internal 3.5" floppy drive as B:, reading and
   writing real disks (Megamiga's Hardware Floppy, `CORE/vhdl/physical_fdd/`,
   is the model; the drive LED and drive sound already follow the internal
-  drive). DD only: 1.44M needs the AT controller (doc/fdc.md section 7).
+  drive). An 80-track DD drive: 720K disks; 1.44M needs the AT controller
+  (doc/fdc.md section 7).
 
-Open: the drive type as the FDC sees it (40 vs 80 tracks, today taken from
-the image size: `drv_80trk`), what B:'s image line shows for the internal
-drive, the settings file signature and the menu heap (doc/m2m-shell.md).
+To verify first: **720K on this machine has never been tested.** The
+Commodore BIOS 4.41 has no floppy type setting (SETUP only switches the
+on-board FDC), and DOS 3.21 may need `DEVICE=DRIVER.SYS` (on the Colt disk;
+it adds a new drive letter) to use an 80-track drive; a tb/sys run with a
+720K image in B: under DOS 3.21 answers it. The hardware switch itself
+(image <-> internal drive, 40 <-> 80 tracks) needs no reset; DOS rereads a
+disk's boot sector when it suspects a change.
 
 ## Remember the hard disk across power-off (decided 2026-10-26)
 
