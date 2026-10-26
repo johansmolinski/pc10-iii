@@ -1,10 +1,11 @@
 # The PC20-III hard disk (XTA)
 
-Status: 2026-10-25, branch `xta`. The interface, the commands and the timing
-come from the Commodore BIOS 4.41 (318085-08), the PC10-III schematics,
-Western Digital's drive manual and three emulators (sections 1-8). The card
-is built (`rtl/hdc/xta_card.sv`, section 9) and tested (section 10); the
-MEGA65 shell does not serve it yet (section 11).
+Status: 2026-10-26, branch `xta-shell`. The interface, the commands and the
+timing come from the Commodore BIOS 4.41 (318085-08), the PC10-III
+schematics, Western Digital's drive manual and three emulators (sections
+1-8). The card is built (`rtl/hdc/xta_card.sv`, section 9) and tested
+(section 10); the MEGA65 shell serves it from an image on the SD card
+(section 11).
 
 The BIOS ROM is Commodore's copyrighted code. Its disassembly stays outside
 the repository (`~/pcxt-work/xta/`: `rom.dis`, `disk.lst`, `fmt.lst`,
@@ -636,24 +637,65 @@ Every existing build is unchanged (`XTA_FIT` = 0): on fedora
 logs. Locally tb/shell (`bash tb/shell/run.sh`, fedora lacks M2M/QNICE)
 and tb/pvc4 (`make run`) PASS.
 
-## 11. The MEGA65 shell (what it needs, not built)
+## 11. The MEGA65 shell
 
-- `pc_system_flat`: `XTA_FIT` = 1 and the `xta_*` ports to main.vhd; the
-  card's file `rtl/hdc/xta_card.sv` into gen_xpr.py / CORE-R6.xpr and the
-  OOC file list (`hdc_secbuf.sv` is there already).
-- Image: a raw file of exactly 21,411,840 bytes (41,820 sectors, 615 x 4 x
-  17 x 512, kobolt's format; LBA = (C x 4 + H) x 17 + S - 1 in INT 13h
-  terms). A smaller file could be accepted with the sectors beyond it
-  failing (sp_err: sense 11h / 03h). `xta_present` = an image is mounted.
-- Backend: the hd_sp_* protocol, one sector per request; it should answer
-  within ~0.6 ms per sector to keep the drive's timing (section 9.5).
-- JMP208: a menu item "PC20-III hard disk" (B) / off (A); default off,
-  since the PC10-III has no drive and with the jumper on and no image the
-  BIOS waits until tick 446 (~24 s) and then prints "Hard disk not found".
-  [Q] Better: JMP208 on only while an image is mounted?
-- The LED: `xta_active`.
-- A ready image is made with `tb/sys/hd/mkhdimg.py build` (the MBR test) or
-  by the WD formatter (section 10.2) and then DOS FDISK/FORMAT.
+Built since 2026-10-26 (branch `xta-shell`; doc/m2m-shell.md sections 4
+and 8 have the shell's side in its context).
+
+- **`pc_system_flat`**: `XTA_FIT` = 1, the `xta_*` ports through
+  `main.vhd` to `mega65.vhd`. `rtl/hdc/xta_card.sv` is in `gen_xpr.py`,
+  `CORE/CORE-R6.xpr` and the OOC run (`tools/ooc/pc_ooc.tcl`, where the card
+  is fitted too). The stand-in `CORE/stub/pc_system.sv` has the ports and
+  ties them off.
+- **The image**: a raw file of exactly 21,411,840 bytes (41,820 sectors,
+  615 x 4 x 17 x 512, kobolt's format; LBA = (C x 4 + H) x 17 + S - 1 in
+  INT 13h terms). Any other size is refused by the firmware ("Not a PC20-III
+  hard disk image: C: needs exactly 21,411,840 bytes") and is no disk for
+  the backend. Menu line ` C:%s` (line 4, manual ROM 2).
+- **JMP208 = an image is mounted** (the user's decision): `xta_enable` and
+  `xta_present` are the same signal, `pc_fdd_sd.vhd`'s `hd_present_o`. A
+  machine without an image is a PC10-III: the ports float, the BIOS says
+  "Hard disk not found" without the 24 s wait. No separate menu item.
+- **Changing the mount while the PC runs** needs nothing more: the BIOS
+  looks for the drive only when it starts, so the user mounts the image and
+  then resets the PC (menu "Reset the PC", or the reset button). While the
+  firmware maps a new image the drive is off (no disk, JMP208 open) for a
+  moment; a command that runs then fails (sense 04h, or a write fault for
+  writes behind). A new image is a new medium: the drive spins up for 5 s
+  (the BIOS waits for it). The image is not remembered over a power cycle
+  (the floppies are not either; doc/m2m-shell.md section 12).
+- **Backend** (`CORE/vhdl/pc_fdd_sd.vhd`, the floppies' engine): drive 2 =
+  C:, QNICE device `C_DEV_PC_HDC` (0x0105) with the floppies' registers and
+  windows, its own extent map (2048 words: **at most 511 extents**, as for
+  the floppies; a more fragmented file is refused with "Image too
+  fragmented": copy it to a freshly formatted card, or defragment). A
+  second main-side sector port (the hd_sp_* protocol: `xta_sp_lba` 28 bits,
+  an LBA above 65535 or >= 41,820 ends with `sp_err`) and an arbiter: one
+  request at a time through the one engine, the FDC's and the hard disk's
+  in turn when both ask (round robin), the answer only to the port being
+  served; a request that its port drops before `sp_done` (RESET DRV during
+  a transfer) is abandoned. Write-through as for the floppies: `sp_done`
+  of a write comes when the block is on the card. C: is never
+  write-protected.
+- **Latency**: each sector is one single-block SD transfer (native 4-bit
+  bus at 25 MHz, or SPI): the request's clock crossing and the extent walk
+  take a few us, the block about 50-300 us to read on typical cards, then
+  18 us to stream it to the card at one byte per clock. That is inside the
+  drive's ~0.6 ms slot (section 9.5), so reads keep the modelled timing.
+  Single-block writes can take a few ms on SD cards (their programming
+  time): then a write or format command takes longer than the real drive
+  (the data stay correct). A FDC request in front adds at most one floppy
+  transfer. Not measured on hardware yet.
+- **LED**: the MEGA65's drive LED is red while `xta_active` is set (the
+  drive busy, or a write still going to the image), yellow while a floppy
+  drive is selected (a floppy wins). No drive sound for the hard disk.
+- **Settings file**: menu signature `menu=6` (the 50-line menu).
+- **A ready image**: a blank file of the right size (zeros: the model
+  counts it as formatted, section 13) is enough for DOS FDISK and FORMAT;
+  `tb/sys/hd/mkhdimg.py build` makes the MBR test image; the WD formatter
+  (section 7: DEBUG `g=f800:5`, or the boot floppy of `tb/sys/hd/mkfmtboot.py`)
+  does the drive's low-level format (its interleave is not kept over a
+  power cycle: the model starts at 3).
 
 ## 12. Steps
 
@@ -663,8 +705,9 @@ and tb/pvc4 (`make run`) PASS.
 3. tb/xta unit bench and mutants: **done**.
 4. tb/sys with the Commodore BIOS: detection and boot from C: **done**;
    the WD formatter **done** (section 10.2).
-5. Shell: menu (image, JMP208), SD backend, LED, settings signature.
-6. Build, hardware test.
+5. Shell: menu (image, JMP208), SD backend, LED, settings signature:
+   **done** (2026-10-26, section 11).
+6. Build: **done** (build `pc10-xta-a`); hardware test: open.
 
 ## 13. Open questions
 
@@ -688,3 +731,12 @@ and tb/pvc4 (`make run`) PASS.
 - -HDCS's decoded range and the CN203 pin.
 - GLaBIOS has no disk BIOS: without the Commodore ROM the drive needs an
   option ROM (a WDXT-150 BIOS would work, but it is WD's code).
+- [Q] The shell forgets the C: image at power-off (as the floppies'):
+  remember its path in the settings file's text (M2M exception 17, as
+  Megamiga's profiles do), so the PC20-III boots from C: without a menu
+  visit? Chosen for now: not remembered (the simple option, the same as A:
+  and B:).
+- [Q] Images of other sizes (a smaller file with the sectors beyond it
+  failing, section 11 of the plan) are refused: the drive has one size.
+- The SD card's single-block write time on real cards (section 11's
+  latency): not measured.
