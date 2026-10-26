@@ -62,7 +62,8 @@ struct Sim {
     // DMA channel 2
     struct {
         bool armed = false;     // unmasked and count left
-        int  dir = 0;           // 1: I/O -> memory (8237 "write"), 2: memory -> I/O ("read")
+        int  dir = 0;           // 1: I/O -> memory (8237 "write"), 2: memory -> I/O ("read"),
+                                // 3: verify (DACK without IOR/IOW: the BIOS's INT 13h AH=04)
         uint32_t addr = 0;
         int count = 0;          // remaining - 1
         int done = 0;           // bytes moved
@@ -209,6 +210,7 @@ struct Sim {
             if (m.armed && ((t->isa_drq >> 1) & 1) && !cpu_busy) { m.phase = 1; m.t0 = cyc; }
             break;
         case 1:                                 // hold acquired, AEN, DACK
+            if (m.dir == 3 && cyc - m.t0 >= 2 * C && !((t->isa_drq >> 1) & 1)) { m.phase = 0; break; }
             if (cyc - m.t0 >= 2 * C) {
                 t->isa_aen = 1;
                 t->isa_addr = m.addr & 0xFFFFF;
@@ -220,8 +222,8 @@ struct Sim {
         case 2:                                 // strobes (S2)
             if (cyc - m.t0 >= 1 * C) {
                 if (m.dir == 1) t->isa_ior_n = 0;
-                else { t->isa_dout = mem[m.addr & 0xFFFFF]; t->isa_iow_n = 0; }
-                t->isa_tc = m.tc;
+                else if (m.dir == 2) { t->isa_dout = mem[m.addr & 0xFFFFF]; t->isa_iow_n = 0; }
+                t->isa_tc = m.tc;               // dir 3 (verify): no strobe
                 m.phase = 3; m.t0 = cyc;
             }
             break;
@@ -463,6 +465,21 @@ int main(int argc, char **argv) {
         // sector to sector: one pitch (654 bytes)
         double d = clk2us(s.drq_rise[512] - s.drq_rise[0]) / 32;
         CHECK(d > 653.9 && d < 654.1, "sector pitch %.2f byte times", d);
+    }
+
+    printf("== read data with a DMA verify transfer (%.0f ms)\n", clk2us(s.cyc) / 1000);
+    {
+        // the 8237's verify mode (42h): DACK2 cycles without IOR; the card takes a DACK as
+        // the byte taken (2026-10-26; before, every verify ended in an overrun)
+        memset(&s.mem[0x30000], 0x5A, 9 * 512 + 16);
+        auto rv = rw(s, 0xE6, 0, 10, 1, 1, 9, 3, 0x30000, 9 * 512);
+        expect_res(rv, { 0x04, 0x00, 0x00, 11, 0, 1, 2 }, "VERIFY C10 H1 R1-9 (MT, TC at the end)");
+        CHECK(s.dma.done == 9 * 512, "verify DMA cycles %d", s.dma.done);
+        int touched = 0;
+        for (int i = 0; i < 9 * 512 + 16; i++) touched += s.mem[0x30000 + i] != 0x5A;
+        CHECK(touched == 0, "verify wrote %d bytes of memory", touched);
+        rv = rw(s, 0xE6, 0, 10, 0, 3, 9, 3, 0x30000, 512 + 100);    // TC inside the second sector
+        expect_res(rv, { 0x00, 0x00, 0x00, 10, 0, 5, 2 }, "VERIFY C10 H0 R3-, TC in R4");
     }
 
     printf("== multi-track, EN, ND, WC, MA (%.0f ms)\n", clk2us(s.cyc) / 1000);

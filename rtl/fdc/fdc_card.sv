@@ -181,9 +181,28 @@ logic       active;
 
 assign cpu_rd  = ior_fall && sel_fdc;
 assign cpu_wr  = iow_rise && io_cyc_fdc;
-assign dma_ack = (ior_fall || iow_fall) && dack2;
+// pc10-iii (2026-10-26): DMA verify cycles. The BIOS's INT 13h AH=04 (DOS FORMAT's
+// verify of every track) programs channel 2 for a verify transfer (8237 mode 42h): DACK2
+// cycles without IOR or IOW. The 765 counts a DACK as the byte taken (its DRQ is cleared
+// by DACK); without this every verify ended in an overrun (FORMAT: "Track 0 bad"). Here
+// such a cycle is acknowledged when its DACK ends, with its TC.
+logic       dack_d, dack_strb, dack_tc;
+always_ff @(posedge clk) begin
+    dack_d <= dack2 && !reset;
+    if (!dack2) begin
+        dack_strb <= 1'b0;
+        dack_tc   <= 1'b0;
+    end else begin
+        if (!isa_ior_n || !isa_iow_n) dack_strb <= 1'b1;
+        if (isa_tc) dack_tc <= 1'b1;
+    end
+end
+wire        vfy_end = dack_d && !dack2 && !dack_strb;
+
+assign dma_ack = ((ior_fall || iow_fall) && dack2) || vfy_end;
 assign dma_wr  = iow_rise && dma_wr_cyc;
-assign tc_pulse = (iow_rise && dma_wr_cyc && tc_q) || (ior_rise && dma_rd_cyc && tc_q);
+assign tc_pulse = (iow_rise && dma_wr_cyc && tc_q) || (ior_rise && dma_rd_cyc && tc_q) ||
+                  (vfy_end && dack_tc);
 
 always_ff @(posedge clk) begin
     if (reset) begin
