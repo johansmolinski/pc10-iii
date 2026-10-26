@@ -2,10 +2,11 @@
 # ghdl checks of the shell's VHDL glue (tb_glue.vhd: keyboard, BIOS, RAM, CGA font, microcode;
 # tb_fdd.vhd: the floppy backend against an engine-port model; tb_drvsnd.vhd: the drive LED and
 # the drive sound against a model of the internal drive; tb_chipset.vhd: the menu's chipset,
-# its switches and the restart; tb_rtc.vhd: the real-time clock's write-back, pc_rtc.vhd with M2M's
-# RTC device and the firmware's access sequence), the firmware's settings file
-# signature and the RTC write-back (PC_RTC_WB) on the QNICE emulator (run_cfgsig.sh, run_rtcwb.sh) and a Verilator run of the stand-in
-# pc_system (tb_stub.sv). Run from anywhere: tb/shell/run.sh. Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py
+# its switches and the restart; tb_rtc.vhd: the real-time clock's write-back, pc_rtc.vhd with
+# M2M's RTC device and the firmware's access sequence), the firmware on the QNICE emulator (the
+# settings file signature: run_cfgsig.sh; the RTC write-back PC_RTC_WB: run_rtcwb.sh) and a
+# Verilator run of the stand-in pc_system (tb_stub.sv). Run from anywhere: tb/shell/run.sh.
+# Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py
 set -e
 H=$(cd "$(dirname "$0")" && pwd)
 R=$(cd "$H/../.." && pwd)

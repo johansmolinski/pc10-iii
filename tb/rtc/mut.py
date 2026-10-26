@@ -7,6 +7,7 @@ if it survives, the exact one (bios, adjust, stoprest, irq, seed, hold).
 usage: mut.py [-j N] [-m name]   (work dirs under $OUT/mut, default ~/pcxt-work/rtc/tb)
 """
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -111,7 +112,7 @@ def one(m):
     src = open(SRC).read()
     if src.count(old) != 1:
         return name, 'PATTERN %d' % src.count(old)
-    work = os.path.join(OUT, 'mut', name.replace(' ', '_').replace('/', '_').replace(':', ''))
+    work = os.path.join(OUT, 'mut', re.sub(r'[^A-Za-z0-9]+', '_', name))
     shutil.rmtree(work, ignore_errors=True)
     os.makedirs(work)
     open(os.path.join(work, 'msm6242.sv'), 'w').write(src.replace(old, new))
