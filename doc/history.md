@@ -1928,3 +1928,6 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   The time was one hour ahead (the MEGA65's battery clock still on summer time,
   which ended 2026-10-25 [A]); DOS TIME does not reach the RTC (IO.SYS never
   writes it, as on the real machine), and FORMAT /S copied no SETCLOCK.EXE.
+- Hardware (pc10-real-u): `setclock -w` (copied from the Colt DOS disk to C:)
+  writes the RTC and the MEGA65's battery clock; the time persists across a
+  power cycle. RTC write-back confirmed.
