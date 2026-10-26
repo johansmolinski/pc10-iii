@@ -2030,3 +2030,11 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   the PC20-III hard disk at the turbo speeds; SETUP's default speed through
   the MBR.
 
+- Hardware (pc10-turbo-b, 2026-10-26): the speed keys Ctrl-Alt-S/T/D beep at
+  the three pitches. `speedtest.img` on the MEGA65 (640 KB) shows the
+  simulation's counts within one iteration in every cell (00: 12E8 0883 0717
+  0835, 40: 1C61 0BD4 0A40 0BD3, 60: 1C64 0BD5 0A41 0C9E, 80: 25DB 0EFC 0E31
+  0EF1, C0: 25DC 0FFA 0E32 0FF9, A0: 25DF 0EFE 0E33 110B, 00: 12E7 0883 0717
+  0836; simulation s1c/s2c: 40, 60 and the C0/A0 bus columns identical, the
+  rest +-1, the timer tick's phase). The FPGA runs the model; whether the
+  model matches a real PC10-III still needs one (doc/turbo.md [Q]).
