@@ -1780,3 +1780,50 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   HDL and timing (WNS +0.263, WHS +0.036) with the SPACE eject; kit
   `~/pcxt-work/kits/pc10-real-t` (+ Commodore MS-DOS 3.21 disks 1/2 for the SD
   card, never in the repo). Loaded on the MEGA65.
+
+## 2026-10-26 - The PC20-III's hard disk in the shell (branch `xta-shell`, step 5)
+
+- **What:** the MEGA65 build fits the hard disk (`pc_system_flat` `XTA_FIT`
+  = 1; doc/xta.md section 11, doc/m2m-shell.md section 4). The image is a raw
+  file of exactly 21,411,840 bytes (41,820 sectors) on the SD card, mounted on
+  the new menu line ` C:%s` (line 4; every `C_MENU_*` from 4 on moved by one,
+  `C_MENU_HDC_LN` for the eject); **JMP208 follows the image** (`xta_enable` =
+  `xta_present` = mounted: without one the PC10-III, "Hard disk not found" at
+  once). The BIOS looks at its start: mount, then reset the PC. SPACE on the
+  mounted line ejects it (main's floppy eject, merged).
+- **Backend:** `pc_fdd_sd.vhd` got a third drive (C:, QNICE device
+  `C_DEV_PC_HDC` 0x0105 with the floppies' registers, its own extent map of at
+  most 511 extents, present only at 41,820 sectors, LBA 28 bits: above 65535
+  or beyond the file = `sp_err`, never write-protected) and a second
+  main-side sector port with an arbiter (one request at a time, round robin
+  when both ask, answers only to the port served; a request dropped before
+  `sp_done`, i.e. a card reset, is abandoned). Still the only user of the SD
+  host's engine port; write-through. Firmware: `PREP_LOAD_IMAGE` takes C:
+  only at 0x0146B800 bytes ("Not a PC20-III hard disk image: C: needs exactly
+  21,411,840 bytes"), `FD_DEV_TAB` has the third device. Settings signature
+  `menu=6`; menu heap demand 1058, `MENU_HEAP_SIZE` 1088, `HEAP_SIZE` 19904
+  (`HEAP` 0xA52E, 418 words below the stack); ROM 32296 of 32768 words.
+- **LED:** red while `xta_active` (busy or a write still going to the image),
+  yellow for a selected floppy drive (it wins); no drive sound for C:.
+- **Tests (tb/shell, local):** `tb_fdd` C: in three extents of 64-sector
+  clusters, both ports at once (reads served F H F H, writes), a monitor (no
+  answer to a port that does not ask, no `err` without `done`, never both
+  `wr_ready`), abandoned requests in the wait, the write collection and the
+  read stream, wrong sizes / off = no disk: PASS, 49 engine transfers;
+  `run_prepload.sh` (new: `PREP_LOAD_IMAGE` on the QNICE emulator, 11 cases)
+  PASS; `tb_drvsnd` the LED colours PASS. `mut.py`: `pc_fdd_sd` 27 of 27 (new;
+  one candidate dropped as equivalent), `pc_drvsnd` 32 of 32, `pc_chipset` 14
+  of 14, signature 5 of 5, `PREP_LOAD_IMAGE` 9 of 9 killed.
+- **Gates** (fedora `gates.sh xsh-a` = 9824c95's tree vs `merge-b`): g_tr
+  a72753ca..., g_tre bd612823..., g_trL2 a72753ca... identical; g_fd identical
+  but the wall time; tb/fdc (232 checks), tb/hdc (3,182), tb/cga, tb/mda logs
+  identical but paths and wall times (tb/shell: local only, as before).
+  tb/xta `make run`: 2,742,243 checks, 0 failed (unchanged RTL).
+- **Builds** (R6, incremental from `pc10-real-r`): `pc10-xta-a` (9824c95):
+  RESULT OK, **WNS +0.052, WHS +0.036**, 0 routing errors; the worst path is
+  QNICE's address bus into the BIOS ROM block RAM (half period, qnice_clk;
+  main_clk +13.2). `pc10-xta-b` (0e28ba4, main's eject merged, from
+  pc10-xta-a): the same timing, **BRAM 260.5 of 365** (258 before: the
+  card's sector buffer and the 8K-word extent map), 29,816 LUTs; `xta_card`
+  1,268 LUTs, 1 RAMB36, 2 DSPs; `pc_fdd_sd` 757 LUTs. Kit
+  `~/pcxt-work/kits/pc10-xta-a/`. Not on hardware yet.
