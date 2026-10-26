@@ -2122,3 +2122,96 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   hardware yet.
 - Hardware (pc10-hdc-a): the user confirmed C: is remembered across power-off
   (mounted again at start-up, DOS boots from it).
+
+## 2026-10-26 - Drive B: as the MEGA65's internal drive (branch `intfd`, build pc10-intfd-c)
+
+- **What** (the backlog item): the menu's row "Drive B" (`image` / `int.
+  drive`) makes B: the MEGA65's internal 3.5" drive, reading and writing real
+  720K disks; `image` is B: as before. Design and verification: doc/fdc.md
+  section 10; menu, drive sound: doc/m2m-shell.md sections 4 and 8.
+- **Where it hooks in:** at sector level, behind the FDC's sector port. The
+  765 model keeps its synthetic surface and all its timing; `fdd_phys.sv`
+  serves B:'s sectors from the real disk like a slow image backend (the card
+  holds its rotation while it waits). The head follows the model's steps of
+  B: at once (homed at TRK0 when its position is unknown); a read searches the
+  ID field (C, H, R, N = 2, CRC) and streams the data field to the card; a
+  write opens WGATE 22 bytes after the ID (as the 765); the first FORMAT
+  commit of a command writes the whole track in the standard layout (new
+  sector-port bit `sp_fmt`, `fdc_active` ends it). `fdd_intdrv.sv` routes the
+  requests and the medium (present = index pulses, wp = WPT, 80/2/9).
+- **From Megamiga** (sy2002's Hardware Floppy, GPL-3.0, translated to
+  SystemVerilog and re-timed from 50 to 28.63636 MHz): the input
+  synchronizers and index qualification (`physical_fdd_inputs`), the runt
+  filter (`physical_fdd_mfm_gaps`), the DPLL data separator
+  (`physical_fdd_bits`), the write discipline of `physical_fdd_writer` (2 us
+  cells, 500 ns pulse at mid-cell, 140 ns precompensation, WGATE exactly over
+  the written cells), the floppy pins (M2M exception 7, already in this M2M
+  copy), the menu rows (exception 21, already here: only config.vhd serves
+  `SEL_OPTM_ROWS` now). No new M2M exception. Not taken: Megamiga's code
+  banks: the firmware needs no word for this (the menu rows are the Shell's;
+  the ROM stays at 32740 of 32768 words), so enabling them (an HDL change and
+  16 block RAM tiles) is left for the next firmware feature.
+- **Two FDC bugs found on the way** (PC side, also for images):
+  - DMA verify: a DACK2 cycle without IOR/IOW (8237 mode 42h, INT 13h AH=04,
+    which DOS FORMAT uses after every track) never took the byte: every
+    verify ended in an overrun, DOS 3.21 `FORMAT B:` said "Invalid media or
+    Track 0 bad". Now the end of such a DACK takes it (f4dfe5b).
+  - Merged strobes: `xt_board` gives a CPU cycle that a DMA transfer held its
+    strobe when AEN falls, right after the 8237's; a held OUT (the timer's EOI,
+    OUT 20h,20h) joined the DMA's IOW into one low level, and the card took the
+    CPU's 20h as the DMA byte. tb/sys: `COPY FC.EXE B:` wrote one byte 20h
+    instead of C0h (15 KB file). Now a DMA cycle also ends with DACK2 and the
+    write data are latched only while DACK2 is low (bc61e07).
+- **Menu and firmware:** lines 7-8 are the row, every line from 7 on moved
+  by two; 52 lines, OPTM_DY 23; settings signature `menu=7`;
+  `MENU_HEAP_SIZE` 1120 (demand 1096), `HEAP_SIZE` 19456 (HEAP 0xA6CA and the
+  heap end 0xF72A unchanged). The drive sound is off while B: is the drive
+  (`pc_drvsnd` held in reset; it homes the drive again afterwards).
+- **Tests:** tb/intfd (new, the card + `fdd_intdrv` + a C++ drive model with
+  flux in and out, doc/fdc.md 10.5): PASS, 184 checks, 26.9 s of PC time;
+  `mut.py` 32 of 32 mutants killed (head, medium, ID search, CRCs, write
+  splice, precompensation, MFM encoding, format, DPLL, sync, routing; the
+  runt filter's mutant is equivalent with the DPLL and not listed; a
+  first run left two, the write-protect check and the fill byte, both now
+  tested). Margin table (`-m`, whole-track reads): no failure up to 150 ns
+  jitter (sigma) at 0.97-1.03 times the speed. tb/fdc 246 checks (232 + the
+  verify transfers + the merged strobes; both new checks fail without their
+  fix). tb/shell `run.sh` all PASS. Gates against main (fedora, GLaBIOS):
+  g_fd (hello360, -C 40) identical but the wall time, g_tr trace md5
+  0303af86... identical.
+- **tb/sys, DOS 3.21 and 720K on B:** (Commodore BIOS 4.41, FE2010A + PVC4,
+  256 KB; a 720K image in B:, `-B`): without any driver `DIR B:`, `TYPE` of a
+  file on cylinder 76, `CHKDSK B:` (730,112 bytes), `COPY FC.EXE B:` and `FC
+  /B` work: DOS takes a disk's geometry from its boot sector. `FORMAT B:`
+  makes a 360K disk (362,496 bytes, 40 tracks), `/T:80 /N:9` is "Parameters
+  not supported": IO.SYS asks INT 13h AH=08h for a drive's type only when
+  AH=15h reports a change line (02h); BIOS 4.41 has AH=08h (type 3, 80
+  cylinders, from the POST's seek-to-50 probe: 40:91h = 95h) but answers
+  AH=15h with 01h for every floppy, so DOS 3.21 sets B: up as a 360K drive, as
+  on a real PC10-III. The user's decision: no CONFIG.SYS route
+  (DRIVER.SYS/DRIVPARM); FORMAT stays at 360K (README note).
+- **Open: a silent one-byte corruption in tb/sys floppy writes.** A boot
+  floppy that writes B: cylinders 0-39 (INT 13h AH=03h, a pattern) and reads
+  them back finds one wrong byte on 6 of 40 cylinders, status 00h, before and
+  after bc61e07 (the merged-strobe change did not touch this case: the
+  simulation's timing is the same, the same cylinders fail). The COPY case
+  above (20h instead of C0h) is the same effect. Not seen on hardware (the
+  user's COPY + COMP passed). A run with a DMA oracle in sys_run (`-dc`: each
+  DMA byte of the FDC against the RAM, with the bus history) is on fedora
+  (`~/pcxt-work/intfd/sys/w4.log`).
+- **Builds:** `pc10-intfd-a` (REF=pc10-keys-b) failed in write_bitstream
+  ("Site type pointers for element PAD ... do not match" at three IOBs: the
+  side/write-data/write-gate pins, constants before, logic now, in an
+  incremental implementation). `pc10-intfd-b`: full build, WNS +0.299, WHS
+  +0.039 (QNICE), BRAM 260.5/365 unchanged, LUTs 30,852, `fdd_intdrv` 809 LUTs
+  / 515 FFs / no BRAM. `pc10-intfd-c` (REF=pc10-intfd-b, + bc61e07): WNS
+  +0.299, WHS +0.039, main_clk +13.558 / +0.071, BRAM 260.5, LUTs 30,825.
+  Kit `~/pcxt-work/kits/pc10-intfd-c/` (the bitstream and `b720.img`; the
+  other SD files as pc10-turbo-b's kit).
+- **Hardware (pc10-intfd-c): HW-confirmed.** The user: "It works perfectly":
+  switching to the internal drive (it homes), DIR and COPY from a 720K DOS
+  disk, COPY of b720.img's files from C: to the real disk and COMP, the
+  write-protect tab (an error), a disk swap, back to the image, the same at
+  9.54 MHz. Plain `FORMAT B:` formats a 360K disk ("362496 bytes total disk
+  space", as in tb/sys above); `FORMAT B: /N:9 /T:80` says "Parameters not
+  supported" (as in tb/sys: DOS 3.21 knows B: only as a 360K drive).

@@ -83,3 +83,12 @@ Each line of `make run` gives, per opcode file:
 GPL-3.0 (see `LICENSE`), like the MiSTer2MEGA65 framework. z8086 is Apache
 2.0 (`rtl/cpu/z8086/LICENSE`, `NOTICE`); its notice is kept with its
 sources.
+
+## Drive B: as the MEGA65's internal drive
+
+The menu's row "Drive B" (`image` / `int. drive`) makes the MEGA65's internal
+3.5" drive drive B:, reading and writing real 720K (DD) disks; switching needs
+no reset. Under DOS 3.21 `FORMAT B:` on it makes a 360K disk (40 tracks):
+DOS 3.21 sets up the PC10-III's floppy drives as 360K drives, as on the real
+machine. 720K disks (formatted elsewhere) read and write normally. Details:
+[doc/fdc.md](doc/fdc.md) section 10.
