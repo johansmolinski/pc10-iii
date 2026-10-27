@@ -2357,3 +2357,56 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
     differ. tb/fdc 232 checks, tb/hdc 3,182, tb/xta 2,742,243, tb/cga, tb/mda,
     tb/pvc4 PASS. tb/shell not run on fedora (no M2M tree there); no VHDL
     changed.
+
+## 2026-10-27 - Release 0.1: README, packaging, microcode notice (branch `release`)
+
+- **Version:** `CORE_VERSION` "0.1" (config.vhd). It said "0.2 (WIP)" since
+  1bbccad (2026-10-21), where the real PC replaced the stand-in of the first
+  shell build, which had been "0.1 (shell)": internal stage numbers, never a
+  release, so the first release is 0.1. The settings file's name does not
+  carry the version (`/pc10/pc10cfg`), so nothing else changes. The help page
+  lists `/pc10/ucode.bin` (it named only the BIOS and the character ROM) and
+  its character ROM line is 37 characters instead of 41 (the frame's inside
+  is 38); the leading empty line went to keep the page at 22 lines. The
+  version and the help page need a build.
+- **README.md** rewritten for users (what it is, features, boards, the SD
+  card, the microcode, the Commodore ROMs with zimmers.net links and md5s,
+  MS-DOS 3.21, the hard disk step by step, flashing, first start, keys,
+  menu, limitations, credits), the developer parts below it. The text of the
+  features still on branches (intfd, ports, dfolder) is in subsections and
+  sentences marked with HTML comments, so it can be cut. `doc/release-0.1.md`:
+  the notes for the GitHub release page.
+- **Boards:** only `CORE-R6.xpr` exists; the README says 0.1 is R6 only (R3
+  needs its board top, R4/R5 were never built).
+- **The microcode in the package** (AGENTS.md rule 4, the user's decision of
+  2026-10-25): `tools/release/UCODE-NOTICE.txt` becomes `pc10/UCODE-NOTICE.txt`
+  next to `pc10/ucode.bin`: Intel's property, not under the GPL-3.0, withdrawn
+  if Intel asks, how to make it yourself, its md5
+  (38d6a32ee095f280af7fc9c704e13d8c, `mkucode.py --cpu 8088` of Jenner's v2).
+- **tools/mkucode.py:** `--jenner` also takes `8086_microcode_v2.zip` itself
+  (read in place). The documented `unzip 8086_microcode_v2.zip` followed by
+  `--jenner 8086_microcode_v2` never worked: the zip has `key.txt` and
+  `roms/` at its top, so unzip puts them into the current directory. Same
+  bundle from the zip and from the directory (md5 above; the 8086 bundle
+  043f6604... as `~/pcxt-work/ucode/8086.bin`).
+- **tools/mkblankhd.py:** an empty C: of 21,411,840 zero bytes. The user's
+  `hd20.img` was such a file, and FDISK + FORMAT C: /S on it gave a bootable
+  C: on hardware (pc10-real-u), so no low-level format is needed.
+- **tools/make_release.py:** from a bitstream: CORE_VERSION must be a plain
+  number (and equal `--version`), the work tree clean, the bitstream's header
+  `mega65_r6` on `7a200tfbg484`; the `.cor` with coretool (`--target
+  mega65r6 --bit-name PC10-III --bit-version 0.1`, checked with `--verify`)
+  or bit2core; `pc10/ucode.bin` built from Jenner's archive (or a given
+  file), which must have the genuine bundle's md5; `blank-hd20.img`; README,
+  LICENSE, the release notes, the two tools. Exactly these files (an
+  allowlist: no ROM or DOS can get in), built under `.part` names and renamed
+  when complete; a zip with one folder `PC10-III-<version>/`. No settings
+  file: the Shell creates `/pc10/pc10cfg` itself (M2M-UPSTREAM cfg-create).
+- **Test:** pc10-intfd-c.bit (`~/pcxt-work/kits/pc10-intfd-c/`) into
+  `~/pcxt-work/release-test/`: `PC10-III-0.1-R6.zip` 2,305,377 bytes, 13 entries (the
+  .cor 5,024,840, the .bit 5,020,744, blank-hd20.img 21,411,840, ucode.bin
+  6,144); coretool `--verify`: target 06 mega65r6, name PC10-III, version
+  0.1. Refused as they should be: `--version 0.2`, `--board R4` (design
+  mega65_r6), an 8086 bundle as `--ucode`, uncommitted changes. That
+  bitstream still says "0.2 (WIP)" on its screens; the release needs a build
+  of the merged tree.

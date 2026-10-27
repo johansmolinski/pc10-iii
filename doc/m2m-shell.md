@@ -125,8 +125,8 @@ in the bitstream (AGENTS.md rule 4). The user builds the bundle once with
 puts it on the SD card next to the BIOS:
 
 ```sh
-curl -O https://www.reenigne.org/misc/8086_microcode_v2.zip && unzip 8086_microcode_v2.zip
-python3 tools/mkucode.py --jenner 8086_microcode_v2 -o ucode.bin   # -> /pc10/ucode.bin
+curl -O https://www.reenigne.org/misc/8086_microcode_v2.zip
+python3 tools/mkucode.py --jenner 8086_microcode_v2.zip -o ucode.bin   # -> /pc10/ucode.bin
 ```
 
 - `/pc10/ucode.bin` is a mandatory auto-load ROM (`globals.vhd`): a missing

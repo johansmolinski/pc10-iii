@@ -38,7 +38,7 @@ end entity config;
 architecture beh of config is
 
 -- The version of the core: welcome/help screens and the core name derive from it
-constant CORE_VERSION : string := "0.2 (WIP)";
+constant CORE_VERSION : string := "0.1";
 
 ----------------------------------------------------------------------------------------------------------
 -- String and character constants (specific for the Anikki-16x16 font)
@@ -75,9 +75,10 @@ constant SCR_WELCOME : string :=
    "Press Space to continue.\n";
 
 constant HELP_1 : string :=
-   "\n PC10-III for MEGA65 " & CORE_VERSION & "\n\n" &
+   " PC10-III for MEGA65 " & CORE_VERSION & "\n\n" &
+   " /pc10/ucode.bin 8088 microcode\n" &
    " /pc10/bios.rom  BIOS, 8-64 KB\n" &
-   " /pc10/char.rom  character ROM (optional)\n" &
+   " /pc10/char.rom  char. ROM (optional)\n" &
    " A: B:  160K-720K  C: 20 MB (raw)\n\n" &
    " Keys (XT keyboard):\n" &
    " " & CHR_LINE_10 & CHR_LINE_10 & CHR_LINE_10 & "\n" &

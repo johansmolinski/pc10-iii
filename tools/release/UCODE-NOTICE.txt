@@ -1,0 +1,46 @@
+ucode.bin - the Intel 8088 microcode for the PC10-III core
+==========================================================
+
+WHAT IT IS
+
+ucode.bin holds the microcode of the Intel 8088 CPU and three tables of the
+same chip that go with it: the decoder of the microcode ROM's addresses, the
+translation ROM and the group decode ROM. The PC10-III core's CPU runs this
+microcode, one micro-instruction per clock, as the real chip does; the core
+loads it from /pc10/ucode.bin on the SD card at every start. Without the file
+the core stops at start-up with a message.
+
+The file was made with tools/mkucode.py of the PC10-III project from Andrew
+Jenner's public archive "8086 microcode disassembled", version 2
+(https://www.reenigne.org/misc/8086_microcode_v2.zip), which he read off Ken
+Shirriff's photographs of the chip's die. mkucode.py contains no table data;
+it only converts the archive into the format the core reads.
+
+    size  6144 bytes
+    md5   38d6a32ee095f280af7fc9c704e13d8c
+
+WHOSE IT IS
+
+The microcode and the tables are Intel Corporation's property and are
+protected by copyright (NEC v. Intel, 1989). They are NOT part of the
+PC10-III core and NOT covered by the core's licence (GPL-3.0) or by any other
+licence from the core's authors. No rights in them are granted by including
+this file in the release package. It is shipped as a separate file only so
+that the core works out of the box.
+
+The core's bitstream and source code contain no part of the microcode. If
+Intel asks, ucode.bin will be withdrawn from the release packages at once;
+the core itself does not change.
+
+MAKING IT YOURSELF
+
+The same file, byte for byte, from your own copy of Jenner's archive, with
+Python 3 and the tool from the core's source (or from the tools folder of
+the release package):
+
+    curl -O https://www.reenigne.org/misc/8086_microcode_v2.zip
+    python3 tools/mkucode.py --jenner 8086_microcode_v2.zip -o ucode.bin
+
+Copy ucode.bin to /pc10/ucode.bin on the SD card.
+
+Source of the core: https://github.com/johansmolinski/pc10-iii
