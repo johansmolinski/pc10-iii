@@ -3,7 +3,7 @@
 The first release: a cycle-exact Commodore PC10-III (IBM PC/XT compatible)
 for the **MEGA65 R6**. It runs the Commodore BIOS 4.41 and Commodore MS-DOS
 3.21 from floppy images and from the hard disk. Everything below was tested
-on a MEGA65.
+on a MEGA65 except the serial and printer ports (see Known limitations).
 
 ## What is in it
 
@@ -20,14 +20,10 @@ on a MEGA65.
   character ROM with its USA/Europe and Scandinavian sets.
 - **640, 512, 256 or 128 KB.**
 - **Floppy drives A: and B:** images of 160K to 720K, read and write.
-  <!-- intfd: cut the next sentence if it misses 0.1 -->
   B: can also be the MEGA65's internal 3.5" drive with real 720K disks.
 - **The hard disk C:**, the PC20-III's 20 MB WD93024-X, as an image on the SD
   card, remembered across power-off.
-  <!-- dfolder: cut the next sentence if it misses 0.1 -->
-  A folder of the SD card as a second, read-only hard disk.
 - **The battery clock**, set from and written back to the MEGA65's clock.
-  <!-- ports: cut the next item if it misses 0.1 -->
 - **Serial and printer ports** on the PMOD headers, **the bus mouse** with an
   Amiga or Atari ST mouse in joystick port 1, **a Covox** on the printer port.
 - **The PC speaker**, the keyboard with a MEGA layer for End, PgUp, PgDn,
@@ -70,12 +66,15 @@ it. You can make the same file yourself:
 - 8088 MPH hangs in its sprite part (being investigated; the demo is written
   for IBM's CGA card, which the PC10-III does not have).
 - Floppy images are not remembered across power-off; no 1.2M/1.44M disks.
-  <!-- intfd: cut the next item if intfd misses 0.1 -->
 - `FORMAT B:` on the internal drive makes a 360K disk: MS-DOS 3.21 sets up
   the PC10-III's floppy drives as 360K drives, as on the real machine; 720K
   disks formatted elsewhere work.
 - C: has the PC20-III's 20 MB only.
 - The monochrome display is shown on HDMI only.
+- The serial and printer ports on the PMOD headers are not tested on
+  hardware yet (only in simulation, with the Commodore BIOS and DOS). The bus
+  mouse is tested with Microsoft's MOUSE.COM and a test program, the Covox
+  with a test program.
 
 ## Package
 
