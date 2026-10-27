@@ -330,8 +330,11 @@ _OPTM_TT_0      MOVE    @R0++, R3
                 RBRA    _OPTM_TT_1B, 1
 
                 ; M2M-UPSTREAM menu-rows: an item that is not available right
-                ; now (config.vhd: OPTM_AVAIL) is drawn dimmed
+                ; now (config.vhd: OPTM_AVAIL) is drawn dimmed; one that the
+                ; core hides (OPTM_CORE_HIDE) is not drawn at all (M2M-UPSTREAM menu-rows-inline)
 _OPTM_TT_GR     MOVE    R1, R8
+                RSUB    OPTM_CORE_HIDE, 1
+                RBRA    _OPTM_TT_1B, C
                 RSUB    _OPTM_AVAIL, 1
                 RBRA    _OPTM_TT_1B, C
                 MOVE    OPTM_FP_SELECT, R7
@@ -1702,8 +1705,11 @@ _OPTM_R_F2M_O2  MOVE    R2, R7
 ; behind OPTM_STRUCT.
 ; ----------------------------------------------------------------------------
 
-; _OPTM_ROWID: R8 = flat index -> R8 = 0x0100 + group id for an option of a
-; row, else 0 (also for an index outside the menu)
+; _OPTM_ROWID: R8 = flat index -> R8 = 0x0100 + bits 6..0 of the group id for
+; an option of a row, else 0 (also for an index outside the menu). Bit 7 of the
+; group id lets a row hold two groups (M2M-UPSTREAM menu-rows-inline, the PC10-III core: the mount line " B:%s" and
+; its single-select " int. drive", group + 0x80: the Shell tells a mount line
+; by its whole group word, CRTROM_M_NO)
 _OPTM_ROWID     INCRB
                 MOVE    OPTM_DATA, R0
                 MOVE    @R0, R0
@@ -1722,7 +1728,7 @@ _OPTM_ROWID     INCRB
                 MOVE    @R0, R0
                 ADD     R8, R0
                 MOVE    @R0, R8
-                AND     0x00FF, R8
+                AND     0x007F, R8
                 ADD     0x0100, R8
                 DECRB
                 RET
@@ -1771,8 +1777,11 @@ _OPTM_RST_NO    OR      0x0004, SR              ; none: set Carry
 
 ; _OPTM_AVAIL: C=1 when the flat index R8 is available, C=0 when it is
 ; greyed out (lines word bit 2: config.vhd's OPTM_AVAIL rule, bits 6..3 = the
-; mother items that make it available, bits 14..7 = the mother group)
+; mother items that make it available, bits 14..7 = the mother group) or
+; hidden by the core right now (OPTM_CORE_HIDE, m2m-rom.asm; M2M-UPSTREAM menu-rows-inline)
 _OPTM_AVAIL     INCRB
+                RSUB    OPTM_CORE_HIDE, 1       ; hidden: not available
+                RBRA    _OPTM_AV_N, C
                 MOVE    OPTM_DATA, R0
                 MOVE    @R0, R0
                 MOVE    R0, R1
@@ -1816,7 +1825,7 @@ _OPTM_AV_2      ADD     1, R5
                 RBRA    _OPTM_AV_Y, 1           ; no selection: available
 _OPTM_AV_3      AND     R6, R3                  ; in the mask?
                 RBRA    _OPTM_AV_Y, !Z
-                AND     0xFFFB, SR              ; greyed out: clear Carry
+_OPTM_AV_N      AND     0xFFFB, SR              ; greyed out: clear Carry
                 DECRB
                 RET
 _OPTM_AV_Y      OR      0x0004, SR              ; available: set Carry
@@ -1917,7 +1926,8 @@ _OPTM_DS_4      ADD     1, R4
 ; -> C=1: R8 is another option of the row the cursor is on, or greyed out:
 ;         search on
 ;    C=0: R8 = where the cursor goes: the item found, or when it is an option
-;         of a row, the selected (shown) option of that row
+;         of a row, the selected (shown) option of that row (none selected:
+;         its first option, M2M-UPSTREAM menu-rows-inline)
 _OPTM_ROWSKIP   INCRB
                 MOVE    R8, R0                  ; R0: the item found
                 CMP     R8, R9                  ; back at the start: take it
@@ -1947,14 +1957,15 @@ _OPTM_RSK_1     CMP     0, R3
                 RBRA    _OPTM_RSK_2, !Z
                 SUB     1, R3
                 RBRA    _OPTM_RSK_1, 1
-_OPTM_RSK_2     MOVE    OPTM_DATA, R4           ; R4: selected items
+_OPTM_RSK_2     MOVE    R3, R6                  ; R6: the first option
+                MOVE    OPTM_DATA, R4           ; R4: selected items
                 MOVE    @R4, R4
                 ADD     OPTM_IR_STDSEL, R4
                 MOVE    @R4, R4
 _OPTM_RSK_3     MOVE    R3, R8                  ; walk the row
                 RSUB    _OPTM_ROWID, 1
                 CMP     R8, R2
-                RBRA    _OPTM_RSK_GO, !Z        ; none selected: the item found
+                RBRA    _OPTM_RSK_NS, !Z        ; none selected
                 MOVE    R4, R5
                 ADD     R3, R5
                 CMP     0, @R5
@@ -1969,6 +1980,15 @@ _OPTM_RSK_3     MOVE    R3, R8                  ; walk the row
                 RBRA    _OPTM_RSK_GO, 1
 _OPTM_RSK_4     ADD     1, R3
                 RBRA    _OPTM_RSK_3, 1
+
+_OPTM_RSK_NS    MOVE    R6, R8                  ; none selected: the first
+                RSUB    _OPTM_VIS, 1            ; option of the row when it is
+                RBRA    _OPTM_RSK_GO, !C        ; shown and available, else the
+                MOVE    R6, R8                  ; item found (M2M-UPSTREAM menu-rows-inline: " B:%s"
+                RSUB    _OPTM_AVAIL, 1          ; before " int. drive" from
+                RBRA    _OPTM_RSK_GO, !C        ; either side)
+                MOVE    R6, R0
+                RBRA    _OPTM_RSK_GO, 1
 
 _OPTM_RSK_GO    MOVE    R0, R8
                 AND     0xFFFB, SR              ; clear Carry

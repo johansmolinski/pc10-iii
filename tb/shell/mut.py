@@ -167,6 +167,14 @@ FW_MUT = [
     ('sig_short_buf', "                MOVE    4, R10\n                RSUB    CFGS_GET, 1",
                       "                MOVE    2, R10\n                RSUB    CFGS_GET, 1"),
     ('sig_no_leave',  "_CFGSC_OK       SYSCALL(leave, 1)", "_CFGSC_OK       NOP"),
+    # a file from a longer menu: its menu bytes in front of the text are dropped
+    ('sig_no_skip',   "                RBRA    _CFGSC_MV, N            ; (above 1)",
+                      "                RBRA    _CFGSC_MV, 1            ; (above 1)"),
+    ('sig_skip_0',    "                CMP     @R1, 1\n", "                CMP     @R1, 0\n"),
+    ('sig_skip_end',  "_CFGSC_SK       CMP     0, R2                   ; that is not a menu byte\n                RBRA    _CFGSC_MV, Z",
+                      "_CFGSC_SK       CMP     0, R2                   ; that is not a menu byte\n                NOP"),
+    ('sig_skip_len',  "_CFGSC_MV       MOVE    R2, @R3", "_CFGSC_MV       NOP"),
+    ('sig_skip_zero', "                RBRA    _CFGSC_M1, !N", "                RBRA    _CFGSC_M1, !Z"),
 ]
 
 # PREP_LOAD_IMAGE (the image checks) against run_prepload.sh

@@ -20,7 +20,7 @@ Rules:
 - Leave `M2M/` as it is. A framework change that cannot be avoided follows
   Megamiga's convention: an `M2M-UPSTREAM <name>` tag at every changed place
   and an entry in `doc/m2m-shell.md` (section "Framework exceptions").
-  So far there are none of our own.
+  Our own so far: `menu-rows-inline` (2026-10-27, doc/m2m-shell.md section 8).
 - To update: copy Megamiga's `M2M/` again (tracked files only), move the
   submodule to the commit Megamiga pins, update the two hashes above, and
   rebuild (`tools/gen_xpr.py` regenerates `CORE/CORE-R6.xpr` from Megamiga's

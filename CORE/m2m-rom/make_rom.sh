@@ -3,8 +3,8 @@
 # PC10-III for MEGA65: build the QNICE firmware (m2m-rom.rom)
 #
 # Called by the Vivado pre-synthesis hook (synth_pre.tcl) and by build_all.sh.
-# Based on Megamiga's CORE/m2m-rom/make_rom.sh (rodata and code banks dropped:
-# this firmware fits the 32K-word ROM).
+# Based on Megamiga's CORE/m2m-rom/make_rom.sh (rodata dropped; the code banks
+# since 2026-10-27: pc_hdc.asm is bank 0).
 #
 #   1. builds the QNICE assembler (qasm, qasm2rom) for this machine into .tools/
 #      (from M2M/QNICE/assembler, so the submodule stays clean)
@@ -15,6 +15,8 @@
 #   4. assembles m2m-rom.asm, trims the RAM variables off the image and checks
 #      the 32768-word ROM limit (M2M-UPSTREAM rom-32k: 0x8000 is the device
 #      window) against the END_OF_ROM marker
+#   5. writes the code banks (M2M-UPSTREAM code-banks: the window 0x9000-0x9FFF,
+#      sections after END_OF_ROM) into m2m-banks.rom (make_banks.py)
 ##############################################################################
 
 set -u
@@ -114,8 +116,9 @@ fi
 ##############################################################################
 # Trim the variables off the image and guard the ROM budget (Megamiga's
 # make_rom.sh: line N of the .out/.rom pair is the word at address N-1 as long
-# as the addresses are contiguous from 0; everything after that must be RAM,
-# address >= 0xA000; the END_OF_ROM marker must agree)
+# as the addresses are contiguous from 0; everything after that must be a code
+# bank, 0x9000-0x9FFF, or RAM, address >= 0xA000; the END_OF_ROM marker must
+# agree)
 ##############################################################################
 
 ROM_MAX_WORDS=32768
@@ -136,7 +139,7 @@ function hex(s,   i, c, v, d) {
     if (a < 0)                { err = "unparsable address in line " NR ": " $1; exit 1 }
     if (!done && a == NR - 1) { n = NR; next }
     done = 1
-    if (a < 40960)            { err = "address " $1 " (line " NR ") is outside the ROM image and below the RAM (0xA000)"; exit 1 }
+    if (a < 36864)            { err = "address " $1 " (line " NR ") is outside the ROM image and below the code window (0x9000)"; exit 1 }
 }
 END {
     if (err != "")  { print "ERROR: m2m-rom.out cannot be trimmed: " err; exit 1 }
@@ -167,6 +170,11 @@ if [ "$EOR_WORDS" -ne "$ROM_WORDS" ]; then
     echo "ERROR: the ROM image is ${ROM_WORDS} words but END_OF_ROM (${EOR_ADDR}) says ${EOR_WORDS}."
     exit 1
 fi
+
+# the code banks (Megamiga, M2M-UPSTREAM code-banks): make_banks.py sorts the
+# sections after the image out of the .out/.rom pair into m2m-banks.rom (the
+# image of the bank ROM behind the window, globals.vhd QNICE_CODE_BANKS)
+python3 make_banks.py m2m-rom.out m2m-rom.rom "$ROM_WORDS" m2m-banks.rom || exit 1
 
 head -n "$ROM_WORDS" m2m-rom.rom > m2m-rom.rom.tmp && mv m2m-rom.rom.tmp m2m-rom.rom
 

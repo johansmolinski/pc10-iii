@@ -563,6 +563,8 @@ OSM_SEL_PRE     MOVE    PC_SUB_ACTIVE, R8       ; a browser/help page may run no
 OSM_SEL_POST    INCRB
                 MOVE    PC_SUB_ACTIVE, R0       ; (every path out of OPTM_CB_SEL)
                 MOVE    0, @R0
+                CMP     PC_OPTM_G_FDB, R8       ; " B:%s": an image now?
+                RBRA    _PCOSP_B, Z
                 CMP     PC_OPTM_G_RESET, R8
                 RBRA    _PCOSP_RET, !Z
 
@@ -575,7 +577,7 @@ _PCOSP_WAIT       SUB     1, R1
 
                 MOVE    OPTM_CUR_SEL, R8        ; momentary: unselect again
                 MOVE    @R8, R8
-                XOR     R9, R9
+_PCOSP_OFF      XOR     R9, R9
                 RSUB    M2M$FORCE_MENU, 1
                 RSUB    OPTM_SHOW, 1
                 MOVE    OPTM_CUR_SEL, R8
@@ -585,6 +587,38 @@ _PCOSP_WAIT       SUB     1, R1
 
 _PCOSP_RET        XOR     R8, R8
                 XOR     R9, R9
+                DECRB
+                RET
+
+                ; B: holds an image now (the Shell loaded it: CRTROM_MAN_LDF
+                ; of manual ROM 1): " int. drive" off, in the menu and in the
+                ; HDL (OPTM_CORE_HIDE hides it meanwhile)
+_PCOSP_B        MOVE    CRTROM_MAN_LDF, R0
+                ADD     1, R0
+                CMP     0, @R0
+                RBRA    _PCOSP_RET, Z
+                MOVE    PC_OSM_B_INT, R8
+                RBRA    _PCOSP_OFF, 1
+
+; ----------------------------------------------------------------------------
+; OPTM_CORE_HIDE (pc10-iii, M2M/rom/menu.asm and menu_rows.asm): C=1 when the
+; menu item R8 (flat index) is hidden right now: not drawn, the cursor skips
+; it. " int. drive" while B: holds an image (the Shell's load flag of manual
+; ROM 1, CRTROM_MAN_LDF; SPACE ejects it, HANDLE_CORE_IO). All registers
+; preserved.
+; ----------------------------------------------------------------------------
+
+OPTM_CORE_HIDE  INCRB
+                CMP     PC_OSM_B_INT, R8
+                RBRA    _OCH_NO, !Z
+                MOVE    CRTROM_MAN_LDF, R0
+                ADD     1, R0
+                CMP     0, @R0
+                RBRA    _OCH_NO, Z
+                OR      0x0004, SR              ; hidden: set Carry
+                DECRB
+                RET
+_OCH_NO         AND     0xFFFB, SR              ; shown: clear Carry
                 DECRB
                 RET
 
@@ -692,7 +726,48 @@ _HCIO_RET_NS    DECRB
                 RET
 
 #include "pc_rtc.asm"
-#include "pc_hdc.asm"
+
+; ----------------------------------------------------------------------------
+; The hard disk C: across power-off (pc_hdc.asm) is code bank BANK_HDC (see
+; "Code banks" after END_OF_ROM); these are its entry points in the fixed ROM.
+; ----------------------------------------------------------------------------
+
+HDC_SAVE        RSUB    FAR_CALL, 1
+                .DW     BANK_HDC, B0_HDC_SAVE
+HDC_RESTORE     RSUB    FAR_CALL, 1
+                .DW     BANK_HDC, B0_HDC_RESTORE
+HDC_PEND_APPLY  RSUB    FAR_CALL, 1
+                .DW     BANK_HDC, B0_HDC_PEND_APPLY
+
+; ----------------------------------------------------------------------------
+; FAR_CALL: call a routine in a code bank (Megamiga, M2M-UPSTREAM code-banks).
+;
+; The QNICE address space is 64K words, so code that does not fit into the
+; 32K-word ROM lives in code banks: 4K-word banks that M2M$CODE_BANK shows in
+; the window M2M$CODE_WIN (0x9000-0x9FFF). An entry point of a bank is a stub
+; in the fixed ROM:
+;
+;   NAME            RSUB    FAR_CALL, 1
+;                   .DW     <bank>, <address in the window>
+;
+; FAR_CALL selects the bank, calls the routine and selects the bank of the
+; caller again, then returns to the caller of the stub. R8..R12 and the Carry
+; pass through both ways (the other flags do not); the stack holds one word
+; more during the call. Code in a bank may call the fixed ROM directly but
+; never another bank (only through a stub); the fixed ROM never calls into a
+; bank except through a stub.
+; ----------------------------------------------------------------------------
+
+FAR_CALL        INCRB
+                MOVE    @SP++, R0               ; R0: the two words of the stub
+                MOVE    M2M$CODE_BANK, R3
+                MOVE    @R3, R4                 ; R4: the bank of the caller
+                MOVE    @R0++, @R3              ; select the bank
+                MOVE    @R0, R0
+                ASUB    R0, 1
+                MOVE    R4, @R3                 ; the caller's bank again
+                DECRB
+                RET
 
 ; CFG_SIGCHECK (M2M-UPSTREAM cfg-strings): C=1 = the settings file R8 (open,
 ; its text loaded by CFGS_LOAD) belongs to this menu: its text has the line
@@ -700,8 +775,27 @@ _HCIO_RET_NS    DECRB
 ; another layout would set the wrong options (the Shell even loads a shorter
 ; file, as one from a menu that grew at its end); for C=0 the Shell uses the
 ; defaults and calls CFG_SIGSET, and the next save writes the file in this
-; layout. Registers preserved.
+; layout. A file from a longer menu (the menu shrank): the Shell reads only
+; this menu's bytes, so the text starts with the old menu's last bytes (0 or
+; 1; a key is printable); they are dropped first, else the 0 would end the
+; text before its first line and no key (signature, hdc=) would ever be found
+; again. Registers preserved.
 CFG_SIGCHECK    SYSCALL(enter, 1)
+                MOVE    CFGS_LEN, R3            ; R2: characters left
+                MOVE    @R3, R2
+                MOVE    CFGS_BUF, R0
+                MOVE    R0, R1                  ; R1: the first character
+_CFGSC_SK       CMP     0, R2                   ; that is not a menu byte
+                RBRA    _CFGSC_MV, Z
+                CMP     @R1, 1
+                RBRA    _CFGSC_MV, N            ; (above 1)
+                ADD     1, R1
+                SUB     1, R2
+                RBRA    _CFGSC_SK, 1
+_CFGSC_MV       MOVE    R2, @R3                 ; the text to the front,
+_CFGSC_M1       MOVE    @R1++, @R0++            ; with its zero
+                SUB     1, R2
+                RBRA    _CFGSC_M1, !N
                 SUB     4, SP                   ; SP: the file's value
                 MOVE    CFG_SIG_KEY, R8
                 MOVE    SP, R9
@@ -736,10 +830,11 @@ CFG_SIGSET      SYSCALL(enter, 1)
 ; "6": 50 lines, " C:%s" (the hard disk image) at line 4. "7": 52 lines,
 ; the row "Drive B" (image / int. drive) at lines 7-8 (branch intfd), or 58
 ; lines, the "Ports and mouse" submenu at lines 43-50 (branch ports). "8": 60
-; lines, both: the row "Drive B" at 7-8, "Ports and mouse" at 45-52.
+; lines, both: the row "Drive B" at 7-8, "Ports and mouse" at 45-52. "9": 59
+; lines, " int. drive" at line 4 beside " B:%s" (no row "Drive B").
 ; At most 3 characters (CFG_SIGCHECK's buffer).
 CFG_SIG_KEY     .ASCII_W "menu"
-CFG_SIG_VAL     .ASCII_W "8"
+CFG_SIG_VAL     .ASCII_W "9"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings
@@ -757,6 +852,22 @@ CFG_SIG_VAL     .ASCII_W "8"
 END_OF_ROM      .DW 0
 
 ; ----------------------------------------------------------------------------
+; Code banks (Megamiga, M2M-UPSTREAM code-banks, see FAR_CALL): each bank is
+; a section that starts with ".ORG 0x9000" (M2M$CODE_WIN) and its marker word
+; 0x4B00 + n, bank n in source order. make_rom.sh (make_banks.py) writes them
+; into m2m-banks.rom and checks the markers.
+; ----------------------------------------------------------------------------
+
+BANK_HDC        .EQU    0                       ; the hard disk C: across power-off
+
+#ifdef RELEASE
+                .ORG    0x9000                  ; M2M$CODE_WIN (.ORG takes no symbol)
+                .DW     0x4B00                  ; bank 0: BANK_HDC
+
+#include "pc_hdc.asm"
+#endif
+
+; ----------------------------------------------------------------------------
 ; Variables: Need to be located in RAM
 ; ----------------------------------------------------------------------------
 
@@ -764,7 +875,7 @@ END_OF_ROM      .DW 0
                 .ORG    0xA000                  ; RAM starts at 0xA000: the 4k device
                                                 ; window takes 0x8000-0x8FFF (M2M-UPSTREAM
                                                 ; rom-32k), the code window 0x9000-0x9FFF
-                                                ; (code-banks; unused here)
+                                                ; (code-banks)
 #endif
 
 #include "../../M2M/rom/shell_vars.asm"
@@ -778,11 +889,11 @@ HDC_FDH         .BLOCK FAT32$FDH_STRUCT_SIZE    ; the directories of its path
 HDC_DE          .BLOCK FAT32$DE_STRUCT_SIZE     ; (HDC_SAVE)
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
-; for this 60-line menu the demand is 1276 words: 20 + 744 item characters
-; + 1 + 4 x 60 + 1 + (5 submenus + 3 manual ROMs + 1) x 30; the Shell checks
+; for this 59-line menu the demand is 1255 words: 20 + 727 item characters
+; + 1 + 4 x 59 + 1 + (5 submenus + 3 manual ROMs + 1) x 30; the Shell checks
 ; it at boot (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
 ; (1088 for the 50-line menu: 1058; 1120 for 52 lines: 1096; 1248 for 58
-; lines: 1238.)
+; lines: 1238; 1280 for 60 lines: 1276.)
 MENU_HEAP_SIZE  .EQU 1280
 
 #ifndef RELEASE

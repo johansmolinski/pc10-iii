@@ -27,9 +27,10 @@ constant QNICE_FIRMWARE_M2M       : string  := "../../../CORE/m2m-rom/m2m-rom.ro
 -- Select firmware here
 constant QNICE_FIRMWARE           : string  := QNICE_FIRMWARE_M2M;
 
--- Megamiga fork (M2M-UPSTREAM code-banks): the code bank ROM behind the window 0x9000-0x9FFF.
--- "" = no code banks: the PC10-III firmware fits into the 32K-word ROM.
-constant QNICE_CODE_BANKS         : string  := "";
+-- Megamiga fork (M2M-UPSTREAM code-banks): the code bank ROM behind the window 0x9000-0x9FFF
+-- (8 banks of 4K words, written by make_rom.sh / make_banks.py; bank 0: pc_hdc.asm). The firmware
+-- outgrew the 32K-word ROM on 2026-10-27 ("" = no code banks).
+constant QNICE_CODE_BANKS         : string  := "../../../CORE/m2m-rom/m2m-banks.rom";
 
 ----------------------------------------------------------------------------------------------------------
 -- Clock Speed(s)

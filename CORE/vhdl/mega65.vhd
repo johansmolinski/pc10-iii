@@ -27,7 +27,7 @@
 --   MEGA65's internal drive follows the motors and head steps of A: and B:; off while B: is
 --   the internal drive)
 -- * rtl/fdc/fdd_intdrv.sv: drive B: as its image or as the MEGA65's internal 3.5" drive,
---   reading and writing real 720K disks (the menu's row "Drive B"; doc/fdc.md section 10)
+--   reading and writing real 720K disks (" int. drive" beside " B:%s"; doc/fdc.md section 10)
 -- * the OSM settings (config.vhd): floppy images and write protection, drive B: image or the
 --   internal drive, drive sound, chipset
 --   (PC10-III's FE2010A or IBM XT's 8255, with its switches; a change restarts the PC),
@@ -353,30 +353,29 @@ architecture synthesis of MEGA65_Core is
 
 constant C_MENU_FDA_LN        : natural := 2;   -- " A:%s" (the firmware's SPACE eject)
 constant C_MENU_FDB_LN        : natural := 3;   -- " B:%s"
-constant C_MENU_HDC_LN        : natural := 4;   -- " C:%s" (the hard disk image)
-constant C_MENU_WP_A          : natural := 5;
-constant C_MENU_WP_B          : natural := 6;
-constant C_MENU_B_IMAGE       : natural := 7;   -- row "Drive B": image (default)
-constant C_MENU_B_INT         : natural := 8;   -- ... int. drive (fdd_intdrv.sv)
-constant C_MENU_DRV_SOUND     : natural := 9;
-constant C_MENU_CHIP_PC10     : natural := 14;
-constant C_MENU_CHIP_XT       : natural := 15;
-constant C_MENU_MEM_640       : natural := 21;
-constant C_MENU_MEM_512       : natural := 22;
-constant C_MENU_MEM_256       : natural := 23;
-constant C_MENU_MEM_128       : natural := 24;
-constant C_MENU_DISP_GREEN    : natural := 39;
-constant C_MENU_DISP_AMBER    : natural := 40;
-constant C_MENU_DISP_WHITE    : natural := 41;
-constant C_MENU_CHARSET_SCAN  : natural := 44;
-constant C_MENU_PMOD          : natural := 48;  -- "PMOD: serial + printer" (pc_ports.vhd)
-constant C_MENU_MOUSE_ATARI   : natural := 50;  -- "Mouse: Atari ST" (else Amiga)
-constant C_MENU_HDMI_720P     : natural := 30;
-constant C_MENU_HDMI_480P     : natural := 31;
-constant C_MENU_HDMI_720P50   : natural := 32;
-constant C_MENU_ANALOG_15KHZ  : natural := 53;
-constant C_MENU_ANALOG_CSYNC  : natural := 54;
-constant C_MENU_RESET         : natural := 57;
+constant C_MENU_HDC_LN        : natural := 5;   -- " C:%s" (the hard disk image)
+constant C_MENU_WP_A          : natural := 6;
+constant C_MENU_WP_B          : natural := 7;
+constant C_MENU_B_INT         : natural := 4;   -- " int. drive" beside " B:%s" (fdd_intdrv.sv)
+constant C_MENU_DRV_SOUND     : natural := 8;
+constant C_MENU_CHIP_PC10     : natural := 13;
+constant C_MENU_CHIP_XT       : natural := 14;
+constant C_MENU_MEM_640       : natural := 20;
+constant C_MENU_MEM_512       : natural := 21;
+constant C_MENU_MEM_256       : natural := 22;
+constant C_MENU_MEM_128       : natural := 23;
+constant C_MENU_DISP_GREEN    : natural := 38;
+constant C_MENU_DISP_AMBER    : natural := 39;
+constant C_MENU_DISP_WHITE    : natural := 40;
+constant C_MENU_CHARSET_SCAN  : natural := 43;
+constant C_MENU_PMOD          : natural := 47;  -- "PMOD: serial + printer" (pc_ports.vhd)
+constant C_MENU_MOUSE_ATARI   : natural := 49;  -- "Mouse: Atari ST" (else Amiga)
+constant C_MENU_HDMI_720P     : natural := 29;
+constant C_MENU_HDMI_480P     : natural := 30;
+constant C_MENU_HDMI_720P50   : natural := 31;
+constant C_MENU_ANALOG_15KHZ  : natural := 52;
+constant C_MENU_ANALOG_CSYNC  : natural := 53;
+constant C_MENU_RESET         : natural := 56;
 
 -- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
 -- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
@@ -654,7 +653,7 @@ begin
    iec_srq_n_o          <= '1';
 
    -- M2M-UPSTREAM floppy-pins: the internal drive is drive B: (fdd_intdrv.sv: all pins) when the
-   -- menu's row "Drive B" says "int. drive"; otherwise it plays the drive sound (pc_drvsnd.vhd:
+   -- menu's " int. drive" is on; otherwise it plays the drive sound (pc_drvsnd.vhd:
    -- motor, select, direction, step) and write gate, write data and side stay inactive.
    -- Density: always the DD-safe level (as Megamiga's Hardware Floppy).
    f_motora_o           <= main_hw_motor_n   when main_b_int = '1' else main_snd_motor_n;
@@ -1191,7 +1190,8 @@ begin
       ); -- i_pc_fdd_sd
 
    -- Drive B: as an image (pc_fdd_sd above) or the internal drive (doc/fdc.md section 10): the
-   -- menu's row "Drive B". Write protection of the images: the menu (main clock domain; the
+   -- menu's " int. drive" (beside " B:%s", only while B: holds no image: OPTM_CORE_HIDE and
+   -- OSM_SEL_POST in m2m-rom.asm). Write protection of the images: the menu (main clock domain; the
    -- FDC card reads WP for its status); the internal drive's: its disk's tab.
    main_b_int <= main_osm_control_i(C_MENU_B_INT);
 

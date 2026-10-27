@@ -261,9 +261,9 @@ Help opens it:
 | `Help` | the help page |
 | `Reset the PC` | resets the PC (like the MEGA65's reset button) |
 
-<!-- in-flight: intfd adds the row, ports the submenu (cut what misses 0.1) -->
-With the features below: the row `Drive B` (`image` / `int. drive`,
-[B: as the internal drive](#b-as-the-internal-drive)) and the submenu
+<!-- in-flight: intfd adds int. drive, ports the submenu (cut what misses 0.1) -->
+With the features below: `int. drive` beside ` B:<No Disk>`
+([B: as the internal drive](#b-as-the-internal-drive)) and the submenu
 `Ports and mouse` ([Ports, mouse and Covox](#ports-mouse-and-covox)).
 
 When a new version of the core changes the menu's lines, its settings return
@@ -280,13 +280,15 @@ start empty.
 <!-- in-flight: branch intfd. Cut this whole subsection if it misses 0.1. -->
 #### B: as the internal drive
 
-The menu's row `Drive B` makes B: either the image (` B:`, the default) or
-`int. drive`: the MEGA65's internal 3.5" drive, reading and writing real 720K
-(DD) disks. A: stays an image. The switch needs no reset: the drive steps its
-head to track 0 at once and follows the PC's seeks from then on. B:'s image
-and its write protection keep their settings for when the row goes back to
-`image`; with the real drive, the disk's own write protection tab counts. The
-drive sound is off while B: is the drive.
+While B: holds no image its menu line reads ` B:<No Disk>         int. drive`:
+`int. drive` (move there with the cursor right key, select it with Return or
+Space) makes B: the MEGA65's internal 3.5" drive, reading and writing real
+720K (DD) disks; selecting it again switches it off. A: stays an image. The
+switch needs no reset: the drive steps its head to track 0 at once and follows
+the PC's seeks from then on. `int. drive` is hidden while B: holds an image
+(Space on ` B:` ejects it), and loading an image into B: switches it off. With
+the real drive, the disk's own write protection tab counts. The drive sound is
+off while B: is the drive.
 
 - HD (1.44M) disks cannot be used: they need an AT's controller.
 - The PC sees the disk through the same floppy controller model as an image:

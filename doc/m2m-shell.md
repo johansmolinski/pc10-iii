@@ -249,8 +249,11 @@ same backend as the floppies (doc/xta.md section 11 has the details):
 
 ### Drive B: as the internal drive (since 2026-10-26)
 
-The menu's row "Drive B" (lines 7-8, `image` / `int. drive`; Megamiga's menu
-rows, section 8) chooses what B: is. With `int. drive` the MEGA65's internal
+The menu line of B: chooses what B: is: ` B:<No Disk>         int. drive`
+(lines 3 and 4 since 2026-10-27, one screen line, section 8; until then the
+row "Drive B", `image` / `int. drive`, at lines 7-8). `int. drive` is shown
+only while B: holds no image (SPACE on ` B:` ejects it, and it comes back);
+loading an image into B: switches it off. With `int. drive` the MEGA65's internal
 3.5" drive is B: (`rtl/fdc/fdd_intdrv.sv`, doc/fdc.md section 10): the FDC's
 requests for B: go to it instead of to `pc_fdd_sd`, B:'s medium is the drive's
 (a disk = index pulses; write protection = the disk's tab, not the menu
@@ -258,8 +261,7 @@ line), an 80-track drive with 720K geometry, and the drive's pins (motor,
 select, step, direction, side, write data, write gate) come from it. A: stays
 an image. The switch needs no reset: the drive is homed (stepped out to
 TRK0) at once, and from then on its head follows B:'s steps in the 765 model.
-The " B:%s" image and "B: write protected" keep their settings and count again
-with `image`. While B: is the drive the drive sound is off (`pc_drvsnd` held
+"B: write protected" keeps its setting and counts again with an image. While B: is the drive the drive sound is off (`pc_drvsnd` held
 in reset, below). Disks: 3.5" DD (720K); an HD disk would need the AT
 controller's 500 kbit/s (doc/fdc.md section 7).
 
@@ -406,12 +408,12 @@ Menu (`config.vhd`, bits = line numbers, `C_MENU_*` in `mega65.vhd`):
 ```
  PC10-III
  A:%s                the floppy image of A: (file browser), "<No Disk>"
- B:%s                the floppy image of B:
+ B:%s     int. drive  the floppy image of B:, and beside it (a row without a label,
+                     Megamiga's menu rows) the MEGA65's internal drive as B: (section 4;
+                     default off), shown only while B: holds no image
  C:%s                the hard disk image of C: (21,411,840 bytes; JMP208 follows it)
  A: write protected
  B: write protected
- Drive B             a row (Megamiga's menu rows): image (default) / int. drive
-  *image  int. drive (the MEGA65's internal drive as B:, section 4)
  Drive sound (int. drive)  the internal drive plays A:/B:'s sounds (default on, section 4)
  Chipset: %s         PC10-III (FE2010A) (default) / IBM XT (8255); a change restarts the PC
  Memory: %s          640 KB / 512 KB / 256 KB / 128 KB
@@ -431,25 +433,30 @@ Menu (`config.vhd`, bits = line numbers, `C_MENU_*` in `mega65.vhd`):
 ```
 
 Settings file `/pc10/pc10cfg` (the Shell creates it), start folder `/pc10`.
-Behind the menu bytes its text holds `key=value` lines: `menu=8` (the
-signature below, `menu=8` since 2026-10-27) and `hdc=<card>:<path>` (C:'s
+Behind the menu bytes its text holds `key=value` lines: `menu=9` (the
+signature below, `menu=9` since 2026-10-27) and `hdc=<card>:<path>` (C:'s
 image, section 4).
 It holds one byte per menu line, so its layout is the menu's: since
 2026-10-25 the firmware's `CFG_SIGCHECK` accepts a file only when its text
 (M2M-UPSTREAM cfg-strings, behind the menu bytes) has the line `menu=5`
-(`CFG_SIG_VAL` in `m2m-rom.asm`, the layout version, `8` since 2026-10-27:
+(`CFG_SIG_VAL` in `m2m-rom.asm`, the layout version, `9` since 2026-10-27:
 change it with every change of the menu's lines; `2` was the 32-line menu with the drive sound,
 `3` the 39-line one with the chipset submenu, `4` the 48-line one with the
 Display submenu and 720p 50 Hz, `5` the 49-line one with the character set,
 `6` the 50-line one with ` C:%s` at line 4, since 2026-10-26; `7` the 52-line one with
 the row "Drive B" at lines 7-8 (branch intfd) or the 58-line one with the "Ports
 and mouse" submenu at lines 43-50 (branch ports), 2026-10-26; `8` the 60-line one
-with both, the row at lines 7-8 and the submenu at lines 45-52, since 2026-10-27).
+with both, the row at lines 7-8 and the submenu at lines 45-52, 2026-10-27; `9` the
+59-line one with ` int. drive` at line 4 beside ` B:%s`, since 2026-10-27).
 Any other file (the 31-line
 files before the drive sound line had none; the Shell would even load a
 shorter file as one from a menu that grew at its end, shifting every option
 behind the new lines) gets the defaults, and `CFG_SIGSET` writes the
-signature with the next save (when the menu closes).
+signature with the next save (when the menu closes). A file from a longer
+menu (the menu shrank) has its last menu bytes in front of the text, as the
+Shell reads only this menu's bytes; `CFG_SIGCHECK` drops those 0/1 bytes
+first (2026-10-27, after pc10-bline-a forgot C: and the settings at every
+start), so its keys (`hdc=`) are found again.
 
 **Chipset** (2026-10-25, `pc_chipset.vhd`): the PC10-III's Faraday FE2010A
 (default; the Commodore BIOS 4.41 needs it) or the IBM 5160's 8255 (GLaBIOS,
@@ -482,26 +489,65 @@ time slice in every loop) first calls `PC_RTC_WB` (`pc_rtc.asm`) and
 `HDC_PEND_APPLY` (`pc_hdc.asm`), then does the SPACE eject. `PREP_START`
 ends with `HDC_RESTORE` (C:'s image, section 4). The Shell writes the settings
 file with the FAT32 write layer, which is included flat
-(`fat32_wglue.asm`), so there are no code banks (`QNICE_CODE_BANKS = ""`).
+(`fat32_wglue.asm`).
+
+**Code banks** (since 2026-10-27, Megamiga's M2M-UPSTREAM code-banks): the
+QNICE sees one of 8 banks of 4K words at 0x9000-0x9FFF (`M2M$CODE_BANK`,
+0xFFE6; the bank ROM is `m2m-banks.rom`, `QNICE_CODE_BANKS` in globals.vhd,
+16 block RAM tiles). The banks are sections after `END_OF_ROM` (`.ORG 0x9000`,
+the marker word 0x4B00 + n), which `make_banks.py` sorts out of the assembly.
+The fixed ROM calls a bank only through a stub (`NAME RSUB FAR_CALL, 1` +
+`.DW bank, address`); bank code calls the fixed ROM directly. Bank 0 is
+`pc_hdc.asm` (364 words, entry points `B0_HDC_SAVE`, `B0_HDC_RESTORE`,
+`B0_HDC_PEND_APPLY` behind the stubs `HDC_SAVE`, `HDC_RESTORE`,
+`HDC_PEND_APPLY`).
+
+**The B: line** (2026-10-27): ` B:%s` (line 3, group `OPTM_G_FDB`, a manual
+ROM load) and ` int. drive` (line 4, single-select, group `OPTM_G_BINT` =
+`OPTM_G_FDB` + 0x80) are a row without a label: one screen line, ` B:%s`
+where a classic line has it, `int. drive` at the right edge of the frame
+(`menu_rows.asm`; a row is bits 6..0 of the group id, because the Shell tells
+a mount line by its whole group word, `CRTROM_M_NO`). `OPTM_CORE_HIDE` (the
+core's hook, asked by `menu_rows.asm` and by `_OPTM_AVAIL` in `menu.asm`)
+hides ` int. drive` while B: holds an image (the Shell's load flag
+`CRTROM_MAN_LDF` of manual ROM 1): no text, the cursor skips it, B:'s
+highlight takes the whole width. `OSM_SEL_POST` switches it off
+(`M2M$FORCE_MENU`) when an image was loaded into B:. Entering the row with
+nothing selected puts the cursor on ` B:`.
+
+**Framework exceptions** (our own changes of `M2M/`, tagged
+`M2M-UPSTREAM <name>`, doc/m2m-provenance.md):
+
+- `menu-rows-inline` (2026-10-27; `M2M/rom/menu_rows.asm`, `menu.asm`,
+  `menu_vars.asm`): a row is bits 6..0 of the group id; a row without a label
+  is one screen line (the first item at the classic place, the second at the
+  right edge); the core's hook `OPTM_CORE_HIDE` hides an item right now (no
+  text, `_OPTM_AVAIL` false, not dimmed); entering a row with nothing selected
+  puts the cursor on its first option. Why: the B: line above, which frees the
+  two lines of the row "Drive B" so that the merged menu fits the 25 lines.
+  For Megamiga: it has no rows on `main` yet; its cores must define
+  `OPTM_CORE_HIDE` (C=0) when they take this.
 
 Budget (`make_rom.sh` prints it; check `HEAP` and `VAR$STACK_START` in
 `m2m-rom.lis`):
 
-- ROM: **32740 of 32768 words** (28 free; the row "Drive B" needs no firmware:
-  the menu rows are the Shell's, only the signature changed; 32357 before C: was remembered:
+- ROM: **32557 of 32768 words** and bank 0 364 of 4096 (since 2026-10-27:
+  32531 before `CFG_SIGCHECK` dropped a longer menu's bytes (26 words);
+  `pc_hdc.asm` moved into bank 0, 32400; the B: line 131 words: the rows
+  without a label and the hidden option in `menu_rows.asm`/`menu.asm`,
+  `OPTM_CORE_HIDE`, `OSM_SEL_POST`; 32740 before, 28 free; the row "Drive B"
+  needed no firmware; 32357 before C: was remembered:
   `pc_hdc.asm` 363 words (`HDC_SAVE` with the path walk 146, `HDC_RESTORE`
   115 of which the message 29, `HDC_PEND_APPLY` 64, texts 38) and 20 in the
   hooks of `m2m-rom.asm`; 32296 before the RTC
   write-back, 32227 before the hard disk, 32166 before the SPACE eject, 31991
   before the settings signature); the Shell plus the FAT32 write
-  layer fill almost all of it. **The next feature needs room first:** move
-  the write layer into code banks (Megamiga does: banks 1 and 2; this M2M has
-  the code-banks exception, `QNICE_CODE_BANKS` in globals.vhd is "" here, so
-  it is an HDL change and a build) or long texts into a read-only data device.
-- RAM: `HEAP` = 0xA6CA, `MENU_HEAP_SIZE` 1280 since 2026-10-27 (the 60-line
-  menu needs 1276: 20 + 744 item characters + 1 + 4 x 60 + 1 + (5 submenus +
-  3 manual ROMs + 1) x 30; the Shell checks it at boot; 1088 for the 50-line
-  menu's 1058), `HEAP_SIZE` 19296 (file browser; 19488 before the row "Drive B"
+  layer fill almost all of the fixed ROM. More room: further code into banks
+  (Megamiga has the FAT32 write layer in banks 1 and 2).
+- RAM: `HEAP` = 0xA6CA, `MENU_HEAP_SIZE` 1280 since 2026-10-27 (the 59-line
+  menu needs 1255: 20 + 727 item characters + 1 + 4 x 59 + 1 + (5 submenus +
+  3 manual ROMs + 1) x 30, the 60-line one 1276; the Shell checks it at boot;
+  1088 for the 50-line menu's 1058), `HEAP_SIZE` 19296 (file browser; 19488 before the row "Drive B"
   and the "Ports and mouse" submenu),
   ending at 0xF72A; the stack (1536 words) ends at 0xFED0, i.e. starts at
   0xF8D0, so 422 words are left. `pc_hdc.asm`'s variables take 412 words
@@ -883,8 +929,8 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
 - **59.92 vs 60 Hz on HDMI:** ascal drops or repeats a frame about every 13 s.
   A 59.92 Hz HDMI mode would be a new M2M video mode (an M2M-UPSTREAM
   exception).
-- **Firmware ROM:** 32740 of 32768 words; the next features need code banks
-  (Megamiga puts the FAT32 write layer into banks 1 and 2).
+- **Firmware ROM:** 32531 of 32768 words; code banks since 2026-10-27 (bank 0:
+  `pc_hdc.asm`); more code can move into banks 1-7.
 - **R3:** this fork's R3 board top was never adapted. It needs:
   - sd-host (exception 18): bidirectional SD pins (CMD, DAT0..3 with output
     enables) from `framework.vhd`, the engine port `sd_eng_*` to the core

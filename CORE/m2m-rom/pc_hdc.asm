@@ -19,6 +19,12 @@
 ; Variables (m2m-rom.asm): HDC_PEND, HDC_PATH (HDC_PLEN words, the last one
 ; HDC_PATH_Z), HDC_FDH, HDC_DE.
 ;
+; Code bank 0 (M2M-UPSTREAM code-banks, since 2026-10-27): the entry points
+; B0_HDC_SAVE, B0_HDC_RESTORE and B0_HDC_PEND_APPLY are called through the
+; stubs HDC_SAVE, HDC_RESTORE and HDC_PEND_APPLY in the fixed ROM (FAR_CALL,
+; m2m-rom.asm). Its texts are used only while it runs (CFGS_SET copies the
+; key and the value).
+;
 ; done by Johan Smolinski in 2026 and licensed under GPL v3
 ; ****************************************************************************
 
@@ -43,7 +49,7 @@ HDC_S_NF        .ASCII_W "Not found"
 ; current directory is not the file's. All registers preserved.
 ; ----------------------------------------------------------------------------
 
-HDC_SAVE        SYSCALL(enter, 1)
+B0_HDC_SAVE     SYSCALL(enter, 1)
                 MOVE    HDC_PEND, R3            ; HDC_RESTORE mounts: the key
                 CMP     0, @R3                  ; stays
                 RBRA    _HSV_RET, !Z
@@ -146,7 +152,7 @@ _HSV_RET        SYSCALL(leave, 1)
 ; preserved; the RAMROM selection changes.
 ; ----------------------------------------------------------------------------
 
-HDC_RESTORE     SYSCALL(enter, 1)
+B0_HDC_RESTORE  SYSCALL(enter, 1)
                 MOVE    HDC_PEND, R3            ; R3: HDC_PEND, 1: it mounts
                 MOVE    1, @R3
                 MOVE    HDC_KEY, R8
@@ -206,7 +212,7 @@ _HRS_W          RSUB    WAIT333MS, 1
                 RSUB    SCR$OSM_OFF, 1
 _HRS_NO         MOVE    0, @R3                  ; nothing pending, C: is empty:
                 MOVE    1, R8                   ; no key
-                RSUB    HDC_SAVE, 1
+                RSUB    B0_HDC_SAVE, 1
 _HRS_RET        SYSCALL(leave, 1)
                 RET
 
@@ -221,7 +227,7 @@ _HRS_RET        SYSCALL(leave, 1)
 ; while nothing waits. All registers preserved.
 ; ----------------------------------------------------------------------------
 
-HDC_PEND_APPLY  SYSCALL(enter, 1)
+B0_HDC_PEND_APPLY SYSCALL(enter, 1)
                 MOVE    HDC_PEND, R0
                 CMP     0, @R0
                 RBRA    _HPA_RET, Z             ; nothing waits

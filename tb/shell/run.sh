@@ -8,7 +8,9 @@
 # the hard disk C: across power-off, pc_hdc.asm on an SD card image: run_hdc.sh) and a
 # Verilator run of the stand-in pc_system (tb_stub.sv). Run from anywhere: tb/shell/run.sh.
 # tb_ports.vhd: the PMOD headers, the mouse lines and the POT buttons (pc_ports.vhd).
-# Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py, tb/shell/mut_hdc.py, tb/shell/mut_ports.py
+# The menu rows (menu_rows.asm: " B:%s" + " int. drive" on one line): run_rows.sh.
+# Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py, tb/shell/mut_hdc.py, tb/shell/mut_ports.py,
+# tb/shell/mut_rows.py
 set -e
 H=$(cd "$(dirname "$0")" && pwd)
 R=$(cd "$H/../.." && pwd)
@@ -40,6 +42,7 @@ ghdl -r --std=08 -frelaxed tb_ports --ieee-asserts=disable 2>&1 | grep -E "PASS|
 "$H/run_prepload.sh"
 "$H/run_rtcwb.sh"
 "$H/run_hdc.sh"
+"$H/run_rows.sh"
 verilator --binary -j 0 -Wno-fatal -Wno-lint -Wno-style --top-module tb_stub \
     "$R/CORE/stub/pc_system.sv" "$H/tb_stub.sv" -o tb_stub > /dev/null
 ./obj_dir/tb_stub
