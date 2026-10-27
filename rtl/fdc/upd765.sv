@@ -77,6 +77,7 @@ module upd765 #(
     // sector engine (fdc_secbuf.sv)
     output logic        x_start,        // one clk
     output logic        x_write,
+    output logic        x_fmt,          // pc10-iii (internal drive): the write is a FORMAT TRACK commit
     output logic        x_slot,
     output logic [7:0]  x_cyl,
     output logic        x_head,
@@ -439,14 +440,14 @@ always_ff @(posedge clk) begin
         end
         if (!x_busy) begin
             if (fetch_pend) begin
-                x_start <= 1'b1;  x_write <= 1'b0;  x_slot <= fetch_slot;
+                x_start <= 1'b1;  x_write <= 1'b0;  x_fmt <= 1'b0;  x_slot <= fetch_slot;
                 {x_cyl, x_head, x_sec} <= fetch_tag;
                 slot_st[fetch_slot] <= SL_BUSYR;
                 slot_tag[fetch_slot] <= fetch_tag;
                 eng_slot <= fetch_slot;  eng_wr <= 1'b0;
                 fetch_pend <= 1'b0;
             end else if (slot_st[0] == SL_DIRTY || slot_st[1] == SL_DIRTY) begin
-                x_start <= 1'b1;  x_write <= 1'b1;  x_slot <= wslot;
+                x_start <= 1'b1;  x_write <= 1'b1;  x_fmt <= op == OP_FMT;  x_slot <= wslot;
                 {x_cyl, x_head, x_sec} <= slot_tag[wslot];
                 slot_st[wslot] <= SL_BUSYW;
                 eng_slot <= wslot;  eng_wr <= 1'b1;

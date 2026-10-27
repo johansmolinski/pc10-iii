@@ -13,6 +13,8 @@ drives are disk images that the MEGA65 glue serves sector by sector. The same
 | `rtl/fdc/fdc_card.sv` | the adapter on the card bus: I/O decode, DOR, DMA/TC handshake, the two drives' mechanics, the 1 us time base |
 | `rtl/fdc/upd765.sv` | the 765: commands, MSR, status bytes, interrupts, seeks, and the synthetic disk surface (rotation, ID and data fields) |
 | `rtl/fdc/fdc_secbuf.sv` | the sector buffer (2 x 512 bytes, one RAMB18) and the sector-port engine |
+| `rtl/fdc/fdd_intdrv.sv`, `fdd_phys.sv`, `fdd_mfm_rd.sv`, `fdd_mfm_wr.sv` | drive B: as the MEGA65's internal 3.5" drive (section 10; glue outside `pc_system`) |
+| `tb/intfd/` | Verilator testbench of the card with the internal drive: a C++ model of the drive (flux in and out), `make run`, mutants `mut.py` |
 | `tb/fdc/fdc_run.cpp`, `tb/fdc/Makefile` | Verilator testbench: `make run` |
 
 All on `clk` (28.63636 MHz) with enables; no other clock. About one RAMB18;
@@ -44,6 +46,18 @@ Wiring as on IBM's adapter:
   forever, as on a real PC; the BIOS times out and resets the controller.
 - **TS (two-sided)** tied high (ST3 bit 3 = 1), as MartyPC reports it.
 - **TC** is the bus TC qualified by DACK2.
+- **DMA verify** (2026-10-26): a DACK2 cycle without IOR or IOW (the 8237's
+  verify transfer, mode 42h: the BIOS's INT 13h AH=04, which DOS FORMAT uses
+  to verify every track) counts as the byte taken, at the end of the DACK,
+  with its TC. The 765 clears DRQ on DACK; before this, every verify ended in
+  an overrun (DOS 3.21 FORMAT: "Invalid media or Track 0 bad").
+- **End of a DMA cycle** (2026-10-26): with its strobe or with DACK2,
+  whichever comes first, and the write data are latched only while DACK2 is
+  low. `xt_board` gives a CPU cycle that the DMA held its strobe when AEN
+  falls, right after the 8237's, so a held OUT (the timer handler's EOI,
+  OUT 20h,20h) joins the DMA's IOW into one low level; the card took the CPU's
+  20h as the byte (tb/sys: DOS COPY to B: wrote one byte 20h in 15 KB). On a
+  PC the 765 takes the byte at WR's rise while DACK is active.
 - **DOR bit 3** gates the DRQ2 and IRQ6 outputs only; the 765 keeps
   requesting (a masked DMA then ends in an overrun) and keeps its interrupt
   state (Sense Interrupt Status still works).
@@ -148,6 +162,7 @@ The card asks the glue for whole 512-byte sectors. One transfer at a time:
 |---|---|---|
 | `sp_req` | out | a transfer is requested; held until `sp_done` (drops the clk after it) |
 | `sp_write` | out | 0 = read the sector into the card, 1 = store the card's data |
+| `sp_fmt` | out | with `sp_write`: the sector is a FORMAT TRACK commit (its 512 bytes are the fill byte; the internal drive writes the whole track, section 10) |
 | `sp_drive` | out | 0 = A:, 1 = B: |
 | `sp_cyl`, `sp_head`, `sp_sector` | out | physical position (sector 1-based) |
 | `sp_lba[15:0]` | out | `(cyl * heads + head) * spt + sector - 1`, from the drive's geometry inputs |
@@ -261,9 +276,9 @@ bridgeboard:
   glue (the same protocol);
 - the A2088T path through Janus (the Amiga reading PC disks via Paula) is
   separate work (doc/plan.md section 7);
-- a real-flux path (Hardware Floppy + IBM MFM decoder) would replace the
-  synthetic surface: the 765 would then need a byte/mark stream interface
-  instead of the internal rotation model.
+- a real drive behind the sector port exists now (section 10: the MEGA65's
+  internal drive as B:); the A2088's drive B: on the Amiga's external port
+  could use the same `fdd_phys.sv`.
 
 ## 9. Verification
 
@@ -288,7 +303,9 @@ IRQ6 and EXM; drive B 80-track: seek 79, read, RECALIBRATE EC after 77
 steps (616 ms) and the second RECALIBRATE; a 25-35 ms backend (reads and
 writes); backend errors (DE+DD, EC); a single-sided medium (MA on side 1);
 no medium (the command hangs, a DOR reset recovers); random seek/read/write
-traffic.
+traffic; since 2026-10-26 DMA verify transfers (a track with MT, TC inside a
+sector, memory untouched) and a write whose every 7th DMA cycle joins a CPU
+OUT 20h,20h into one IOW level (246 checks).
 
 A run simulates 10.4 s of PC time in about five minutes (`-s seed` varies
 the backend latencies and the random traffic). Mutants that the bench
@@ -299,3 +316,144 @@ recalibrate limit, the DOR bit 3 IRQ gate.
 Not yet verified: Vivado synthesis (Verilator lint only), and the card inside `pc_system` with the real KF8237 and a
 BIOS (GLaBIOS / IBM XT BIOS booting DOS from an image) - that needs the two
 `xt_board.sv` fixes of section 6.
+
+## 10. Drive B: as the MEGA65's internal drive (2026-10-26)
+
+The menu's row "Drive B" (`image` / `int. drive`) makes drive B: the MEGA65's
+internal 3.5" drive, reading and writing real 720K disks. `fdd_intdrv.sv`
+sits between the card and the image backend (`pc_fdd_sd.vhd`): with
+`enable` = 1 the requests of B: go to `fdd_phys.sv`, its medium is the
+drive's (present, write protection) with the geometry of a 720K disk in an
+80-track drive (80/2/9, `drv_80trk` = 1), and the drive's pins come from it;
+A: stays an image. A request is routed by its first clk and stays there until
+it is answered.
+
+### 10.1 Where the drive is hooked: at sector level
+
+The 765 model keeps its synthetic surface (rotation, ID fields, gaps,
+interrupts, status bytes, step and head-load timing, section 4); the real
+drive supplies only the sectors, through the sector port (section 5), like
+an image. The alternatives were a byte/mark stream from a track decoder into
+a 765 without its rotation model, or flux level. Sector level was chosen
+because:
+
+- the 765 (and with it every BIOS- and DOS-visible behaviour, the results
+  table, overrun, TC, MT, the IBM adapter's select and READY wiring) stays the
+  one that tb/fdc, tb/sys and the hardware verify; images and the drive share
+  it;
+- the card already buffers whole sectors and stops its rotation while the
+  backend works ("backend stalls", section 4): a real drive is just a slow
+  backend, whose rotational wait adds to the model's;
+- the drive's own timing (300 rpm, its index, the sector's place on the
+  track) never meets the PC's clock domain: the drive side decodes and writes
+  at its own speed, the PC sees the model's timing.
+
+What it costs: a sector takes the model's rotational wait plus the drive's
+(on average about one turn more for the first sector of a command; a
+multi-sector read keeps pace, because the model prefetches the next sector
+while the current one is transferred: a 9-sector read in tb/intfd takes
+677 ms against 400 ms on a real XT). Copy protections, non-standard IDs,
+deleted data marks, READ ID and READ TRACK see the model's standard surface,
+not the disk's (as for images); "sector not found" on the disk is reported as
+a data error (the port has one error bit).
+
+### 10.2 fdd_phys
+
+- **The head follows the model.** Every step of drive B: in the model
+  (`drv_step` while B: is selected) moves the target cylinder (0..79); the
+  real head is stepped toward it at once, at most one pulse per 3 ms (8 us
+  direction setup, 8 us pulse, 8 us hold), so a PC seek sounds and takes the
+  time it does on a PC. The real position is tracked (`cur`); it is unknown
+  after power-up and after switching to the drive: the drive is homed first
+  (outward steps every 6 ms until TRK0, at most 90). TRK0 after an outward
+  step resynchronises `cur`. A PC reset puts the model's heads to 0 without
+  steps; the real head follows to 0. A request whose cylinder differs from
+  `cur` moves the head there itself.
+- **The drive's lines:** motor on while the DOR's motor bit of B: is set or
+  a request runs; selected while the motor runs, the head moves or is not
+  homed. `present` = an index pulse within the last 400 ms (the model turns
+  only with a disk in, so a command on an empty drive waits as on a PC and
+  the BIOS reports "not ready"); `wp` = the WPT pin, latched while selected.
+  Density: the DD level, always.
+- **A request:** motor on for 500 ms at least (spin-up), the head settled
+  18 ms after its last step, the side selected (100 us), then:
+  - read: decode the track (`fdd_mfm_rd.sv`) until the ID field with the
+    request's C, H, R and N = 2 passes with a good CRC; the data field (DAM
+    FB or F8 within 2.5 ms) goes to the card byte by byte as it is decoded,
+    a bad data CRC ends with `sp_err`;
+  - write: the same search; 702 us after the ID's CRC (22 bytes of gap 2, as
+    the 765) WGATE opens for 12 x 00, 3 x A1*, FB, the card's 512 bytes,
+    CRC, one 4E;
+  - format (`sp_fmt`): the first commit of a FORMAT TRACK command writes the
+    whole track from index to index in the model's standard layout (GAP4a 80,
+    sync, IAM, GAP1 50, sectors 1-9 with the commit's C and H, N = 2, GAP3 80,
+    the fill byte, 4E up to the index); the other commits of that track and
+    command are taken without touching the disk (a new command writes again).
+    Like the model, the IDs the host passed are not written as given;
+  - not found: no matching ID within three index pulses is `sp_err`; when
+    IDs of another cylinder passed (a lost step), the head is homed and moved
+    once more first. No index pulse for 1 s (no disk) is `sp_err` too.
+- `enable` = 0: the pins are idle, a running request ends with `sp_err`, the
+  position is forgotten.
+
+### 10.3 The read and write chains (from Megamiga)
+
+`fdd_mfm_rd.sv` is Megamiga's Hardware Floppy front-end (`physical_fdd_inputs`,
+`physical_fdd_mfm_gaps`, the DPLL of `physical_fdd_bits`; sy2002, GPL-3.0, in
+turn from C64MEGA65's physical-1581; hardware-proven on the MEGA65's drive),
+re-timed from 50 MHz to the PC's 28.63636 MHz: 2-FF synchronizers, an index
+pulse counts after 200 us low, edges closer than 280 ns are runts, the DPLL
+(phase in 1/16 clk, cell 57.27 clk, phase pull err/2, period err/64,
++-10 %). New: IBM framing, 0x4489 (A1 without its clock bit) starts a byte;
+C2* is not framed on (it occurs inside data at other bit positions).
+
+`fdd_mfm_wr.sv` keeps Megamiga's write discipline (`physical_fdd_writer`):
+2.000 us cells from a fractional clock (11/630 per clk), a 500 ns WDATA pulse
+at mid-cell, precompensation of 140 ns over a 7-bit window (early when the gap
+before is the shorter one) from cylinder 40 on, WGATE exactly over the
+written cells, the pins inactive at power-up. New: the MFM encoder (clock =
+NOR of the neighbouring data bits, A1*, C2*) and a one-byte holding register.
+
+### 10.4 Menu, drive sound, LED
+
+- Menu (doc/m2m-shell.md section 8): the row "Drive B" at lines 7-8.
+  `image` (default) is B: as before; the " B:%s" line and "B: write
+  protected" stay visible and keep their settings, they apply again when the
+  row goes back to `image`.
+- **The drive sound is off** while B: is the drive (`pc_drvsnd` is held in
+  reset; its own head position is forgotten and it homes the drive again
+  later). A: plays no sound then: the drive cannot be both.
+- The drive LED is unchanged: yellow while A: or B: is selected.
+- DOS 3.21's `FORMAT B:` makes a 360K disk on it: the Commodore BIOS's INT 13h
+  AH=15h reports no change line, so DOS 3.21 never asks AH=08h for the 80-track
+  type the BIOS would give (doc/m2m-shell.md section 4). Reading and writing
+  720K disks is unaffected.
+
+### 10.5 Verification
+
+`tb/intfd` (`make run`, 27 s of PC time, about 4 minutes): the card driven
+like the BIOS (as tb/fdc), A: an image, B: a C++ model of the drive: tracks as
+flux positions (ns after the index) built from sector data in the IBM layout,
+300 rpm with a speed factor, Gaussian jitter and runts on the read pulses,
+spin-up, steps with stops and lost steps on request, TRK0/WPT/index, writes
+recorded from WDATA under WGATE (an erase over the gate's span, a write longer
+than a turn overwrites its start), and an independent decoder (interval PLL,
+syncs, CRC) that reads the model's tracks back. Checked: homing from
+cylinder 30 (6 ms steps), presence after the motor, SEEK mirrored with the
+765's step rate, reads (one side, MT both sides, cylinders 45 and 79), writes
+(cylinders 20 and 60, the neighbours intact, the precompensation: 0 shifted
+pulses below cylinder 40, 8172 early / 8192 late / 0 wrong at 60, the
+gate span), FORMAT on a formatted and an unformatted track (one gate of one
+turn, one IAM, IDs, fill, CRCs) and the same track again in a new command
+(written again), an unformatted track (error), a data CRC error and a bad ID
+CRC (errors, the other sectors fine), IDs with the other head (error), runts,
+write protection (no gate), a lost step (home and retry), another drive's
+disk (2:1 interleave, GAP3 84, 1.5 % faster), speed +-2 % with 100 ns jitter
+(read and write), no disk (the command waits, a DOR reset recovers), A: while
+B: is the drive (no step for A:'s seek), the PC's reset (the head follows to
+0), switching to the image (pins idle, B:'s image served) and back (homed,
+follows the model), switching during a request (error), and every track of
+the disk at the end. `-m` prints a margin table (whole-track reads): no
+failure up to 150 ns jitter (sigma) at 0.97-1.03 times the speed; at 200 ns
+(sigma) reads fail.
+

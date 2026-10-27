@@ -22,8 +22,12 @@
 --   writes the time back into the MEGA65's battery RTC when the PC sets it (QNICE device
 --   C_DEV_PC_RTC, the firmware's HANDLE_CORE_IO; doc/rtc.md)
 -- * pc_drvsnd.vhd: the drive LED (yellow while A: or B: is selected) and the drive sound (the
---   MEGA65's internal drive follows the motors and head steps of A: and B:)
--- * the OSM settings (config.vhd): floppy images and write protection, drive sound, chipset
+--   MEGA65's internal drive follows the motors and head steps of A: and B:; off while B: is
+--   the internal drive)
+-- * rtl/fdc/fdd_intdrv.sv: drive B: as its image or as the MEGA65's internal 3.5" drive,
+--   reading and writing real 720K disks (the menu's row "Drive B"; doc/fdc.md section 10)
+-- * the OSM settings (config.vhd): floppy images and write protection, drive B: image or the
+--   internal drive, drive sound, chipset
 --   (PC10-III's FE2010A or IBM XT's 8255, with its switches; a change restarts the PC),
 --   memory size, display (colour or mono in three phosphors: the PVC4's CONFIG switch 2 with
 --   switches 3/4; a change restarts the PC), character set (CONFIG switch 1), HDMI mode (60 Hz for colour, 50 Hz for mono),
@@ -350,23 +354,25 @@ constant C_MENU_FDB_LN        : natural := 3;   -- " B:%s"
 constant C_MENU_HDC_LN        : natural := 4;   -- " C:%s" (the hard disk image)
 constant C_MENU_WP_A          : natural := 5;
 constant C_MENU_WP_B          : natural := 6;
-constant C_MENU_DRV_SOUND     : natural := 7;
-constant C_MENU_CHIP_PC10     : natural := 12;
-constant C_MENU_CHIP_XT       : natural := 13;
-constant C_MENU_MEM_640       : natural := 19;
-constant C_MENU_MEM_512       : natural := 20;
-constant C_MENU_MEM_256       : natural := 21;
-constant C_MENU_MEM_128       : natural := 22;
-constant C_MENU_DISP_GREEN    : natural := 37;
-constant C_MENU_DISP_AMBER    : natural := 38;
-constant C_MENU_DISP_WHITE    : natural := 39;
-constant C_MENU_CHARSET_SCAN  : natural := 42;
-constant C_MENU_HDMI_720P     : natural := 28;
-constant C_MENU_HDMI_480P     : natural := 29;
-constant C_MENU_HDMI_720P50   : natural := 30;
-constant C_MENU_ANALOG_15KHZ  : natural := 43;
-constant C_MENU_ANALOG_CSYNC  : natural := 44;
-constant C_MENU_RESET         : natural := 47;
+constant C_MENU_B_IMAGE       : natural := 7;   -- row "Drive B": image (default)
+constant C_MENU_B_INT         : natural := 8;   -- ... int. drive (fdd_intdrv.sv)
+constant C_MENU_DRV_SOUND     : natural := 9;
+constant C_MENU_CHIP_PC10     : natural := 14;
+constant C_MENU_CHIP_XT       : natural := 15;
+constant C_MENU_MEM_640       : natural := 21;
+constant C_MENU_MEM_512       : natural := 22;
+constant C_MENU_MEM_256       : natural := 23;
+constant C_MENU_MEM_128       : natural := 24;
+constant C_MENU_DISP_GREEN    : natural := 39;
+constant C_MENU_DISP_AMBER    : natural := 40;
+constant C_MENU_DISP_WHITE    : natural := 41;
+constant C_MENU_CHARSET_SCAN  : natural := 44;
+constant C_MENU_HDMI_720P     : natural := 30;
+constant C_MENU_HDMI_480P     : natural := 31;
+constant C_MENU_HDMI_720P50   : natural := 32;
+constant C_MENU_ANALOG_15KHZ  : natural := 45;
+constant C_MENU_ANALOG_CSYNC  : natural := 46;
+constant C_MENU_RESET         : natural := 49;
 
 -- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
 -- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
@@ -457,9 +463,14 @@ signal main_drv_motor         : std_logic_vector(1 downto 0);
 signal main_drv_select        : std_logic_vector(1 downto 0);
 signal main_drv_step          : std_logic;
 signal main_drv_step_in       : std_logic;
+signal main_fdc_active        : std_logic;
 signal main_sp_req            : std_logic;
 signal main_sp_write          : std_logic;
+signal main_sp_fmt            : std_logic;
 signal main_sp_drive          : std_logic;
+signal main_sp_cyl            : std_logic_vector(7 downto 0);
+signal main_sp_head           : std_logic;
+signal main_sp_sector         : std_logic_vector(7 downto 0);
 signal main_sp_lba            : std_logic_vector(15 downto 0);
 signal main_sp_rd_valid       : std_logic;
 signal main_sp_rd_data        : std_logic_vector(7 downto 0);
@@ -468,6 +479,32 @@ signal main_sp_wr_data        : std_logic_vector(7 downto 0);
 signal main_sp_wr_ready       : std_logic;
 signal main_sp_done           : std_logic;
 signal main_sp_err            : std_logic;
+-- drive B: as the internal drive (fdd_intdrv.sv): the image backend's side of the sector
+-- port and drive inputs (pc_fdd_sd.vhd), the drive's pins, the drive sound's pins
+signal main_b_int             : std_logic;
+signal main_i_drv_80trk       : std_logic_vector(1 downto 0);
+signal main_i_img_present     : std_logic_vector(1 downto 0);
+signal main_i_img_tracks      : std_logic_vector(15 downto 0);
+signal main_i_img_heads       : std_logic_vector(3 downto 0);
+signal main_i_img_spt         : std_logic_vector(11 downto 0);
+signal main_i_sp_req          : std_logic;
+signal main_i_sp_rd_valid     : std_logic;
+signal main_i_sp_rd_data      : std_logic_vector(7 downto 0);
+signal main_i_sp_wr_ready     : std_logic;
+signal main_i_sp_done         : std_logic;
+signal main_i_sp_err          : std_logic;
+signal main_snd_rst           : std_logic;
+signal main_snd_motor_n       : std_logic;
+signal main_snd_select_n      : std_logic;
+signal main_snd_stepdir_n     : std_logic;
+signal main_snd_step_n        : std_logic;
+signal main_hw_motor_n        : std_logic;
+signal main_hw_select_n       : std_logic;
+signal main_hw_stepdir_n      : std_logic;
+signal main_hw_step_n         : std_logic;
+signal main_hw_side1_n        : std_logic;
+signal main_hw_wdata_n        : std_logic;
+signal main_hw_wgate_n        : std_logic;
 -- the PC20-III's hard disk (xta_card.sv) and its sector port
 signal main_xta_present       : std_logic;
 signal main_xta_active        : std_logic;
@@ -481,6 +518,70 @@ signal main_xta_sp_wr_data    : std_logic_vector(7 downto 0);
 signal main_xta_sp_wr_ready   : std_logic;
 signal main_xta_sp_done       : std_logic;
 signal main_xta_sp_err        : std_logic;
+
+-- drive B: as an image or the MEGA65's internal drive (rtl/fdc/fdd_intdrv.sv, doc/fdc.md 10)
+component fdd_intdrv is
+   generic (
+      CLK_HZ        : integer := 28_636_364
+   );
+   port (
+      clk           : in  std_logic;
+      reset         : in  std_logic;
+      pc_reset      : in  std_logic;
+      enable        : in  std_logic;
+      drv_80trk     : out std_logic_vector(1 downto 0);
+      img_present   : out std_logic_vector(1 downto 0);
+      img_wp        : out std_logic_vector(1 downto 0);
+      img_tracks    : out std_logic_vector(15 downto 0);
+      img_heads     : out std_logic_vector(3 downto 0);
+      img_spt       : out std_logic_vector(11 downto 0);
+      drv_motor     : in  std_logic_vector(1 downto 0);
+      drv_select    : in  std_logic_vector(1 downto 0);
+      drv_step      : in  std_logic;
+      drv_step_in   : in  std_logic;
+      fdc_active    : in  std_logic;
+      sp_req        : in  std_logic;
+      sp_write      : in  std_logic;
+      sp_fmt        : in  std_logic;
+      sp_drive      : in  std_logic;
+      sp_cyl        : in  std_logic_vector(7 downto 0);
+      sp_head       : in  std_logic;
+      sp_sector     : in  std_logic_vector(7 downto 0);
+      sp_rd_valid   : out std_logic;
+      sp_rd_data    : out std_logic_vector(7 downto 0);
+      sp_wr_valid   : in  std_logic;
+      sp_wr_ready   : out std_logic;
+      sp_wr_data    : in  std_logic_vector(7 downto 0);
+      sp_done       : out std_logic;
+      sp_err        : out std_logic;
+      i_drv_80trk   : in  std_logic_vector(1 downto 0);
+      i_img_present : in  std_logic_vector(1 downto 0);
+      i_img_wp      : in  std_logic_vector(1 downto 0);
+      i_img_tracks  : in  std_logic_vector(15 downto 0);
+      i_img_heads   : in  std_logic_vector(3 downto 0);
+      i_img_spt     : in  std_logic_vector(11 downto 0);
+      i_sp_req      : out std_logic;
+      i_sp_rd_valid : in  std_logic;
+      i_sp_rd_data  : in  std_logic_vector(7 downto 0);
+      i_sp_wr_ready : in  std_logic;
+      i_sp_done     : in  std_logic;
+      i_sp_err      : in  std_logic;
+      f_motor_n     : out std_logic;
+      f_select_n    : out std_logic;
+      f_stepdir_n   : out std_logic;
+      f_step_n      : out std_logic;
+      f_side1_n     : out std_logic;
+      f_wdata_n     : out std_logic;
+      f_wgate_n     : out std_logic;
+      f_index_n     : in  std_logic;
+      f_track0_n    : in  std_logic;
+      f_wpt_n       : in  std_logic;
+      f_rdata_n     : in  std_logic;
+      busy          : out std_logic;
+      cyl           : out std_logic_vector(6 downto 0);
+      known         : out std_logic
+   );
+end component fdd_intdrv;
 
 begin
 
@@ -526,12 +627,17 @@ begin
    iec_srq_en_o         <= '0';
    iec_srq_n_o          <= '1';
 
-   -- M2M-UPSTREAM floppy-pins: the internal drive plays the drive sound (pc_drvsnd.vhd: motor,
-   -- select, direction, step); write gate, write data, side and density stay inactive (the
-   -- DD-safe density level): nothing on a disk in it is touched
-   f_wdata_o            <= '1';
-   f_wgate_o            <= '1';
-   f_side1_o            <= '1';
+   -- M2M-UPSTREAM floppy-pins: the internal drive is drive B: (fdd_intdrv.sv: all pins) when the
+   -- menu's row "Drive B" says "int. drive"; otherwise it plays the drive sound (pc_drvsnd.vhd:
+   -- motor, select, direction, step) and write gate, write data and side stay inactive.
+   -- Density: always the DD-safe level (as Megamiga's Hardware Floppy).
+   f_motora_o           <= main_hw_motor_n   when main_b_int = '1' else main_snd_motor_n;
+   f_selecta_o          <= main_hw_select_n  when main_b_int = '1' else main_snd_select_n;
+   f_stepdir_o          <= main_hw_stepdir_n when main_b_int = '1' else main_snd_stepdir_n;
+   f_step_o             <= main_hw_step_n    when main_b_int = '1' else main_snd_step_n;
+   f_side1_o            <= main_hw_side1_n   when main_b_int = '1' else '1';
+   f_wdata_o            <= main_hw_wdata_n   when main_b_int = '1' else '1';
+   f_wgate_o            <= main_hw_wgate_n   when main_b_int = '1' else '1';
    f_density_o          <= '1';
 
    -- M2M-UPSTREAM sdram-pins: SDRAM idle (the PC keeps everything in block RAM; R3 has none)
@@ -632,11 +738,15 @@ begin
    main_power_led_o     <= '1';
    main_power_led_col_o <= x"0000FF" when main_reset_m2m_i else x"00FF00";
 
+   -- the drive sound is off while B: is the internal drive (held in reset: the head position it
+   -- follows is lost then, it homes the drive again afterwards)
+   main_snd_rst <= main_rst or main_b_int;
+
    i_pc_drvsnd : entity work.pc_drvsnd
       port map (
          clk_i                => main_clk,
-         rst_i                => main_rst,
-         sound_i              => main_osm_control_i(C_MENU_DRV_SOUND),
+         rst_i                => main_snd_rst,
+         sound_i              => main_osm_control_i(C_MENU_DRV_SOUND) and not main_b_int,
          drv_motor_i          => main_drv_motor,
          drv_select_i         => main_drv_select,
          drv_step_i           => main_drv_step,
@@ -644,10 +754,10 @@ begin
          hd_active_i          => main_xta_active,
          led_o                => main_drive_led_o,
          led_col_o            => main_drive_led_col_o,
-         f_motora_o           => f_motora_o,
-         f_selecta_o          => f_selecta_o,
-         f_stepdir_o          => f_stepdir_o,
-         f_step_o             => f_step_o,
+         f_motora_o           => main_snd_motor_n,
+         f_selecta_o          => main_snd_select_n,
+         f_stepdir_o          => main_snd_stepdir_n,
+         f_step_o             => main_snd_step_n,
          f_track0_i           => f_track0_i,
          f_diskchanged_i      => f_diskchanged_i,
          cyl_o                => open,
@@ -752,13 +862,17 @@ begin
          img_heads_i          => main_img_heads,
          img_spt_i            => main_img_spt,
          drv_motor_o          => main_drv_motor,
-         fdc_active_o         => open,
+         fdc_active_o         => main_fdc_active,
          drv_select_o         => main_drv_select,
          drv_step_o           => main_drv_step,
          drv_step_in_o        => main_drv_step_in,
          sp_req_o             => main_sp_req,
          sp_write_o           => main_sp_write,
+         sp_fmt_o             => main_sp_fmt,
          sp_drive_o           => main_sp_drive,
+         sp_cyl_o             => main_sp_cyl,
+         sp_head_o            => main_sp_head,
+         sp_sector_o          => main_sp_sector,
          sp_lba_o             => main_sp_lba,
          sp_rd_valid_i        => main_sp_rd_valid,
          sp_rd_data_i         => main_sp_rd_data,
@@ -959,23 +1073,23 @@ begin
          sd_q2c_i             => sd_eng_i,
          main_clk_i           => main_clk,
          main_rst_i           => main_rst,
-         drv_80trk_o          => main_drv_80trk,
-         img_present_o        => main_img_present,
+         drv_80trk_o          => main_i_drv_80trk,
+         img_present_o        => main_i_img_present,
          img_wp_o             => open,
-         img_tracks_o         => main_img_tracks,
-         img_heads_o          => main_img_heads,
-         img_spt_o            => main_img_spt,
-         sp_req_i             => main_sp_req,
+         img_tracks_o         => main_i_img_tracks,
+         img_heads_o          => main_i_img_heads,
+         img_spt_o            => main_i_img_spt,
+         sp_req_i             => main_i_sp_req,
          sp_write_i           => main_sp_write,
          sp_drive_i           => main_sp_drive,
          sp_lba_i             => main_sp_lba,
-         sp_rd_valid_o        => main_sp_rd_valid,
-         sp_rd_data_o         => main_sp_rd_data,
+         sp_rd_valid_o        => main_i_sp_rd_valid,
+         sp_rd_data_o         => main_i_sp_rd_data,
          sp_wr_valid_i        => main_sp_wr_valid,
          sp_wr_data_i         => main_sp_wr_data,
-         sp_wr_ready_o        => main_sp_wr_ready,
-         sp_done_o            => main_sp_done,
-         sp_err_o             => main_sp_err,
+         sp_wr_ready_o        => main_i_sp_wr_ready,
+         sp_done_o            => main_i_sp_done,
+         sp_err_o             => main_i_sp_err,
          hd_present_o         => main_xta_present,
          hd_sp_req_i          => main_xta_sp_req,
          hd_sp_write_i        => main_xta_sp_write,
@@ -990,7 +1104,68 @@ begin
          main_busy_o          => open
       ); -- i_pc_fdd_sd
 
-   -- write protection: the menu (main clock domain; the FDC card reads WP for its status)
-   main_img_wp <= main_osm_control_i(C_MENU_WP_B) & main_osm_control_i(C_MENU_WP_A);
+   -- Drive B: as an image (pc_fdd_sd above) or the internal drive (doc/fdc.md section 10): the
+   -- menu's row "Drive B". Write protection of the images: the menu (main clock domain; the
+   -- FDC card reads WP for its status); the internal drive's: its disk's tab.
+   main_b_int <= main_osm_control_i(C_MENU_B_INT);
+
+   i_fdd_intdrv : fdd_intdrv
+      port map (
+         clk                  => main_clk,
+         reset                => main_rst,
+         pc_reset             => main_pc_reset,
+         enable               => main_b_int,
+         drv_80trk            => main_drv_80trk,
+         img_present          => main_img_present,
+         img_wp               => main_img_wp,
+         img_tracks           => main_img_tracks,
+         img_heads            => main_img_heads,
+         img_spt              => main_img_spt,
+         drv_motor            => main_drv_motor,
+         drv_select           => main_drv_select,
+         drv_step             => main_drv_step,
+         drv_step_in          => main_drv_step_in,
+         fdc_active           => main_fdc_active,
+         sp_req               => main_sp_req,
+         sp_write             => main_sp_write,
+         sp_fmt               => main_sp_fmt,
+         sp_drive             => main_sp_drive,
+         sp_cyl               => main_sp_cyl,
+         sp_head              => main_sp_head,
+         sp_sector            => main_sp_sector,
+         sp_rd_valid          => main_sp_rd_valid,
+         sp_rd_data           => main_sp_rd_data,
+         sp_wr_valid          => main_sp_wr_valid,
+         sp_wr_ready          => main_sp_wr_ready,
+         sp_wr_data           => main_sp_wr_data,
+         sp_done              => main_sp_done,
+         sp_err               => main_sp_err,
+         i_drv_80trk          => main_i_drv_80trk,
+         i_img_present        => main_i_img_present,
+         i_img_wp             => main_osm_control_i(C_MENU_WP_B) & main_osm_control_i(C_MENU_WP_A),
+         i_img_tracks         => main_i_img_tracks,
+         i_img_heads          => main_i_img_heads,
+         i_img_spt            => main_i_img_spt,
+         i_sp_req             => main_i_sp_req,
+         i_sp_rd_valid        => main_i_sp_rd_valid,
+         i_sp_rd_data         => main_i_sp_rd_data,
+         i_sp_wr_ready        => main_i_sp_wr_ready,
+         i_sp_done            => main_i_sp_done,
+         i_sp_err             => main_i_sp_err,
+         f_motor_n            => main_hw_motor_n,
+         f_select_n           => main_hw_select_n,
+         f_stepdir_n          => main_hw_stepdir_n,
+         f_step_n             => main_hw_step_n,
+         f_side1_n            => main_hw_side1_n,
+         f_wdata_n            => main_hw_wdata_n,
+         f_wgate_n            => main_hw_wgate_n,
+         f_index_n            => f_index_i,
+         f_track0_n           => f_track0_i,
+         f_wpt_n              => f_writeprotect_i,
+         f_rdata_n            => f_rdata_i,
+         busy                 => open,
+         cyl                  => open,
+         known                => open
+      ); -- i_fdd_intdrv
 
 end architecture synthesis;

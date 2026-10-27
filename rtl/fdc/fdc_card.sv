@@ -75,6 +75,7 @@ module fdc_card #(
     // sector port (doc/fdc.md)
     output logic        sp_req,
     output logic        sp_write,
+    output logic        sp_fmt,         // pc10-iii (internal drive): a FORMAT TRACK commit (doc/fdc.md section 5)
     output logic        sp_drive,
     output logic [7:0]  sp_cyl,
     output logic        sp_head,
@@ -160,7 +161,9 @@ always_ff @(posedge clk)
 always_ff @(posedge clk) begin
     ior_d <= isa_ior_n;
     iow_d <= isa_iow_n;
-    if (!isa_iow_n) wdat_q <= isa_dout;     // the last value seen during the strobe
+    // the last value seen during the strobe; in a DMA write cycle only while DACK2 is low
+    // (pc10-iii, 2026-10-26: see dma_wend below)
+    if (!isa_iow_n && (dack2 || !dma_wr_cyc)) wdat_q <= isa_dout;
 end
 
 // ------------------------------------------------------------ DOR
@@ -175,15 +178,43 @@ logic       hd, step, step_dir;
 logic [9:0] buf_addr;
 logic       buf_we;
 logic [7:0] buf_wdata, buf_rdata;
-logic       x_start, x_write, x_slot, x_head, x_busy, x_done, x_err;
+logic       x_start, x_write, x_fmt, x_slot, x_head, x_busy, x_done, x_err;
 logic [7:0] x_cyl, x_sec;
 logic       active;
 
 assign cpu_rd  = ior_fall && sel_fdc;
 assign cpu_wr  = iow_rise && io_cyc_fdc;
-assign dma_ack = (ior_fall || iow_fall) && dack2;
-assign dma_wr  = iow_rise && dma_wr_cyc;
-assign tc_pulse = (iow_rise && dma_wr_cyc && tc_q) || (ior_rise && dma_rd_cyc && tc_q);
+// pc10-iii (2026-10-26): DMA verify cycles. The BIOS's INT 13h AH=04 (DOS FORMAT's
+// verify of every track) programs channel 2 for a verify transfer (8237 mode 42h): DACK2
+// cycles without IOR or IOW. The 765 counts a DACK as the byte taken (its DRQ is cleared
+// by DACK); without this every verify ended in an overrun (FORMAT: "Track 0 bad"). Here
+// such a cycle is acknowledged when its DACK ends, with its TC.
+logic       dack_d, dack_strb, dack_tc;
+always_ff @(posedge clk) begin
+    dack_d <= dack2 && !reset;
+    if (!dack2) begin
+        dack_strb <= 1'b0;
+        dack_tc   <= 1'b0;
+    end else begin
+        if (!isa_ior_n || !isa_iow_n) dack_strb <= 1'b1;
+        if (isa_tc) dack_tc <= 1'b1;
+    end
+end
+wire        vfy_end = dack_d && !dack2 && !dack_strb;
+
+// pc10-iii (2026-10-26): a DMA cycle ends with its strobe or with DACK2, whichever comes
+// first. xt_board gives a CPU cycle that the DMA held its strobe when AEN falls, right
+// after the 8237's, so a held I/O write (the timer handler's EOI, OUT 20h,20h) joins the
+// DMA's IOW into one low level: the card took the byte at the end of that level, i.e. the
+// CPU's 20h (tb/sys, DOS COPY to B:: one byte 20h in 15 KB). On a PC the 765 takes the
+// byte at WR's rise while DACK is active.
+wire        dack_off = dack_d && !dack2;
+wire        dma_wend = dma_wr_cyc && (iow_rise || dack_off);
+wire        dma_rend = dma_rd_cyc && (ior_rise || dack_off);
+
+assign dma_ack = ((ior_fall || iow_fall) && dack2) || vfy_end;
+assign dma_wr  = dma_wend;
+assign tc_pulse = (dma_wend && tc_q) || (dma_rend && tc_q) || (vfy_end && dack_tc);
 
 always_ff @(posedge clk) begin
     if (reset) begin
@@ -211,7 +242,7 @@ always_ff @(posedge clk) begin
             if (!isa_ior_n) isa_din <= dma_rdata;
         end else if ((dma_rd_cyc || dma_wr_cyc) && dack2 && isa_tc)
             tc_q <= 1'b1;
-        if ((ior_rise && dma_rd_cyc) || (iow_rise && dma_wr_cyc)) begin
+        if (dma_rend || dma_wend) begin
             dma_rd_cyc <= 1'b0;
             dma_wr_cyc <= 1'b0;
             tc_q <= 1'b0;
@@ -382,6 +413,7 @@ upd765 #(
     .buf_rdata  (buf_rdata),
     .x_start    (x_start),
     .x_write    (x_write),
+    .x_fmt      (x_fmt),
     .x_slot     (x_slot),
     .x_cyl      (x_cyl),
     .x_head     (x_head),
@@ -401,6 +433,7 @@ fdc_secbuf u_buf (
     .a_rdata     (buf_rdata),
     .x_start     (x_start),
     .x_write     (x_write),
+    .x_fmt       (x_fmt),
     .x_slot      (x_slot),
     .x_cyl       (x_cyl),
     .x_head      (x_head),
@@ -412,6 +445,7 @@ fdc_secbuf u_buf (
     .x_err       (x_err),
     .sp_req      (sp_req),
     .sp_write    (sp_write),
+    .sp_fmt      (sp_fmt),
     .sp_drive    (sp_drive),
     .sp_cyl      (sp_cyl),
     .sp_head     (sp_head),

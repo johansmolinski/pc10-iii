@@ -93,6 +93,7 @@ module pc_system #(
     output logic             drv_step_in,
     output logic        sp_req,
     output logic        sp_write,
+    output logic        sp_fmt,         // a FORMAT TRACK commit (the internal drive, doc/fdc.md 10)
     output logic        sp_drive,
     output logic [7:0]  sp_cyl,
     output logic        sp_head,
@@ -539,6 +540,7 @@ fdc_card #(.REG_DECODE(1'b1)) u_fdc (
     .drv_step_in (drv_step_in),
     .sp_req      (sp_req),
     .sp_write    (sp_write),
+    .sp_fmt      (sp_fmt),
     .sp_drive    (sp_drive),
     .sp_cyl      (sp_cyl),
     .sp_head     (sp_head),

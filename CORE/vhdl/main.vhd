@@ -97,7 +97,11 @@ entity main is
       drv_step_in_o           : out std_logic;
       sp_req_o                : out std_logic;
       sp_write_o              : out std_logic;
+      sp_fmt_o                : out std_logic;     -- a FORMAT TRACK commit (the internal drive)
       sp_drive_o              : out std_logic;
+      sp_cyl_o                : out std_logic_vector(7 downto 0);
+      sp_head_o               : out std_logic;
+      sp_sector_o             : out std_logic_vector(7 downto 0);
       sp_lba_o                : out std_logic_vector(15 downto 0);
       sp_rd_valid_i           : in  std_logic;
       sp_rd_data_i            : in  std_logic_vector(7 downto 0);
@@ -181,6 +185,7 @@ architecture synthesis of main is
          drv_step_in : out std_logic;
          sp_req      : out std_logic;
          sp_write    : out std_logic;
+         sp_fmt      : out std_logic;
          sp_drive    : out std_logic;
          sp_cyl      : out std_logic_vector(7 downto 0);
          sp_head     : out std_logic;
@@ -334,10 +339,11 @@ begin
          drv_step_in => drv_step_in_o,
          sp_req      => sp_req_o,
          sp_write    => sp_write_o,
+         sp_fmt      => sp_fmt_o,
          sp_drive    => sp_drive_o,
-         sp_cyl      => open,
-         sp_head     => open,
-         sp_sector   => open,
+         sp_cyl      => sp_cyl_o,
+         sp_head     => sp_head_o,
+         sp_sector   => sp_sector_o,
          sp_lba      => sp_lba_o,
          sp_rd_valid => sp_rd_valid_i,
          sp_rd_data  => sp_rd_data_i,

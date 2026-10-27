@@ -1,7 +1,7 @@
 #include <unistd.h>
 // sys_run.cpp - Verilator driver for the pc_system simulation.
 //   sys_run -b bios.rom [-s seconds] [-t trace.txt] [-i itrace.txt from_ms] [-q]
-//           [-a floppy.img] [-d dip_sw1] [-L ram_latency_clk]
+//           [-a floppy.img] [-B floppy.img] [-WB out.img] [-d dip_sw1] [-L ram_latency_clk]
 //           [-X xub.bin] [-H disk.img] [-J slave.img] [-G c,h,s] [-V variant]
 //           [-W out.img] [-K backend_us] [-S ms,ms,...]
 //           [-F font.bin] [-m] [-v] [-o image] [-C [max]] [-f]
@@ -13,6 +13,10 @@
 // 2C0h-2CFh and 230h.
 // Loads the BIOS right-aligned below 1 MB, runs, prints POST codes (port 80h)
 // and periodic CS:IP, and dumps the CGA text screen at the end.
+//
+// Floppies: -a and -B attach images to A: and B: (geometry from the size, an
+// 80-track drive for 720K as in the MEGA65 glue); -WB writes B:'s image to a
+// file at the end.
 //
 // Hard disk (rtl/hdc, doc/hdc.md): -X puts an option ROM (the XTIDE Universal
 // BIOS) into the card's socket at C8000, -H/-J attach master/slave images
@@ -206,9 +210,11 @@ static bool ascii_sc(char c, unsigned &sc, bool &shift) {
 }
 
 static bool fdclog = false;     // -f
+static bool dmachk = false;     // -dc: the FDC's DMA bytes against the RAM
 int main(int argc, char **argv) {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     const char *bios = nullptr, *trace = nullptr, *itrace = nullptr, *fdimg = nullptr;
+    const char *fdimg_b = nullptr, *fdout_b = nullptr;   // -B image (drive B:), -WB out.img
     const char *xub = nullptr, *hdimg[2] = {nullptr, nullptr}, *hdgeo = nullptr, *hdout = nullptr;
     const char *xtaimg = nullptr, *xtaout = nullptr;
     int jmp208 = -1;                    // -1: B with an image, else A
@@ -241,6 +247,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-d") && i + 1 < argc) dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-q")) quiet = true;
         else if (!strcmp(argv[i], "-f")) fdclog = true;
+        else if (!strcmp(argv[i], "-dc")) dmachk = true;
         else if (!strcmp(argv[i], "-m")) mono = true;
         else if (!strcmp(argv[i], "-P") && i + 1 < argc) cbm_dip = strtoul(argv[++i], nullptr, 16);
         else if (!strcmp(argv[i], "-v")) vidlog = true;
@@ -251,6 +258,8 @@ int main(int argc, char **argv) {
             if (i + 1 < argc && argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') wmax = atoi(argv[++i]);
         }
         else if (!strcmp(argv[i], "-a") && i + 1 < argc) fdimg = argv[++i];
+        else if (!strcmp(argv[i], "-B") && i + 1 < argc) fdimg_b = argv[++i];
+        else if (!strcmp(argv[i], "-WB") && i + 1 < argc) fdout_b = argv[++i];
         else if (!strcmp(argv[i], "-L") && i + 1 < argc) ramlat = atoi(argv[++i]);
         else if (!strcmp(argv[i], "-i") && i + 2 < argc) { itrace = argv[++i]; itrace_from = atof(argv[++i]); }
         else if (!strcmp(argv[i], "-X") && i + 1 < argc) xub = argv[++i];
@@ -370,29 +379,41 @@ int main(int argc, char **argv) {
     std::vector<unsigned char> mring(1 << 20);
     unsigned long long mdots = 0;
 
-    // floppy A: from an image file (geometry from its size)
-    std::vector<unsigned char> disk;
-    if (fdimg) {
-        FILE *d = fopen(fdimg, "rb");
-        if (!d) { perror(fdimg); return 1; }
-        fseek(d, 0, SEEK_END); disk.resize(ftell(d)); fseek(d, 0, SEEK_SET);
-        if (fread(disk.data(), 1, disk.size(), d) != disk.size()) { perror(fdimg); return 1; }
-        fclose(d);
-        unsigned tr = 40, hd = 2, spt = 9;
-        switch (disk.size()) {
-            case 163840: hd = 1; spt = 8; break;
-            case 184320: hd = 1; spt = 9; break;
-            case 327680: spt = 8; break;
-            case 368640: break;
-            case 737280: tr = 80; break;
-            default: fprintf(stderr, "%s: unknown floppy size %zu\n", fdimg, disk.size()); return 1;
+    // floppies A: and B: from image files (geometry from the size; an 80-track
+    // drive for 720K, as pc_fdd_sd.vhd's drv_80trk)
+    std::vector<unsigned char> disks[2];
+    {
+        unsigned present = 0, tracks = 0, heads = 0, spts = 0, d80 = 0;
+        const char *names[2] = {fdimg, fdimg_b};
+        for (int k = 0; k < 2; k++) {
+            if (!names[k]) continue;
+            std::vector<unsigned char> &disk = disks[k];
+            FILE *d = fopen(names[k], "rb");
+            if (!d) { perror(names[k]); return 1; }
+            fseek(d, 0, SEEK_END); disk.resize(ftell(d)); fseek(d, 0, SEEK_SET);
+            if (fread(disk.data(), 1, disk.size(), d) != disk.size()) { perror(names[k]); return 1; }
+            fclose(d);
+            unsigned tr = 40, hd = 2, spt = 9;
+            switch (disk.size()) {
+                case 163840: hd = 1; spt = 8; break;
+                case 184320: hd = 1; spt = 9; break;
+                case 327680: spt = 8; break;
+                case 368640: break;
+                case 737280: tr = 80; break;
+                default: fprintf(stderr, "%s: unknown floppy size %zu\n", names[k], disk.size()); return 1;
+            }
+            present |= 1u << k;
+            tracks |= tr << (8 * k);
+            heads |= hd << (2 * k);
+            spts |= spt << (6 * k);
+            if (tr == 80) d80 |= 1u << k;
         }
-        tb->img_present = 1;
-        tb->img_tracks = tr;
-        tb->img_heads = hd;
-        tb->img_spt = spt;
-    } else
-        tb->img_present = 0;
+        tb->img_present = present;
+        tb->img_tracks = tracks;
+        tb->img_heads = heads;
+        tb->img_spt = spts;
+        tb->drv_80trk = d80;
+    }
     int sp_state = 0, sp_n = 0;     // 0 idle, 1 reading, 2 writing, 3 done pulse
 
     // hard disks
@@ -494,7 +515,8 @@ int main(int argc, char **argv) {
                                tb->sp_sector, tb->sp_lba);
         }
         size_t base = (size_t)tb->sp_lba * 512;
-        bool bad = tb->sp_drive != 0 || base + 512 > disk.size();
+        std::vector<unsigned char> &disk = disks[tb->sp_drive & 1];
+        bool bad = base + 512 > disk.size();
         if (sp_state == 1) {
             if (bad) { tb->sp_done = 1; tb->sp_err = 1; sp_state = 3; }
             else {
@@ -744,6 +766,56 @@ int main(int argc, char **argv) {
         if (tb->mda_ce)
             mring[mdots++ & (mring.size() - 1)] = tb->mda_video | tb->mda_intens << 1 | tb->mda_hsync << 2 |
                                                   tb->mda_vsync << 3 | (!tb->mda_hblank && !tb->mda_vblank) << 4;
+        if (dmachk) {
+            // the DMA oracle of the FDC (2026-10-26): a memory-to-FDC byte (WRITE DATA,
+            // FORMAT) must be the RAM's byte at the cycle's address; an FDC-to-memory byte
+            // must be in the RAM after its cycle. Each mismatch is printed with the last
+            // 24 clks of the bus.
+            auto *q = tb->rootp;
+            struct H { unsigned a, d; uint8_t iow, ior, aen, dack, memr, memw; };
+            static H hist[32]; static unsigned hn = 0;
+            static unsigned w_addr = 0, r_addr = 0, r_pend = 0, n_w = 0, n_r = 0, n_bad = 0;
+            static uint8_t r_byte = 0;
+            unsigned a = q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__isa_addr;
+            H h = { a, q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__isa_dout,
+                    (uint8_t)q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__isa_iow_n,
+                    (uint8_t)q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__isa_ior_n,
+                    (uint8_t)q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__isa_aen,
+                    (uint8_t)((q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__isa_dack_n >> 2) & 1),
+                    (uint8_t)q->tb_sys__DOT__u_pc__DOT__isa_memr_n, (uint8_t)q->tb_sys__DOT__u_pc__DOT__isa_memw_n };
+            hist[hn++ & 31] = h;
+            auto dump = [&]() {
+                for (unsigned k = hn - 24; k != hn; k++) {
+                    H &x = hist[k & 31];
+                    printf("    a %05X d %02X iow %d ior %d aen %d dack2 %d memr %d memw %d\n",
+                           x.a, x.d, x.iow, x.ior, x.aen, x.dack, x.memr, x.memw);
+                }
+            };
+            if (q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__dma_ack) {
+                if (!h.iow) w_addr = a;
+                if (!h.ior) { r_addr = a; }
+            }
+            if (q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__dma_wr) {
+                n_w++;
+                uint8_t got = q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__wdat_q, exp = q->tb_sys__DOT__ram[w_addr & 0xFFFFF];
+                if (got != exp && n_bad++ < 20) {
+                    printf("[%9.4f ms] DMA->FDC byte %02X, RAM[%05X] = %02X  %04X:%04X\n", cyc / CLK_HZ * 1e3,
+                           got, w_addr, exp, tb->cs, tb->ip);
+                    dump();
+                }
+            }
+            if (!h.ior && !h.dack) { r_byte = q->tb_sys__DOT__u_pc__DOT__u_fdc__DOT__isa_din; r_pend = 8; }
+            if (r_pend && h.ior && --r_pend == 0) {
+                n_r++;
+                uint8_t exp = r_byte, got = q->tb_sys__DOT__ram[r_addr & 0xFFFFF];
+                if (got != exp && n_bad++ < 20) {
+                    printf("[%9.4f ms] FDC->DMA byte %02X, RAM[%05X] = %02X  %04X:%04X\n", cyc / CLK_HZ * 1e3,
+                           exp, r_addr, got, tb->cs, tb->ip);
+                    dump();
+                }
+            }
+            if (cyc == total - 1) printf("DMA oracle: %u FDC writes, %u FDC reads, %u mismatches\n", n_w, n_r, n_bad);
+        }
         if (fdclog) {
             auto *q = tb->rootp;
             static unsigned intr_d = 0, drq_d = 0;
@@ -812,6 +884,12 @@ int main(int argc, char **argv) {
         printf("hard disk backend: %llu sector reads, %llu sector writes\n", hd_reads, hd_writes);
     if (xtaimg)
         printf("XTA backend: %llu sector reads, %llu sector writes\n", xta_reads, xta_writes);
+    if (fdout_b && fdimg_b) {
+        FILE *o = fopen(fdout_b, "wb");
+        if (!o || fwrite(disks[1].data(), 1, disks[1].size(), o) != disks[1].size()) perror(fdout_b);
+        if (o) fclose(o);
+        printf("B: image written to %s\n", fdout_b);
+    }
     if (xtaout && xtaimg) {
         FILE *o = fopen(xtaout, "wb");
         if (!o || fwrite(xta.data(), 1, xta.size(), o) != xta.size()) perror(xtaout);

@@ -79,6 +79,7 @@ module pc_system #(
     output logic             drv_step_in,
     output logic        sp_req,
     output logic        sp_write,
+    output logic        sp_fmt,
     output logic        sp_drive,
     output logic [7:0]  sp_cyl,
     output logic        sp_head,
@@ -222,7 +223,7 @@ module pc_system #(
     assign drv_select = 2'b00;
     assign drv_step = 1'b0;
     assign drv_step_in = 1'b0;
-    assign {sp_req, sp_write, sp_drive, sp_head, sp_wr_valid} = '0;
+    assign {sp_req, sp_write, sp_fmt, sp_drive, sp_head, sp_wr_valid} = '0;
     assign {sp_cyl, sp_sector, sp_lba, sp_wr_data} = '0;
     // no hard disk card in the stand-in
     assign hdc_rom_addr = '0;
