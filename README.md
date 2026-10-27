@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="doc/img/pc10-logo-horizontal.svg" alt="PC10 logo" width="480">
+</p>
+
 # PC10-III for MEGA65
 
 A cycle-exact Commodore PC10-III (IBM PC/XT compatible) for the MEGA65, by
