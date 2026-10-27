@@ -2569,8 +2569,8 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   restart line). tb/shell `run.sh` PASS (tb_glue as before).
 - **Gates** (fedora `gates.sh cgac-a`): g_tr e5d8018b..., g_tre a2c25729...,
   g_trL2 e5d8018b...: identical to merge-d (first difference against MartyPC
-  unchanged); tb/cga, tb/fdc 246 checks, tb/hdc 3,182 checks, tb/mda,
-  tb/shell PASS.
+  unchanged); g_fd boots from floppy A:; tb/cga, tb/fdc 246 checks, tb/hdc
+  3,182 checks, tb/mda, tb/shell PASS.
 - **Build `pc10-cgac-a`** (REF=pc10-rel-0.1): RESULT OK, WNS +0.349, WHS
   +0.018, LUTs 31,893 (+593), BRAM 282.5/365 (+6), 0 routing errors. Kit
   `~/pcxt-work/kits/pc10-cgac-a/` (SD files as release 0.1). Loaded on the
