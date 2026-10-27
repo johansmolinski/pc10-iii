@@ -5,8 +5,10 @@ gate array 5720 decodes (section 1), the serial port (section 2), the
 parallel port (section 3), the bus mouse (section 4), the Covox Speech Thing
 on the parallel port's latch and the audio mixer (section 5), the MEGA65 side:
 the PMOD headers, the joystick port and the menu (section 6), the tests
-(section 7), the hardware test (section 8), open questions (section 9). Not on
-hardware yet (build `pc10-ports-c`).
+(section 7), the hardware test (section 8), open questions (section 9). On
+hardware (pc10-real-v, pc10-bline-b, 2026-10-27): the POST, the mouse in
+MTEST and the Covox; the serial and printer ports are not tested (no PMOD
+adapter), section 8.
 
 Facts are marked with their source; **[A]** marks an assumption, **[Q]** an
 open question.
@@ -415,6 +417,16 @@ MTEST.COM, COVOX.COM and an AUTOEXEC.BAT that runs `mouse` and `mtest`
    `dir > prn`, `copy file prn`. Without a printer the BIOS still sends
    (BUSY reads "not busy").
 6. **PMOD off:** a module's power LED goes out, nothing is driven.
+
+**Results** (the user, 2026-10-27, builds pc10-real-v and pc10-bline-b):
+
+- 1: the POST lists LPT, COM, MOUSE and RTC.
+- 2: MOUSE.COM installs and MTEST follows the mouse (an Amiga mouse). Not
+  tried yet: a program with a mouse cursor; the Atari ST mouse (its axis
+  directions stay open, section 6.2).
+- 3: COVOX.COM plays its tone and sweep.
+- 4-6: not tested: no serial/printer PMOD adapter. Release 0.1 says so
+  (README, doc/release-0.1.md).
 
 ## 9. Open questions
 

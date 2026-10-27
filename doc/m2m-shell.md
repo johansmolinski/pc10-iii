@@ -907,13 +907,15 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
   which then loses steps: only sound, the counter would be off until the next
   TRK0), its TRK0 delay, and the /DSKCHG behaviour of the MEGA65's drive (the
   guard relies on it as Megamiga does) are untested here.
-- **Not on hardware:** nothing of this has run on a MEGA65 (no bitstream was
-  loaded). Untested in simulation: the firmware (QNICE), i.e. BIOS_ALIGN,
-  FONT_START, PREP_LOAD_IMAGE/FD_SETUP, the menu; the M2M CSR handshake of
-  the floppy devices; the SD engine port with the real `sdhost.vhd` (the
-  bench uses a model of its protocol).
+- **Simulation gaps:** the shell runs on the MEGA65 (every build since
+  pc10-real-r), but simulation still does not cover the menu's cursor
+  (`menu.asm`), the M2M CSR handshake of the floppy devices and the SD
+  engine port with the real `sdhost.vhd` (the bench uses a model of its
+  protocol); the QNICE emulator tests cover the signature, PREP_LOAD_IMAGE,
+  the RTC write-back, C: across power-off and the menu rows.
 - **Hard disk C:** remembered over a power cycle since 2026-10-26 (section
-  4; not on hardware yet: build pc10-hdc-a); single-block SD writes may be
+  4; on hardware since pc10-hdc-a, again with pc10-bline-b after the
+  settings fix for a shrinking menu); single-block SD writes may be
   slower than the drive's slot.
 - **Floppy images:** SPACE on a mounted " A:"/" B:" (and " C:") line ejects the disk
   (2026-10-26, Megamiga's HANDLE_UNMOUNT_KEY in `HANDLE_CORE_IO`: the drive's
@@ -929,7 +931,7 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
 - **59.92 vs 60 Hz on HDMI:** ascal drops or repeats a frame about every 13 s.
   A 59.92 Hz HDMI mode would be a new M2M video mode (an M2M-UPSTREAM
   exception).
-- **Firmware ROM:** 32531 of 32768 words; code banks since 2026-10-27 (bank 0:
+- **Firmware ROM:** 32557 of 32768 words; code banks since 2026-10-27 (bank 0:
   `pc_hdc.asm`); more code can move into banks 1-7.
 - **R3:** this fork's R3 board top was never adapted. It needs:
   - sd-host (exception 18): bidirectional SD pins (CMD, DAT0..3 with output

@@ -2514,3 +2514,16 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
 - Hardware (pc10-bline-b): the user confirmed it works: C: is remembered
   across power-off again, the settings are kept, and the menu (the B: line
   with ` int. drive`, the frame within the 25 lines) is as designed.
+
+## 2026-10-27 - Release 0.1: what ships (branch `rel01`)
+
+- **Hardware results** (the user, on pc10-bline-b): 8088 MPH still hangs in
+  its sprite part (the known limitation stays; doc/backlog.md: the IBM CGA
+  card's timing). The Covox plays COVOX.COM's tone and sweep. The bus mouse
+  works in MTEST with MOUSE.COM (a program with a mouse cursor not tried
+  yet). The serial and printer ports are not tested: no PMOD adapter.
+- **Docs for 0.1:** README and doc/release-0.1.md lose their in-flight notes
+  (intfd and ports are in main); the folder-as-hard-disk feature (branch
+  `dfolder`, uncommitted, no firmware) is cut from both; both say the serial
+  and printer ports are untested on hardware. doc/ports.md section 8 has the
+  results; doc/m2m-shell.md's open issues are brought up to date.

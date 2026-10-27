@@ -16,7 +16,8 @@ and memory on all of them).
 
 **Version 0.1** is the first release. It runs the Commodore BIOS 4.41 and
 Commodore MS-DOS 3.21 from floppy images and from the hard disk; every feature
-below was tested on a MEGA65. It is built for the **MEGA65 R6** only (see
+below was tested on a MEGA65 except the serial and printer ports (see
+[Ports, mouse and Covox](#ports-mouse-and-covox)). It is built for the **MEGA65 R6** only (see
 [Boards](#boards)).
 
 - [Features](#features)
@@ -46,20 +47,15 @@ below was tested on a MEGA65. It is built for the **MEGA65 R6** only (see
 - **640, 512, 256 or 128 KB** of memory.
 - **Floppy drives A: and B:** as disk images on the SD card (160K, 180K,
   320K, 360K, 720K), read and write, with write protection.
-  <!-- in-flight: branch intfd (cut the next sentence if it misses 0.1) -->
   Or drive B: as the MEGA65's internal 3.5" drive, reading and writing real
   720K disks ([B: as the internal drive](#b-as-the-internal-drive)).
 - **The hard disk C:**, the PC20-III's 20 MB drive (a Western Digital
   WD93024-X, which the Commodore BIOS drives itself), as an image on the SD
   card, read and write; the image is remembered across power-off.
-  <!-- in-flight: branch dfolder (cut the next sentence if it misses 0.1) -->
-  And a folder of the SD card as a second, read-only hard disk
-  ([A folder of the SD card as a hard disk](#a-folder-of-the-sd-card-as-a-hard-disk)).
 - **The battery clock** (an MSM6242B, as on the board): set from the MEGA65's
   battery clock at power-up, and written back to it when DOS's SETCLOCK or the
   BIOS SETUP sets the time.
 - **The PC speaker.**
-  <!-- in-flight: branch ports (cut the next item if it misses 0.1) -->
 - **The ports of the board** ([Ports, mouse and Covox](#ports-mouse-and-covox)):
   the serial port (an 8250) and the printer port on the MEGA65's PMOD
   headers; the bus mouse with an Amiga (or Atari ST) mouse in joystick port 1,
@@ -261,7 +257,6 @@ Help opens it:
 | `Help` | the help page |
 | `Reset the PC` | resets the PC (like the MEGA65's reset button) |
 
-<!-- in-flight: intfd adds int. drive, ports the submenu (cut what misses 0.1) -->
 With the features below: `int. drive` beside ` B:<No Disk>`
 ([B: as the internal drive](#b-as-the-internal-drive)) and the submenu
 `Ports and mouse` ([Ports, mouse and Covox](#ports-mouse-and-covox)).
@@ -277,7 +272,6 @@ to the image file on the SD card (a write is on the card when DOS reports it
 done). The floppy images are not remembered across power-off: A: and B:
 start empty.
 
-<!-- in-flight: branch intfd. Cut this whole subsection if it misses 0.1. -->
 #### B: as the internal drive
 
 While B: holds no image its menu line reads ` B:<No Disk>         int. drive`:
@@ -293,7 +287,6 @@ off while B: is the drive.
 - HD (1.44M) disks cannot be used: they need an AT's controller.
 - The PC sees the disk through the same floppy controller model as an image:
   standard DOS disks work; copy-protected disks and odd formats do not.
-<!-- intfd: FORMAT B: = 360K confirmed on hardware (pc10-intfd-c); the user's decision: no DRIVER.SYS route, this note -->
 - `FORMAT B:` under MS-DOS 3.21 makes a 360K disk (40 tracks), and
   `FORMAT B: /T:80 /N:9` says "Parameters not supported": DOS 3.21 sets up
   the PC10-III's floppy drives as 360K drives, as on the real machine. Disks
@@ -307,21 +300,6 @@ starts. Without an image the PC is a PC10-III without a hard disk ("Hard disk
 not found" at start-up is normal then). The image is remembered with its card
 and path (in the settings file) and mounted again at the next power-on; if it
 is missing then, the core says so for 5 seconds and starts without it.
-
-<!-- in-flight: branch dfolder. Cut this whole subsection if it misses 0.1; check every detail against the branch's doc first. -->
-#### A folder of the SD card as a hard disk
-
-A folder of the SD card can be a second hard disk for DOS, read-only: choose
-the folder in the menu, and at the next reset of the PC DOS sees its files as
-drive D: (C: when no hard disk image is mounted).
-
-- Read-only: DOS reports writes as write-protect errors.
-- Long names appear as their 8.3 short names, the ones the card's own
-  directory keeps for them (e.g. `VERYLO~1.FIL`), as a PC shows them.
-- A snapshot at the PC's reset: changes on the card appear after the next
-  reset. Up to the size of the PC20-III's drive (about 21 MB); files that do
-  not fit are left out.
-- Not remembered across power-off.
 
 ### Speed
 
@@ -355,7 +333,6 @@ at boot.
 
 The PC speaker, on HDMI and the audio jack.
 
-<!-- in-flight: branch ports. Cut this whole subsection (and the Features item) if it misses 0.1. -->
 ### Ports, mouse and Covox
 
 The PC10-III's ports, as its Commodore BIOS finds them at start-up (COM at
@@ -369,7 +346,9 @@ The PC10-III's ports, as its Commodore BIOS finds them at start-up (COM at
   tolerant: use a 3.3 V USB-UART module or an RS-232 level shifter (MAX3232)
   for the serial port, 5 V buffers for a printer, and never RS-232 levels on
   the header. The serial layout is Megamiga's, so its adapters fit.
-  doc/ports.md section 6.1 has the wiring.
+  doc/ports.md section 6.1 has the wiring. Release 0.1: the serial and
+  printer ports are not tested on hardware yet (simulated only, with the
+  Commodore BIOS and DOS); the mouse and the Covox are.
 - **Mouse:** an Amiga mouse (the PC10-III came with Commodore's 1352, an Amiga
   mouse) in joystick port 1; `Ports and mouse > Mouse: Atari ST` for an
   Atari ST mouse. It needs Microsoft's bus mouse driver, MOUSE.COM, which is
@@ -432,7 +411,6 @@ the back card first, then in the tray, and `/pc10/bios.rom`, `ucode.bin` and
   sy2002 and MJoergen, with [QNICE-FPGA](https://github.com/sy2002/QNICE-FPGA),
   in the [Megamiga](https://github.com/johansmolinski/Megamiga) fork, whose
   SD card engine, menu and drive sound the core uses.
-  <!-- in-flight: branch intfd (cut the next sentence if it misses 0.1) -->
   The internal drive's read and write chains are sy2002's Hardware Floppy
   from [AExp](https://github.com/sy2002/AExp) (via Megamiga).
 - The default font: VileR's ([int10h.org](https://int10h.org/oldschool-pc-fonts/),
