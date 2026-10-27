@@ -2410,3 +2410,40 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   mega65_r6), an 8086 bundle as `--ucode`, uncommitted changes. That
   bitstream still says "0.2 (WIP)" on its screens; the release needs a build
   of the merged tree.
+
+## 2026-10-27 - Main with intfd, ports, mph and release (build pc10-real-v)
+
+- **Merges:** `intfd` (drive B: as the internal drive, which carries
+  dfolder's committed FDC commits), `ports` (after its docs commit 3c1cc28),
+  `mph`, `release`. Not merged: `z8086-eval` (an evaluation, superseded by
+  `z86`), the uncommitted D:-folder work in the `dfolder` worktree (no
+  firmware yet). The README's in-flight dfolder parts are still in; cut them
+  if D: misses 0.1.
+- **Menu (intfd + ports):** 60 lines, the row "Drive B" at 7-8, "Ports and
+  mouse" at 45-52 (PMOD 48, Mouse: Atari ST 50), Reset the PC at 57; OPTM_DY
+  24; groups BDRV 15, PMOD 16, MOUSE 17. Settings signature `menu=8` (both
+  branches used `7` for different layouts). `MENU_HEAP_SIZE` 1280 (demand
+  1276: 744 item characters, 4 x 60, 5 submenus), `HEAP_SIZE` 19296; HEAP
+  0xA6CA and the heap end 0xF72A unchanged; ROM 32740/32768.
+- **Tests (local):** tb/shell `run.sh` PASS (tb_fdd 49 transfers, drvsnd,
+  chipset, rtc, ports, CFGSIG, PREPLOAD, RTCWB, HDC, stub). tb_glue does not
+  elaborate here ("too large object, 256 kB > --max-stack-alloc"): the same
+  before the merges, so it comes from this host's ghdl, not the tree.
+  tb/ports PASS, tb/intfd 184 checks PASS, tb/pit PASS (18,897 reads).
+  tb/sys (`make FE=1 PVC4=1 RAM_KB=256`, BIOS 4.41, `-d 5D -s 20`, 63 min
+  wall): the POST lists `Onboard   LPT    at 03BCh`, `COM    at 03F8h`,
+  `MOUSE  at 023Ch`, `RTC    at 02C0h`; BDA COM 03F8, LPT 03BC, equipment
+  426D, as on the ports branch.
+- **Gates** (fedora `gates.sh merge-d`, tree src-m4): g_tr e5d8018b..., g_tre
+  a2c25729..., g_trL2 e5d8018b...: identical to mph-b (the first difference
+  with MartyPC is still at reference clock 2,227,925). g_fd boots ("Booted from
+  floppy A:") and matches mph-b apart from ports' BDA line. tb/fdc 246 checks,
+  tb/hdc 3,182, tb/cga and tb/mda PASS. tb/shell is not run on fedora (no M2M
+  tree there).
+- **Build `pc10-real-v`** (full, no reference: intfd's and ports' pins both
+  change IOBs, which broke the incremental runs pc10-intfd-a/pc10-ports-a):
+  RESULT OK, WNS +0.356, WHS +0.036 (main_clk +12.213 / +0.036, qnice
+  +0.504), LUTs 31,294, FFs 21,909, BRAM 260.5/365, 0 routing errors; 6 min
+  15 s. Kit `~/pcxt-work/kits/pc10-real-v/` (`pc10-real-v.bit` md5
+  b38b0554..., `sd/pc10/b720.img`, `sd/pc10/ports.img`; the other SD files
+  as pc10-hdc-a). CORE_VERSION 0.1. Not on hardware yet.
