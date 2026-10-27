@@ -158,12 +158,12 @@ always_ff @(posedge clk) begin
     end else if (cpu_fall) begin
         if (cpu_bus_t == T1) begin
             if (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) cmd_memr <= 1'b1;
-            if (cpu_bus_type == ST_IOR)  cmd_ior  <= 1'b1;
             if (cpu_bus_type == ST_INTA) cmd_inta <= 1'b1;
         end
         if (cpu_bus_t == T2) begin
             if (cpu_bus_type == ST_MEMW) cmd_memw <= 1'b1;
             if (cpu_bus_type == ST_IOW)  cmd_iow  <= 1'b1;
+            if (cpu_bus_type == ST_IOR)  cmd_ior  <= 1'b1;   // pc10-iii: IORC in T2 (below)
         end
     end
 end
@@ -180,6 +180,16 @@ logic aen;                              // DMA owns the bus
 // after AEN fell (aen_d); here that clk would be half an OSC tick, after the
 // cards' next dot tick, so the gap moved to the clk before the edge instead
 // (the CPU-clock and OSC-tick timing are unchanged).
+// pc10-iii: IOR starts at the falling edge in T2, as the 8288's IORC and
+// MartyPC's (from T2, with the advanced write commands), not in T1 as MEMR
+// still does (doc/architecture.md section 3). In T1 it was one CPU clock early,
+// and a refresh that the hold logic grants in Ti (MartyPC's timing) raises AEN
+// at the start of T2: AEN cut that early strobe and the CPU's IOR came back
+// after the transfer, so the I/O device saw two read strobes for one IN. The
+// 8253 counted two reads and its LSB/MSB sequence ran one byte out of step
+// (8088 MPH's metric, CGA_COMP's timings, doc/history.md 2026-10-26); with
+// IORC in T2 the strobe starts after the transfer, once. About 1 IN in 4,000
+// of a latch-and-read loop was hit, at 4.77 and at 7.16 MHz.
 wire  cmd_en   = !aen;
 wire  cpu_memr = cmd_memr && cmd_en;
 wire  cpu_memw = cmd_memw && cmd_en;
@@ -189,7 +199,7 @@ wire  inta     = cmd_inta;
 
 `ifndef SYNTHESIS
 // the original 8288 function, as a reference for the registers above
-logic cmd_rd, cmd_wr;
+logic cmd_rd, cmd_wr, cmd_wr2;          // cmd_wr2: the T2 commands (writes, IORC)
 wire  is_read  = cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR ||
                  cpu_bus_type == ST_IOR  || cpu_bus_type == ST_INTA;
 wire  is_write = cpu_bus_type == ST_MEMW || cpu_bus_type == ST_IOW;
@@ -197,16 +207,18 @@ always_ff @(posedge clk) begin
     if (reset || !in_cycle || cyc_end) begin
         cmd_rd <= 1'b0;
         cmd_wr <= 1'b0;
+        cmd_wr2 <= 1'b0;
     end else if (cpu_fall) begin
         if (cpu_bus_t == T1 && is_read)  cmd_rd <= 1'b1;
         if (cpu_bus_t == T2 && is_write) cmd_wr <= 1'b1;
+        if (cpu_bus_t == T2)             cmd_wr2 <= 1'b1;
     end
 end
 always_ff @(posedge clk)
     if (!reset && (
         cpu_memr != (cmd_rd && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR) && !aen) ||
         cpu_memw != (cmd_wr && cpu_bus_type == ST_MEMW && !aen) ||
-        cpu_ior  != (cmd_rd && cpu_bus_type == ST_IOR && !aen) ||
+        cpu_ior  != (cmd_wr2 && cpu_bus_type == ST_IOR && !aen) ||
         cpu_iow  != (cmd_wr && cpu_bus_type == ST_IOW && !aen) ||
         inta     != (cmd_rd && cpu_bus_type == ST_INTA)))
         $fatal(1, "xt_board: command registers differ from the 8288 function");
@@ -718,7 +730,7 @@ always_comb begin
         cmd_memr_next = 1'b0;
         cmd_memw_next = 1'b0;
     end else if (cpu_fall) begin
-        if (cpu_bus_t == T1 && cpu_bus_type == ST_IOR) cmd_ior_next = 1'b1;
+        if (cpu_bus_t == T2 && cpu_bus_type == ST_IOR) cmd_ior_next = 1'b1;
         if (cpu_bus_t == T2 && cpu_bus_type == ST_IOW) cmd_iow_next = 1'b1;
         if (cpu_bus_t == T1 && (cpu_bus_type == ST_CODE || cpu_bus_type == ST_MEMR)) cmd_memr_next = 1'b1;
         if (cpu_bus_t == T2 && cpu_bus_type == ST_MEMW) cmd_memw_next = 1'b1;
@@ -755,6 +767,17 @@ always_ff @(posedge clk)
                    (!mem_rd_n && !mem_rd_n_d && cpu_memr != cpu_memr_d) ||
                    (!mem_wr_n && !mem_wr_n_d && cpu_memw != cpu_memw_d)))
         $fatal(1, "xt_board: a bus strobe changed owner without going high");
+// pc10-iii: one IN, one IOR strobe: a device with read side effects (the
+// 8253's LSB/MSB sequence, the 8237's flip-flop, the 765's FIFO) counts each
+// strobe. A refresh may still cut IOR (it cannot start before T2 now) only
+// where it would on the 5160 too; a second strobe in one bus cycle stops.
+logic ior_seen;
+always_ff @(posedge clk) begin
+    if (reset || cyc_end) ior_seen <= 1'b0;
+    else if (cpu_ior && !cpu_ior_d) ior_seen <= 1'b1;
+    if (!reset && cpu_ior && !cpu_ior_d && ior_seen)
+        $fatal(1, "xt_board: a second IOR strobe in one CPU bus cycle");
+end
 `endif
 assign isa_ale    = cpu_bus_t == T1;
 assign isa_dack_n = dack_n;

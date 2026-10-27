@@ -57,6 +57,9 @@ why, test numbers).
   harness), `tb_z86.v` (wrapper; debug outputs via hierarchical references).
 - `tb/sys/`: the system (`pc_system` + RAM/ROM models, a BIOS, the MartyPC
   trace comparison `tools/ctrace_diff.py`).
+- `rtl/system/kf/`: kitune-san's 8237/8253/8255/8259 (changes marked
+  `pc10-iii`); `tb/pit/`: the 8253's read/write byte sequence and latch
+  (`make run`, mutants `mut.py`).
 - `rtl/video/cga/` (cga_card.sv, cga_crtc.sv) and `tb/cga/` (Verilator TB
   with a C++ MartyPC model, `make run`, mutants `mut.py`): `doc/cga.md`.
 - `rtl/video/pvc4/pvc4.sv`, `rtl/system/cbm_cfg230.sv` and `tb/pvc4/`: the

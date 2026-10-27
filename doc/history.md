@@ -2300,3 +2300,60 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   `~/pcxt-work/kits/pc10-ports-c/` (`pc10-ports-c.bit`, `sd/pc10/ports.img`:
   Colt DOS 3.21 disk 1 + MOUSE.COM from PC1020-3.ZIP + MTEST.COM + COVOX.COM;
   the other SD files as pc10-keys-b). Not on hardware yet.
+
+## 2026-10-26 - 8253 reads: the control word restarts the byte sequence; IOR in T2 (branch `mph`)
+
+- **Why:** on the MEGA65 (pc10-real-u, 4.77 MHz) 8088 MPH's loader reported a
+  "metric cycle count of 12166" (its Zen timer: counter 0 in mode 2, latch,
+  LSB, MSB; a real 5150 gives ~1680, the window is 1668-1688), Trixter's
+  CGA_COMP measured 8 KB of video RAM writes in 35,698 us (224 KB/s) and the
+  CGA refresh rate as 24.1 Hz (min 18.86, max 155.28, average 28.26).
+- **Not the CPU or the PVC4:** a test ROM (no BIOS) running the loader's own
+  metric code and Zen timer (copied from the PKLITE-unpacked EXE, kept in
+  `~/pcxt-work`) gives 1673 (0689h) on both the PVC4 build (FE2010A) and the
+  IBM CGA build; REP STOSW of 4096 words to B800 takes 29,511 ticks (331 KB/s)
+  on both, the vertical retrace period 19,912 ticks (59.92 Hz).
+- **Cause 1, KF8253:** a control word reset the LSB/MSB read and write
+  sequence only when its RL bits differed from the counter's (the BIOS writes
+  36h, the Zen timer and CGA_COMP 34h: both RL = 11). One odd read left every
+  later two-byte read of the counter byte-swapped. In the DOS environment the
+  retrace periods came out as C44E, C94E, ... = the true 4EC4 (20,164) with
+  its bytes swapped: 1193180 / C44Eh = 23.7 Hz, the hardware's "24.1 Hz".
+  Fixed in `KF8253_Counter.sv`: every mode word restarts both sequences and
+  drops an unread latch (8254 data sheet: "latched until read or the counter
+  is reprogrammed"; MartyPC `set_mode`: read_state NoRead, load_state
+  WaitingForLsb, count_is_latched false).
+- **Cause 2, the odd read:** the CPU's IOR started at the falling edge in T1
+  (doc/architecture.md section 3 listed it as an open point; the 8288's IORC
+  and MartyPC's start in T2). A refresh that the hold logic grants in Ti
+  (MartyPC's timing) raises AEN at the start of T2: it cut the early IOR,
+  and the strobe came back after the transfer, so the 8253 counted two reads
+  for one IN (found with a probe on counter 0: `[pit0 rd] F000:004A aen=1`,
+  then the same IN again). A loop of latch + two INs (`tb/sys/pitread_rom.py`)
+  was hit about once per 4,000 INs at 4.77 MHz (pc10-real-u's RTL) and at
+  7.16 MHz (main). IOR now starts in T2 (cmd_ior, its next-clk copy and the
+  8288 reference); MEMR stays in T1 (the CGA/PVC4 wait calibration). A new
+  `$fatal` in xt_board: "a second IOR strobe in one CPU bus cycle".
+- **Tests:**
+  - `tb/pit` (new): the 8253 driven with I/O cycles against a model written
+    from the data sheet: `seq` (odd read/write then the same RL, unread latch
+    then a control word, double latch, RL 01/10/11 on all counters), `zen`
+    (400 Zen-timer measurements with odd reads in between), `random` (60,000
+    operations): PASS, 18,897 reads compared. `mut.py`: 8 of 8 killed (the
+    original RL-change rule, latch kept by a control word, no latch, latch
+    released after the LSB, read sequence frozen, MSB first for reads and
+    for writes, LSB-only read gives the MSB).
+  - `pitread_rom.py` in tb/sys (`make FE=1 PVC4=1`): 8,000 INs, 8,000 read
+    strobes, POST AF; with IOR back in T1 the run stops at the new `$fatal`
+    (at 17.9 ms, 7.16 MHz).
+  - Gates (fedora `gates.sh mph-b`, vs turbo-b): g_tr's first difference
+    against MartyPC unchanged (reference clock 2,227,925); the trace differs
+    from turbo-b's only in the data column of 4,111 `T1 IOR` lines (now FF:
+    no strobe in T1 yet; MartyPC's trace prints 00 there, the comparison
+    does not use it); g_tre likewise (4,112), g_trL2 = g_tr. g_fd boots ("Booted
+    from floppy A:"), the boot sector read at 9,405.4 ms instead of 9,005.4:
+    GLaBIOS's IO_WAIT_MS (latch + two INs) now waits as long as it should
+    (before, cut INs ended some delays early). CGA wait oracle 0 of 14,277
+    differ. tb/fdc 232 checks, tb/hdc 3,182, tb/xta 2,742,243, tb/cga, tb/mda,
+    tb/pvc4 PASS. tb/shell not run on fedora (no M2M tree there); no VHDL
+    changed.
