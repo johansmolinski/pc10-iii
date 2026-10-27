@@ -319,8 +319,9 @@ BIOS (GLaBIOS / IBM XT BIOS booting DOS from an image) - that needs the two
 
 ## 10. Drive B: as the MEGA65's internal drive (2026-10-26)
 
-The menu's row "Drive B" (`image` / `int. drive`) makes drive B: the MEGA65's
-internal 3.5" drive, reading and writing real 720K disks. `fdd_intdrv.sv`
+The menu's ` int. drive` beside ` B:<No Disk>` (until 2026-10-27 the row
+"Drive B", `image` / `int. drive`) makes drive B: the MEGA65's internal 3.5"
+drive, reading and writing real 720K disks. `fdd_intdrv.sv`
 sits between the card and the image backend (`pc_fdd_sd.vhd`): with
 `enable` = 1 the requests of B: go to `fdd_phys.sv`, its medium is the
 drive's (present, write protection) with the geometry of a 720K disk in an
@@ -416,10 +417,11 @@ NOR of the neighbouring data bits, A1*, C2*) and a one-byte holding register.
 
 ### 10.4 Menu, drive sound, LED
 
-- Menu (doc/m2m-shell.md section 8): the row "Drive B" at lines 7-8.
-  `image` (default) is B: as before; the " B:%s" line and "B: write
-  protected" stay visible and keep their settings, they apply again when the
-  row goes back to `image`.
+- Menu (doc/m2m-shell.md section 8): ` int. drive` at line 4, on the screen
+  line of ` B:%s` (line 3), shown only while B: holds no image; loading an
+  image switches it off (until 2026-10-27: the row "Drive B" at lines 7-8,
+  with the image kept). "B: write protected" keeps its setting for the next
+  image.
 - **The drive sound is off** while B: is the drive (`pc_drvsnd` is held in
   reset; its own head position is forgotten and it homes the drive again
   later). A: plays no sound then: the drive cannot be both.

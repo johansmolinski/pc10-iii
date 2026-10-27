@@ -48,5 +48,5 @@ OPTR_GRP        .BLOCK 1                        ; group id of the open row
 OPTR_COL        .BLOCK 1                        ; its next marker column
 OPTR_LBL        .BLOCK 1                        ; its label text..
 OPTR_LBLN       .BLOCK 1                        ; ..and its length (0: none)
-OPTR_FST        .BLOCK 1                        ; pc10-iii: the ordinal of the first
+OPTR_FST        .BLOCK 1                        ; M2M-UPSTREAM menu-rows-inline: the ordinal of the first
                                                 ; option of a row without a label

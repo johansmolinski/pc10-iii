@@ -302,7 +302,7 @@ is open).
 ### 6.3 The menu and the settings file
 
 ```
- Ports and mouse          submenu, main menu line 45
+ Ports and mouse          submenu, main menu line 44
    PMOD: serial + printer   (default off) both PMOD headers on: COM, LPT
    Mouse: Amiga             (default)
    Mouse: Atari ST
@@ -314,8 +314,9 @@ menu heap 1238 words for 1248 (`MENU_HEAP_SIZE`; 20 + 714 item characters + 1
 (-160). Merged with intfd's row "Drive B" (2026-10-27): 60 lines, the submenu
 at lines 45-52, signature `menu=8` (a settings file of an older menu is reset
 to the defaults once), `MENU_HEAP_SIZE` 1280 (demand 1276: 744 item
-characters, 4 x 60), `HEAP_SIZE` 19296; HEAP/stack addresses unchanged. No
-firmware code: the HDL reads the two menu bits.
+characters, 4 x 60), `HEAP_SIZE` 19296; HEAP/stack addresses unchanged. With
+` int. drive` beside ` B:%s` (2026-10-27): 59 lines, the submenu at lines
+44-51, signature `menu=9`. No firmware code: the HDL reads the two menu bits.
 
 ## 7. Tests
 

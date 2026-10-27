@@ -27,7 +27,7 @@
 --   MEGA65's internal drive follows the motors and head steps of A: and B:; off while B: is
 --   the internal drive)
 -- * rtl/fdc/fdd_intdrv.sv: drive B: as its image or as the MEGA65's internal 3.5" drive,
---   reading and writing real 720K disks (the menu's row "Drive B"; doc/fdc.md section 10)
+--   reading and writing real 720K disks (" int. drive" beside " B:%s"; doc/fdc.md section 10)
 -- * the OSM settings (config.vhd): floppy images and write protection, drive B: image or the
 --   internal drive, drive sound, chipset
 --   (PC10-III's FE2010A or IBM XT's 8255, with its switches; a change restarts the PC),
@@ -653,7 +653,7 @@ begin
    iec_srq_n_o          <= '1';
 
    -- M2M-UPSTREAM floppy-pins: the internal drive is drive B: (fdd_intdrv.sv: all pins) when the
-   -- menu's row "Drive B" says "int. drive"; otherwise it plays the drive sound (pc_drvsnd.vhd:
+   -- menu's " int. drive" is on; otherwise it plays the drive sound (pc_drvsnd.vhd:
    -- motor, select, direction, step) and write gate, write data and side stay inactive.
    -- Density: always the DD-safe level (as Megamiga's Hardware Floppy).
    f_motora_o           <= main_hw_motor_n   when main_b_int = '1' else main_snd_motor_n;
@@ -1190,7 +1190,8 @@ begin
       ); -- i_pc_fdd_sd
 
    -- Drive B: as an image (pc_fdd_sd above) or the internal drive (doc/fdc.md section 10): the
-   -- menu's row "Drive B". Write protection of the images: the menu (main clock domain; the
+   -- menu's " int. drive" (beside " B:%s", only while B: holds no image: OPTM_CORE_HIDE and
+   -- OSM_SEL_POST in m2m-rom.asm). Write protection of the images: the menu (main clock domain; the
    -- FDC card reads WP for its status); the internal drive's: its disk's tab.
    main_b_int <= main_osm_control_i(C_MENU_B_INT);
 

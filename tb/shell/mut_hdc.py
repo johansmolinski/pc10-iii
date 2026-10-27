@@ -60,7 +60,7 @@ MUT = [
     ('rs_no_status',  HDC, "                RSUB    CRTROM_CSR_W, 1         ; (HDC_PEND)", "                NOP"),
     ('rs_reason',     HDC, "                MOVE    R2, R8\n                RSUB    SCR$PRINTSTR, 1",
                            "                MOVE    HDC_S_NF, R8\n                RSUB    SCR$PRINTSTR, 1"),
-    ('rs_keep_key',   HDC, "                MOVE    1, R8                   ; no key\n                RSUB    HDC_SAVE, 1",
+    ('rs_keep_key',   HDC, "                MOVE    1, R8                   ; no key\n                RSUB    B0_HDC_SAVE, 1",
                            "                MOVE    1, R8                   ; no key\n                NOP"),
     ('rs_pend_left',  HDC, "_HRS_NO         MOVE    0, @R3", "_HRS_NO         NOP"),
     ('rs_handle',     HDC, "                MOVE    HANDLE_RM_FILE3, R9     ; the Shell's handle of C:",

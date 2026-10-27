@@ -39,9 +39,23 @@
 ; - a row group is a radio group (no OPTM_G_SINGLESEL)
 ; - a row fits into the frame: 1 + sum(1 + len(option) + 1) - 1 <= OPTM_DX - 2
 ;
+; M2M-UPSTREAM menu-rows-inline (the PC10-III core, 2026-10-27): a row is the items with the same bits 6..0 of the
+; group id (bit 7 lets a row hold two groups), and a row without a label (no
+; ": " in its first item) of two items is one screen line: the first item
+; where a classic line has it, the second at the right edge of the frame
+; (the PC10-III core's mount line " B:%s" and its single-select " int. drive"):
+;
+;    B:%s                       B:<No Disk>         int. drive
+;    int. drive         ->
+;
+; The first item is highlighted up to one blank in front of the second, or
+; over the whole width while the core hides the second (OPTM_CORE_HIDE: C=1
+; for a flat index that is not drawn right now; menu.asm's _OPTM_AVAIL asks it
+; too, so the cursor skips it).
+;
 ; Needs (from the includer): OPTM_* variables (menu_vars.asm), OPTM_NL,
-; SCR$PRINTSTRXY, OPT_LINE_AT (a separator at screen row R8), ERR_F_NEWLINE
-; and FATAL.
+; SCR$PRINTSTRXY, OPT_LINE_AT (a separator at screen row R8), ERR_F_NEWLINE,
+; FATAL and OPTM_CORE_HIDE (M2M-UPSTREAM menu-rows-inline).
 ;
 ; done by Johan Smolinski in 2026 and licensed under GPL v3
 ; ****************************************************************************
@@ -154,7 +168,7 @@ _OPTR_P_OPT     MOVE    R2, R9                  ; R12/R9: the option text
                 MOVE    @SP++, R9
                 RBRA    _OPTR_P_M2, 1
 
-                ; pc10-iii: a row without a label is one screen line: its
+                ; M2M-UPSTREAM menu-rows-inline: a row without a label is one screen line: its
                 ; first option where a classic line has its text (marker
                 ; column 0), highlighted over the whole width, or up to one
                 ; blank in front of the next option, which sits at the right
@@ -287,7 +301,7 @@ _OPTR_CL_1      MOVE    OPTR_GRP, R8
                 MOVE    0xFFFF, @R8
                 RET
 
-; pc10-iii: C=1 when the core hides the item of R4 (its group word) right
+; M2M-UPSTREAM menu-rows-inline: C=1 when the core hides the item of R4 (its group word) right
 ; now (OPTM_CORE_HIDE, m2m-rom.asm; R8 changed)
 _OPTR_HID       MOVE    R7, @--SP
                 MOVE    OPTM_DATA, R7

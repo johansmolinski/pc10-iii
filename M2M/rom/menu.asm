@@ -331,7 +331,7 @@ _OPTM_TT_0      MOVE    @R0++, R3
 
                 ; M2M-UPSTREAM menu-rows: an item that is not available right
                 ; now (config.vhd: OPTM_AVAIL) is drawn dimmed; one that the
-                ; core hides (OPTM_CORE_HIDE) is not drawn at all (pc10-iii)
+                ; core hides (OPTM_CORE_HIDE) is not drawn at all (M2M-UPSTREAM menu-rows-inline)
 _OPTM_TT_GR     MOVE    R1, R8
                 RSUB    OPTM_CORE_HIDE, 1
                 RBRA    _OPTM_TT_1B, C
@@ -1707,7 +1707,7 @@ _OPTM_R_F2M_O2  MOVE    R2, R7
 
 ; _OPTM_ROWID: R8 = flat index -> R8 = 0x0100 + bits 6..0 of the group id for
 ; an option of a row, else 0 (also for an index outside the menu). Bit 7 of the
-; group id lets a row hold two groups (pc10-iii: the mount line " B:%s" and
+; group id lets a row hold two groups (M2M-UPSTREAM menu-rows-inline, the PC10-III core: the mount line " B:%s" and
 ; its single-select " int. drive", group + 0x80: the Shell tells a mount line
 ; by its whole group word, CRTROM_M_NO)
 _OPTM_ROWID     INCRB
@@ -1778,7 +1778,7 @@ _OPTM_RST_NO    OR      0x0004, SR              ; none: set Carry
 ; _OPTM_AVAIL: C=1 when the flat index R8 is available, C=0 when it is
 ; greyed out (lines word bit 2: config.vhd's OPTM_AVAIL rule, bits 6..3 = the
 ; mother items that make it available, bits 14..7 = the mother group) or
-; hidden by the core right now (OPTM_CORE_HIDE, m2m-rom.asm; pc10-iii)
+; hidden by the core right now (OPTM_CORE_HIDE, m2m-rom.asm; M2M-UPSTREAM menu-rows-inline)
 _OPTM_AVAIL     INCRB
                 RSUB    OPTM_CORE_HIDE, 1       ; hidden: not available
                 RBRA    _OPTM_AV_N, C
@@ -1927,7 +1927,7 @@ _OPTM_DS_4      ADD     1, R4
 ;         search on
 ;    C=0: R8 = where the cursor goes: the item found, or when it is an option
 ;         of a row, the selected (shown) option of that row (none selected:
-;         its first option, pc10-iii)
+;         its first option, M2M-UPSTREAM menu-rows-inline)
 _OPTM_ROWSKIP   INCRB
                 MOVE    R8, R0                  ; R0: the item found
                 CMP     R8, R9                  ; back at the start: take it
@@ -1984,7 +1984,7 @@ _OPTM_RSK_4     ADD     1, R3
 _OPTM_RSK_NS    MOVE    R6, R8                  ; none selected: the first
                 RSUB    _OPTM_VIS, 1            ; option of the row when it is
                 RBRA    _OPTM_RSK_GO, !C        ; shown and available, else the
-                MOVE    R6, R8                  ; item found (pc10-iii: " B:%s"
+                MOVE    R6, R8                  ; item found (M2M-UPSTREAM menu-rows-inline: " B:%s"
                 RSUB    _OPTM_AVAIL, 1          ; before " int. drive" from
                 RBRA    _OPTM_RSK_GO, !C        ; either side)
                 MOVE    R6, R0

@@ -2447,3 +2447,46 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   15 s. Kit `~/pcxt-work/kits/pc10-real-v/` (`pc10-real-v.bit` md5
   b38b0554..., `sd/pc10/b720.img`, `sd/pc10/ports.img`; the other SD files
   as pc10-hdc-a). CORE_VERSION 0.1. Not on hardware yet.
+
+## 2026-10-27 - The B: line: " int. drive" beside " B:%s"; code banks (branch `bline`, build pc10-bline-a)
+
+- **Why:** on hardware (pc10-real-v) the merged menu's frame lost its bottom
+  line and the top border showed stray corners: the main menu had 24 screen
+  lines, the frame OPTM_DY + 2 = 26, the OSM canvas 25 (640 x 400 / 16): the
+  bottom border wrapped onto the top one. intfd (DY 23) and ports (DY 22) each
+  fit alone.
+- **The user's design:** `int. drive` to the right of B:'s `<No Disk>`,
+  hidden while an image is in B:, back after the SPACE eject: the row "Drive
+  B" (two lines) is gone. 59 lines, OPTM_DY 22, frame 24 lines; signature
+  `menu=9`; menu heap demand 1255 (1280 kept). C_MENU_B_INT 4, C: 5, every
+  line from "Drive sound" on one less than in menu=8.
+- **How** (doc/m2m-shell.md section 8): ` B:%s` (group FDB, manual ROM 1) and
+  ` int. drive` (single-select, group BINT = FDB + 0x80: the Shell tells a
+  mount line by its whole group word, CRTROM_M_NO, so the option needs its own
+  group) are a row without a label. Framework exception `menu-rows-inline`
+  (our first, doc/m2m-provenance.md): a row is bits 6..0 of the group id; a
+  row without a label is one screen line, the first item at the classic place,
+  the second at the right edge; the core hook `OPTM_CORE_HIDE` (firmware:
+  int. drive while `CRTROM_MAN_LDF[1]`) hides an item (no text, `_OPTM_AVAIL`
+  false, not dimmed); entering a row with nothing selected goes to its first
+  option. `OSM_SEL_POST` switches int. drive off (`M2M$FORCE_MENU`, menu and
+  HDL) after an image is loaded into B:.
+- **Code banks** (the ROM was full: 32740 + the B: line's code): Megamiga's
+  M2M-UPSTREAM code-banks, already in this M2M: `make_banks.py`, `FAR_CALL`,
+  `QNICE_CODE_BANKS` = `m2m-banks.rom` (+16 block RAM tiles); `pc_hdc.asm` is
+  bank 0 (364 words) behind the stubs HDC_SAVE/HDC_RESTORE/HDC_PEND_APPLY.
+  ROM 32400 after the move, 32531 with the B: line (237 free).
+- **Tests:** tb/shell `run.sh` PASS (tb_fdd, drvsnd, chipset, rtc, ports,
+  CFGSIG, PREPLOAD, RTCWB, HDC, ROWS, stub; tb_glue does not elaborate with
+  this host's ghdl, as before). New `run_rows.sh` + `rows_test.asm`: the real
+  `menu_rows.asm` on the QNICE emulator with a stub screen (the B: row shown
+  and hidden, a labelled row as Megamiga's; screen text, OPTR_LAY, OPTR_POS);
+  `mut_rows.py` 7 of 7 killed. `mut_hdc.py` 40 of 40 killed (one pattern
+  followed the label rename). Not tested off hardware: the cursor in
+  `menu.asm` (left/right, up/down into the row, the skip of the hidden
+  option) and `OSM_SEL_POST`.
+- **Build `pc10-bline-a`** (REF=pc10-real-v, incremental, 8 min): RESULT OK,
+  WNS +0.356, WHS +0.036 (main_clk +12.213 / +0.036, qnice +0.381), LUTs
+  31,322, BRAM 276.5/365 (+16: the bank ROM), 0 routing errors. Kit
+  `~/pcxt-work/kits/pc10-bline-a/` (SD files as pc10-real-v). Loaded on the
+  board; not tested yet.
