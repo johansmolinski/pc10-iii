@@ -444,11 +444,11 @@ all equal.
 
 ## 10. For the integrator
 
-- **PC10-III:** the PC10-III has no CGA; its onboard Paradise PVC4
-  (doc/pvc4.md) replaces this card in the shell (`pc_system` `PVC4_FIT`,
-  `CGA_FIT` = 0). The PVC4's colour personality reuses this card's display
-  logic without the snow. With `CGA_FIT` = 0 the card sees no bus strobes
-  (since 2026-10-25).
+- **PC10-III:** the PC10-III has no CGA on its board; its onboard Paradise
+  PVC4 (doc/pvc4.md) is the machine's video. The PVC4's colour personality
+  reuses this card's display logic without the snow. Since 2026-10-28 the
+  shell builds this card as well, as an expansion card that the menu plugs
+  in (section 11). A card that is not in the machine sees no bus strobes.
 
 - **pc_system ports**: the instance in `pc_system.sv` must connect
   `font_we/font_addr/font_data/font_thin` (new `pc_system` ports for the
@@ -466,3 +466,43 @@ all equal.
   `make CGA="../../rtl/video/cga/cga_crtc.sv ../../rtl/video/cga/cga_card.sv"`
   builds the system simulation with the real card (done 2026-10-21: GLaBIOS
   boots; no font there yet).
+
+## 11. In the PC10-III: an IBM CGA card in a slot (2026-10-28)
+
+The menu's **Display > IBM CGA card** puts this card into an expansion slot
+of the PC10-III, for programs written for the IBM 5150/5160 with the IBM CGA
+(8088 MPH, Area 5150): its wait states, its 6845 and its snow, which the
+PVC4 does not have (doc/backlog.md).
+
+- **The machine does it itself.** The service manual (SM 5-1, doc/pvc4.md
+  section 7) pairs an expansion card of the same kind (colour) with a
+  colour-strapped PVC4, which then stays disabled. The Commodore BIOS 4.41
+  finds the card at F000:E431: with the onboard video off (230h bit 7 =
+  venb' = 1) it writes B800:7Bh and reads it back; the card answers, and the
+  BIOS leaves the PVC4 off. Nothing in the core decides it.
+- **`pc_system`:** `CGA_FIT` = 1 next to `PVC4_FIT` (`pc_system_flat.sv`),
+  and the input `cga_card`, taken while reset is high (a card is plugged in
+  with the power off): only then is the card on the bus (it sees strobes,
+  drives data and IOCHRDY), and `vid_*` come from it instead of the PVC4
+  (the monitor is on the card's connector). Without `PVC4_FIT` the CGA is
+  the machine's video as before and `cga_card` is ignored: the IBM 5160
+  configuration (the gates) does not change.
+- **`pc_chipset.vhd`:** the menu's choice; it restarts the PC like a change
+  between colour and mono, and it straps the PVC4 colour (CONFIG switch 2
+  on, DIP SW1 bits 5-4 colour) whatever the mono setting was: a mono PVC4
+  next to a CGA would be two displays at once, and the core has one output.
+- **Character ROM:** an 8 KB IBM 5788005 image as before; from the PC10-III's
+  32 KB Commodore ROM (`font_cbm`, the kit's `char.rom`) the USA/Europe set's
+  8x8 colour glyphs (A14 = 1, A13 = 0, A11 = 1, rows 0-7), which are the IBM
+  CGA's font, go to the card's 0x1800 with their dots reversed (the ROM keeps
+  the leftmost dot in D0). The Scandinavian set stays the PVC4's: the IBM
+  card has one ROM.
+- **Video path:** the card's timing is the PVC4's colour personality's
+  (912 x 262 at 59.92 Hz, `ce_14m`): HDMI, VGA and 15 kHz RGB as before.
+- **Cost:** about 480 LUTs, 415 flip-flops and 6 block RAM tiles (section 1).
+- **Tests:** `tb/sys` `make FE=1 PVC4=1 CGACARD=1` with the Commodore BIOS
+  4.41 and the Commodore `char.rom`: the banner appears in the CGA's memory,
+  the PVC4 sees no CPU memory cycle (the BIOS left it off), and the CGA's
+  frame equals the PVC4's of the same boot without the card dot for dot (the
+  same glyphs, not mirrored). `tb_chipset.vhd`: the restart, the colour
+  straps with mono chosen, the card's output.

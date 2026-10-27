@@ -1,4 +1,4 @@
-# CGA card testbench (doc/cga.md section 9).
+# CGA card testbench (doc/cga.md section 11).
 #   make          build obj/cga_run
 #   make run      font + all tests; images and logs in $(OUT)
 #   make png      convert the PPM images in $(OUT) to PNG

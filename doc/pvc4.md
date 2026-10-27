@@ -437,7 +437,9 @@ read through the FE2010A's switch register like the 5160's SW1 bits 5-4
 (mono for a mono-strapped PVC4, colour for colour) the onboard video stays
 disabled; an adapter of the other kind can coexist. `pc_system` keeps the
 IBM cards as parameters next to the PVC4 (`CGA_FIT`, `MDA_FIT`); the BIOS's
-probe then finds them. The SM warns that Hercules page 1 (B8000) collides
+probe then finds them. Since 2026-10-28 the shell builds the IBM CGA next to
+the PVC4, and the menu's "Display > IBM CGA card" plugs it in (`cga_card`,
+with the PVC4 strapped colour): doc/cga.md section 11. The SM warns that Hercules page 1 (B8000) collides
 with an expansion CGA.
 
 ## 8. Integration and the shell

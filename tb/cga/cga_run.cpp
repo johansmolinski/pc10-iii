@@ -1,4 +1,4 @@
-// cga_run.cpp - Verilator testbench for rtl/video/cga (doc/cga.md section 9).
+// cga_run.cpp - Verilator testbench for rtl/video/cga (doc/cga.md section 11).
 //
 // The card is driven by a model of the pc10-iii system board's bus timing
 // (rtl/system/xt_board.sv: the 8288 command edges, the commands ending at the

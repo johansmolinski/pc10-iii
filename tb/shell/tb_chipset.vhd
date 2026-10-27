@@ -2,7 +2,9 @@
 -- to the IBM XT (the chipset and the switches change in the same clock, the PC is held in reset
 -- from that clock for 2^G_RST_BITS clocks), no restart while nothing changes, and back; the
 -- display: colour (switches 5D/6D, cbm_dip 01) or mono (bits 5-4 = 11, 7D on both chipsets,
--- cbm_dip 11), a change restarts the PC the same way.
+-- cbm_dip 11), a change restarts the PC the same way; the IBM CGA card: plugged in with a
+-- restart, the onboard video strapped colour even with mono chosen (5D/6D, cbm_dip 01), mono
+-- again when it is pulled out.
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -16,6 +18,8 @@ architecture sim of tb_chipset is
    signal done : boolean := false;
    signal xt   : std_logic := '0';
    signal mono : std_logic := '0';
+   signal cga  : std_logic := '0';
+   signal cgao : std_logic;
    signal dip  : std_logic_vector(1 downto 0);
    signal fe, rst : std_logic;
    signal sw   : std_logic_vector(7 downto 0);
@@ -24,8 +28,8 @@ begin
 
    dut : entity work.pc_chipset
       generic map (G_RST_BITS => BITS)
-      port map (clk_i => clk, xt_i => xt, mono_i => mono, fe2010a_o => fe, dip_sw1_o => sw,
-                cbm_dip_o => dip, rst_o => rst);
+      port map (clk_i => clk, xt_i => xt, mono_i => mono, cga_i => cga, fe2010a_o => fe,
+                dip_sw1_o => sw, cbm_dip_o => dip, cga_o => cgao, rst_o => rst);
 
    stim : process
       variable fails : natural := 0;
@@ -49,7 +53,7 @@ begin
       wait until rising_edge(clk);
       wait for 1 ns;
       expect("default PC10-III", fe = '1'); expect("default switches 5D", sw = x"5D");
-      expect("default colour, USA set", dip = "01");
+      expect("default colour, USA set", dip = "01"); expect("default no CGA card", cgao = '0');
       expect("no restart at the start", rst = '0');
       for i in 1 to 20 loop wait until rising_edge(clk); end loop;
       wait for 1 ns;
@@ -98,6 +102,28 @@ begin
       expect("colour XT: switches 6D", sw = x"6D" and dip = "01");
       count_rst;
       expect("colour restart length " & integer'image(n + 1), n + 1 = 2**BITS);
+      -- the IBM CGA card on the XT: a restart, the card in with it
+      for i in 1 to 20 loop wait until rising_edge(clk); end loop;
+      cga <= '1'; wait for 1 ns;
+      expect("CGA: restart", rst = '1');
+      expect("CGA: the card goes in with the register, not before", cgao = '0');
+      wait until rising_edge(clk); wait for 1 ns;
+      expect("CGA: card in", cgao = '1'); expect("CGA: colour XT 6D", sw = x"6D" and dip = "01");
+      count_rst;
+      expect("CGA restart length " & integer'image(n + 1), n + 1 = 2**BITS);
+      -- mono chosen with the card in: the onboard video stays colour, no restart
+      for i in 1 to 20 loop wait until rising_edge(clk); end loop;
+      mono <= '1'; wait for 1 ns;
+      expect("CGA + mono: no restart", rst = '0');
+      wait until rising_edge(clk); wait for 1 ns;
+      expect("CGA + mono: colour straps", sw = x"6D" and dip = "01" and cgao = '1');
+      -- the card pulled out: mono now, one restart
+      cga <= '0'; wait for 1 ns;
+      expect("CGA out: restart", rst = '1');
+      wait until rising_edge(clk); wait for 1 ns;
+      expect("CGA out: mono XT 7D", sw = x"7D" and dip = "11" and cgao = '0');
+      count_rst;
+      expect("CGA out restart length " & integer'image(n + 1), n + 1 = 2**BITS);
       if fails = 0 then
          report "CHIPSET TB: PASS";
       else

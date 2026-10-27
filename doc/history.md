@@ -2542,3 +2542,36 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   `PC10-III-0.1-R6.zip` 2,376 KB zipped, sha256 f4461a44...; kept in
   `~/pcxt-work/release-0.1/` (the extras in `~/pcxt-work/release-0.1-extras/`).
   The bitstream loaded on the board.
+
+## 2026-10-28 - An IBM CGA card in a slot (branch `cgacard`, build pc10-cgac-a)
+
+- **What** (the backlog item, the user's choice after 0.1): the menu's
+  "Display > IBM CGA card" puts the IBM CGA (`cga_card.sv`, verified against
+  MartyPC) into an expansion slot of the PC10-III, for programs that need the
+  IBM card's timing (8088 MPH, Area 5150). doc/cga.md section 11.
+- **How:** `pc_system` builds the CGA next to the PVC4 (`pc_system_flat.sv`
+  `CGA_FIT` = 1); the new input `cga_card` (taken in reset) puts it on the bus
+  and its picture on `vid_*`. Without `PVC4_FIT` nothing changes (the CGA is
+  the machine's video, `cga_card` ignored). `pc_chipset.vhd`: the choice
+  restarts the PC and straps the onboard video colour (CONFIG switch 2 on,
+  5D/6D) whatever the mono setting. The Commodore BIOS 4.41 does the rest:
+  its probe at F000:E431 finds the card and leaves the PVC4 off. The card's
+  character ROM from the Commodore `char.rom`: the USA/Europe 8x8 colour glyphs
+  (A14 = 1, A13 = 0, A11 = 1, rows 0-7) into its 0x1800, dots reversed.
+  Menu 60 lines (`menu=10`, menu heap demand 1274 of 1280); ROM 32558.
+- **Tests:** tb/sys `make FE=1 PVC4=1 CGACARD=1` (new; `sys_run` dumps the
+  CGA's screen), BIOS 4.41 + Commodore char.rom, 3 s (8 min 42 s wall): the
+  banner and "Hard disk not found" in the CGA's memory, the PVC4 0 CPU memory
+  cycles (without the card: 28,694 reads, 74,791 writes), the CGA's frame
+  equal to the PVC4's of the boot without the card. tb_chipset: the card
+  (restart, colour straps with mono chosen, pulled out = mono again);
+  `mut.py` chipset mutants 19 of 19 killed (5 new, 3 patterns followed the
+  restart line). tb/shell `run.sh` PASS (tb_glue as before).
+- **Gates** (fedora `gates.sh cgac-a`): g_tr e5d8018b..., g_tre a2c25729...,
+  g_trL2 e5d8018b...: identical to merge-d (first difference against MartyPC
+  unchanged); tb/cga, tb/fdc 246 checks, tb/hdc 3,182 checks, tb/mda,
+  tb/shell PASS.
+- **Build `pc10-cgac-a`** (REF=pc10-rel-0.1): RESULT OK, WNS +0.349, WHS
+  +0.018, LUTs 31,893 (+593), BRAM 282.5/365 (+6), 0 routing errors. Kit
+  `~/pcxt-work/kits/pc10-cgac-a/` (SD files as release 0.1). Loaded on the
+  board; not tested yet.
