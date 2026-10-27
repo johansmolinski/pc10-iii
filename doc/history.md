@@ -2511,3 +2511,6 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   16 block RAMs verified; the bank image is byte-identical): pc10-bline-a's
   netlist and timing. Kit `~/pcxt-work/kits/pc10-bline-b/`. Loaded on the
   board.
+- Hardware (pc10-bline-b): the user confirmed it works: C: is remembered
+  across power-off again, the settings are kept, and the menu (the B: line
+  with ` int. drive`, the frame within the 25 lines) is as designed.
