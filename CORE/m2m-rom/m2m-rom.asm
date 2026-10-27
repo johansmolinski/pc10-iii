@@ -563,6 +563,8 @@ OSM_SEL_PRE     MOVE    PC_SUB_ACTIVE, R8       ; a browser/help page may run no
 OSM_SEL_POST    INCRB
                 MOVE    PC_SUB_ACTIVE, R0       ; (every path out of OPTM_CB_SEL)
                 MOVE    0, @R0
+                CMP     PC_OPTM_G_FDB, R8       ; " B:%s": an image now?
+                RBRA    _PCOSP_B, Z
                 CMP     PC_OPTM_G_RESET, R8
                 RBRA    _PCOSP_RET, !Z
 
@@ -575,7 +577,7 @@ _PCOSP_WAIT       SUB     1, R1
 
                 MOVE    OPTM_CUR_SEL, R8        ; momentary: unselect again
                 MOVE    @R8, R8
-                XOR     R9, R9
+_PCOSP_OFF      XOR     R9, R9
                 RSUB    M2M$FORCE_MENU, 1
                 RSUB    OPTM_SHOW, 1
                 MOVE    OPTM_CUR_SEL, R8
@@ -585,6 +587,38 @@ _PCOSP_WAIT       SUB     1, R1
 
 _PCOSP_RET        XOR     R8, R8
                 XOR     R9, R9
+                DECRB
+                RET
+
+                ; B: holds an image now (the Shell loaded it: CRTROM_MAN_LDF
+                ; of manual ROM 1): " int. drive" off, in the menu and in the
+                ; HDL (OPTM_CORE_HIDE hides it meanwhile)
+_PCOSP_B        MOVE    CRTROM_MAN_LDF, R0
+                ADD     1, R0
+                CMP     0, @R0
+                RBRA    _PCOSP_RET, Z
+                MOVE    PC_OSM_B_INT, R8
+                RBRA    _PCOSP_OFF, 1
+
+; ----------------------------------------------------------------------------
+; OPTM_CORE_HIDE (pc10-iii, M2M/rom/menu.asm and menu_rows.asm): C=1 when the
+; menu item R8 (flat index) is hidden right now: not drawn, the cursor skips
+; it. " int. drive" while B: holds an image (the Shell's load flag of manual
+; ROM 1, CRTROM_MAN_LDF; SPACE ejects it, HANDLE_CORE_IO). All registers
+; preserved.
+; ----------------------------------------------------------------------------
+
+OPTM_CORE_HIDE  INCRB
+                CMP     PC_OSM_B_INT, R8
+                RBRA    _OCH_NO, !Z
+                MOVE    CRTROM_MAN_LDF, R0
+                ADD     1, R0
+                CMP     0, @R0
+                RBRA    _OCH_NO, Z
+                OR      0x0004, SR              ; hidden: set Carry
+                DECRB
+                RET
+_OCH_NO         AND     0xFFFB, SR              ; shown: clear Carry
                 DECRB
                 RET
 
@@ -777,10 +811,11 @@ CFG_SIGSET      SYSCALL(enter, 1)
 ; "6": 50 lines, " C:%s" (the hard disk image) at line 4. "7": 52 lines,
 ; the row "Drive B" (image / int. drive) at lines 7-8 (branch intfd), or 58
 ; lines, the "Ports and mouse" submenu at lines 43-50 (branch ports). "8": 60
-; lines, both: the row "Drive B" at 7-8, "Ports and mouse" at 45-52.
+; lines, both: the row "Drive B" at 7-8, "Ports and mouse" at 45-52. "9": 59
+; lines, " int. drive" at line 4 beside " B:%s" (no row "Drive B").
 ; At most 3 characters (CFG_SIGCHECK's buffer).
 CFG_SIG_KEY     .ASCII_W "menu"
-CFG_SIG_VAL     .ASCII_W "8"
+CFG_SIG_VAL     .ASCII_W "9"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings
@@ -835,11 +870,11 @@ HDC_FDH         .BLOCK FAT32$FDH_STRUCT_SIZE    ; the directories of its path
 HDC_DE          .BLOCK FAT32$DE_STRUCT_SIZE     ; (HDC_SAVE)
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
-; for this 60-line menu the demand is 1276 words: 20 + 744 item characters
-; + 1 + 4 x 60 + 1 + (5 submenus + 3 manual ROMs + 1) x 30; the Shell checks
+; for this 59-line menu the demand is 1255 words: 20 + 727 item characters
+; + 1 + 4 x 59 + 1 + (5 submenus + 3 manual ROMs + 1) x 30; the Shell checks
 ; it at boot (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
 ; (1088 for the 50-line menu: 1058; 1120 for 52 lines: 1096; 1248 for 58
-; lines: 1238.)
+; lines: 1238; 1280 for 60 lines: 1276.)
 MENU_HEAP_SIZE  .EQU 1280
 
 #ifndef RELEASE

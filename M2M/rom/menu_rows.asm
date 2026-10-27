@@ -92,8 +92,8 @@ _OPTR_P_1       MOVE    R2, R8                  ; R11: length of the text
                 MOVE    @R3, R7                 ; an option of a row?
                 AND     2, R7
                 RBRA    _OPTR_P_NR, Z
-                MOVE    @R4, R7                 ; R7: its group id
-                AND     0x00FF, R7
+                MOVE    @R4, R7                 ; R7: its group id (bits 6..0,
+                AND     0x007F, R7              ; see _OPTM_ROWID in menu.asm)
                 MOVE    OPTR_GRP, R8
                 CMP     @R8, R7                 ; the row that is open?
                 RBRA    _OPTR_P_MEM, Z
@@ -135,15 +135,16 @@ _OPTR_P_OPT     MOVE    R2, R9                  ; R12/R9: the option text
 
                 CMP     @R1, 0x7FFF             ; shown?
                 RBRA    _OPTR_P_NEXT, !N
+                MOVE    OPTR_LBLN, R8           ; R8: the label's length
+                MOVE    @R8, R8
                 MOVE    OPTR_COL, R7            ; the first option shown in
                 CMP     0, @R7                  ; this row: print the label
-                RBRA    _OPTR_P_M2, !Z
+                RBRA    _OPTR_P_LA, !Z
+                CMP     0, R8                   ; (no label: the row is one
+                RBRA    _OPTR_P_FST, Z          ; line, see _OPTR_P_FST)
                 MOVE    1, @R7                  ; (options: marker column 1)
-                MOVE    OPTR_LBLN, R8
-                CMP     0, @R8
-                RBRA    _OPTR_P_M2, Z
                 MOVE    R9, @--SP
-                MOVE    @R8, R9
+                MOVE    R8, R9
                 MOVE    OPTR_LBL, R8
                 MOVE    @R8, R8
                 XOR     R10, R10
@@ -151,6 +152,47 @@ _OPTR_P_OPT     MOVE    R2, R9                  ; R12/R9: the option text
                 RSUB    OPTR_PUT, 1
                 ADD     1, R5
                 MOVE    @SP++, R9
+                RBRA    _OPTR_P_M2, 1
+
+                ; pc10-iii: a row without a label is one screen line: its
+                ; first option where a classic line has its text (marker
+                ; column 0), highlighted over the whole width, or up to one
+                ; blank in front of the next option, which sits at the right
+                ; edge of the frame (a row of two options: " B:%s" and
+                ; " int. drive"). An option that the core hides right now
+                ; (OPTM_CORE_HIDE) keeps its place but gets no text.
+_OPTR_P_FST     MOVE    OPTR_FST, R8            ; the first option: remember
+                MOVE    R6, @R8                 ; its ordinal
+                MOVE    1, @R7                  ; (the row is drawn)
+                MOVE    R2, R8                  ; the whole text, as a
+                MOVE    R11, R9                 ; classic line
+                XOR     R10, R10
+                MOVE    R5, R11
+                RSUB    OPTR_PUT, 1
+                XOR     R8, R8                  ; layout: column 0, full width
+                XOR     R9, R9
+                RSUB    _OPTR_REC, 1
+                ADD     1, R6
+                RBRA    _OPTR_P_NEXT, 1
+
+_OPTR_P_LA      CMP     0, R8                   ; a later option of a row
+                RBRA    _OPTR_P_M2, !Z          ; without a label: at the
+                MOVE    OPTM_DX, R8             ; right edge of the frame
+                MOVE    @R8, R8                 ; (marker column DX - 3 - its
+                SUB     3, R8                   ; length)
+                SUB     R9, R8
+                MOVE    R8, @R7
+                RSUB    _OPTR_HID, 1            ; hidden: no text
+                RBRA    _OPTR_P_HID, C
+                MOVE    OPTR_FST, R8            ; the first option ends one
+                MOVE    @R8, R8                 ; blank in front of it
+                CMP     OPTR_MAX, R8
+                RBRA    _OPTR_P_M2, !N
+                ADD     R8, R8
+                ADD     OPTR_LAY, R8
+                ADD     1, R8
+                MOVE    @R7, @R8
+                SUB     1, @R8
 
 _OPTR_P_M2      MOVE    OPTR_COL, R7            ; the option behind its marker
                 MOVE    @R7, R10
@@ -165,6 +207,12 @@ _OPTR_P_M2      MOVE    OPTR_COL, R7            ; the option behind its marker
                 ADD     1, R9                   ; the next option: one blank
                 MOVE    OPTR_COL, R7            ; between this text and its
                 ADD     R9, @R7                 ; marker
+                ADD     1, R6
+                RBRA    _OPTR_P_NEXT, 1
+
+_OPTR_P_HID     MOVE    @R7, R8                 ; hidden: the layout only
+                ADD     1, R9
+                RSUB    _OPTR_REC, 1
                 ADD     1, R6
                 RBRA    _OPTR_P_NEXT, 1
 
@@ -238,6 +286,17 @@ _OPTR_CLOSE     MOVE    OPTR_COL, R8
 _OPTR_CL_1      MOVE    OPTR_GRP, R8
                 MOVE    0xFFFF, @R8
                 RET
+
+; pc10-iii: C=1 when the core hides the item of R4 (its group word) right
+; now (OPTM_CORE_HIDE, m2m-rom.asm; R8 changed)
+_OPTR_HID       MOVE    R7, @--SP
+                MOVE    OPTM_DATA, R7
+                MOVE    @R7, R7
+                ADD     OPTM_IR_GROUPS, R7
+                MOVE    R4, R8
+                SUB     @R7, R8                 ; R8: its flat index
+                MOVE    @SP++, R7
+                RBRA    OPTM_CORE_HIDE, 1
 
 ; record the layout of ordinal R6: row R5, column R8, width R9 (0 = full)
 ; (R7, R8 changed)

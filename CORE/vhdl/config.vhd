@@ -3,8 +3,8 @@
 --
 -- Configuration data for the Shell: welcome and help screens, directories, the on-screen
 -- menu (OSM). The address decoder at the end is the M2M template's plus Megamiga's
--- SEL_OPTM_ROWS (M2M-UPSTREAM menu-rows, M2M/rom/menu_rows.asm: radio groups side by side,
--- here the row "Drive B"); SEL_OPTM_DEPS is not served.
+-- SEL_OPTM_ROWS (M2M-UPSTREAM menu-rows, M2M/rom/menu_rows.asm: menu items side by side,
+-- here the line " B:%s  int. drive"); SEL_OPTM_DEPS is not served.
 --
 -- Rules (Megamiga AGENTS.md, hard rules 7, 10, 11):
 --   * OPTM_PAUSE stays false.
@@ -192,88 +192,90 @@ constant OPTM_S_SAVING     : string := "<Saving>";
 --     0  PC10-III                headline
 --     1  ----
 --     2  A:%s                    floppy image of A: (manual ROM load 0, pc_fdd_sd.vhd)
---     3  B:%s                    floppy image of B: (manual ROM load 1)
---     4  C:%s                    hard disk image of C: (manual ROM load 2, pc_fdd_sd.vhd;
+--     3  B:%s                    floppy image of B: (manual ROM load 1); lines 3 and 4 are one
+--     4   int. drive             screen line, a row without a label (M2M-UPSTREAM menu-rows):
+--                                " B:<No Disk>         int. drive". C_MENU_B_INT (default off):
+--                                B: is the MEGA65's internal drive (fdd_intdrv.sv, doc/fdc.md
+--                                section 10). Hidden while B: holds an image (OPTM_CORE_HIDE,
+--                                m2m-rom.asm); mounting an image switches it off (OSM_SEL_POST)
+--     5  C:%s                    hard disk image of C: (manual ROM load 2, pc_fdd_sd.vhd;
 --                                JMP208 follows it: no image = no drive)
---     5  A: write protected      C_MENU_WP_A
---     6  B: write protected      C_MENU_WP_B
---     7  Drive B: image          row "Drive B" (M2M-UPSTREAM menu-rows): C_MENU_B_IMAGE (default):
---     8   int. drive             B: is the image of line 3; C_MENU_B_INT: B: is the MEGA65's
---                                internal drive (fdd_intdrv.sv, doc/fdc.md section 10)
---     9  Drive sound (int. drive) C_MENU_DRV_SOUND (default on; pc_drvsnd.vhd)
---    10  ----
---    11  Chipset: %s             submenu (a change restarts the PC, mega65.vhd)
---    12    Chipset               headline
---    13    ----
---    14    PC10-III (FE2010A)    C_MENU_CHIP_PC10 (default; switches 5D)
---    15    IBM XT (8255)         C_MENU_CHIP_XT (switches 6D)
---    16    ----
---    17    Back to main menu
---    18  Memory: %s              submenu
---    19    Memory size           headline
---    20    ----
---    21    640 KB                C_MENU_MEM_640 (default)
---    22    512 KB                C_MENU_MEM_512
---    23    256 KB                C_MENU_MEM_256
---    24    128 KB                C_MENU_MEM_128
---    25    ----
---    26    Back to main menu
---    27  HDMI: %s                submenu
---    28    HDMI mode             headline
---    29    ----
---    30    720p 60 Hz 16:9       C_MENU_HDMI_720P (default)
---    31    480p 59.94 Hz 4:3     C_MENU_HDMI_480P
---    32    720p 50 Hz 16:9       C_MENU_HDMI_720P50 (the PVC4's mono personality is 49.8 Hz)
---    33    ----
---    34    Back to main menu
---    35  Display: %s             submenu: the PVC4's CONFIG switch 2 + switches 3/4 (a change
+--     6  A: write protected      C_MENU_WP_A
+--     7  B: write protected      C_MENU_WP_B
+--     8  Drive sound (int. drive) C_MENU_DRV_SOUND (default on; pc_drvsnd.vhd)
+--     9  ----
+--    10  Chipset: %s             submenu (a change restarts the PC, mega65.vhd)
+--    11    Chipset               headline
+--    12    ----
+--    13    PC10-III (FE2010A)    C_MENU_CHIP_PC10 (default; switches 5D)
+--    14    IBM XT (8255)         C_MENU_CHIP_XT (switches 6D)
+--    15    ----
+--    16    Back to main menu
+--    17  Memory: %s              submenu
+--    18    Memory size           headline
+--    19    ----
+--    20    640 KB                C_MENU_MEM_640 (default)
+--    21    512 KB                C_MENU_MEM_512
+--    22    256 KB                C_MENU_MEM_256
+--    23    128 KB                C_MENU_MEM_128
+--    24    ----
+--    25    Back to main menu
+--    26  HDMI: %s                submenu
+--    27    HDMI mode             headline
+--    28    ----
+--    29    720p 60 Hz 16:9       C_MENU_HDMI_720P (default)
+--    30    480p 59.94 Hz 4:3     C_MENU_HDMI_480P
+--    31    720p 50 Hz 16:9       C_MENU_HDMI_720P50 (the PVC4's mono personality is 49.8 Hz)
+--    32    ----
+--    33    Back to main menu
+--    34  Display: %s             submenu: the PVC4's CONFIG switch 2 + switches 3/4 (a change
 --                                between colour and mono restarts the PC, pc_chipset.vhd)
---    36    Display               headline
---    37    ----
---    38    Colour                (default; 80 x 25 colour)
---    39    Monochrome, green     C_MENU_DISP_GREEN (mono; the phosphor only in main.vhd)
---    40    Monochrome, amber     C_MENU_DISP_AMBER
---    41    Monochrome, white     C_MENU_DISP_WHITE
---    42    ----
---    43    Back to main menu
---    44  Scandinavian charset    C_MENU_CHARSET_SCAN (CONFIG switch 1 on: the Commodore character
+--    35    Display               headline
+--    36    ----
+--    37    Colour                (default; 80 x 25 colour)
+--    38    Monochrome, green     C_MENU_DISP_GREEN (mono; the phosphor only in main.vhd)
+--    39    Monochrome, amber     C_MENU_DISP_AMBER
+--    40    Monochrome, white     C_MENU_DISP_WHITE
+--    41    ----
+--    42    Back to main menu
+--    43  Scandinavian charset    C_MENU_CHARSET_SCAN (CONFIG switch 1 on: the Commodore character
 --                                ROM's A14 = 0, live as on the board; default off = USA/Europe)
---    45  Ports and mouse         submenu (doc/ports.md)
---    46    Ports and mouse       headline
---    47    ----
---    48    PMOD: serial + printer  C_MENU_PMOD (default off: the PMOD headers unpowered, all
+--    44  Ports and mouse         submenu (doc/ports.md)
+--    45    Ports and mouse       headline
+--    46    ----
+--    47    PMOD: serial + printer  C_MENU_PMOD (default off: the PMOD headers unpowered, all
 --                                pins high-Z; on: COM on PMOD1 lo, LPT on PMOD2 + PMOD1 hi)
---    49    Mouse: Amiga          (default) the quadrature mouse in joystick port 1
---    50    Mouse: Atari ST       C_MENU_MOUSE_ATARI (DB9 pins 1 and 4 swapped)
---    51    ----
---    52    Back to main menu
---    53  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
---    54  Analog: CSYNC           C_MENU_ANALOG_CSYNC
---    55  ----
---    56  Help
---    57  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
---    58  ----
---    59  Close Menu
+--    48    Mouse: Amiga          (default) the quadrature mouse in joystick port 1
+--    49    Mouse: Atari ST       C_MENU_MOUSE_ATARI (DB9 pins 1 and 4 swapped)
+--    50    ----
+--    51    Back to main menu
+--    52  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
+--    53  Analog: CSYNC           C_MENU_ANALOG_CSYNC
+--    54  ----
+--    55  Help
+--    56  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
+--    57  ----
+--    58  Close Menu
 --
 -- The settings file keeps one byte per line, so the layout is part of its format: the
 -- firmware's CFG_SIGCHECK accepts only a file whose text carries this menu's signature
 -- (m2m-rom.asm, CFG_SIG_VAL; change it with every layout change), any other file is reset to
 -- the defaults.
-constant OPTM_SIZE         : natural := 60;
+constant OPTM_SIZE         : natural := 59;
 constant OPTM_DX           : natural := 28;
-constant OPTM_DY           : natural := 24;   -- the visible main menu (lines 0-11, 18, 27, 35, 44, 45, 53-59;
-                                              -- the row "Drive B" takes two screen lines for its two items)
+constant OPTM_DY           : natural := 22;   -- the screen lines of the main menu (lines 0-9, 10, 17,
+                                              -- 26, 34, 43, 44, 52-58; lines 3 and 4 share one): the
+                                              -- frame is OPTM_DY + 2 = 24 of the 25 lines (CHARS_DY)
 
 constant OPTM_ITEMS        : string :=
    " PC10-III\n"              &
    "\n"                       &
    " A:%s\n"                  &
    " B:%s\n"                  &
+   " int. drive\n"            &
    " C:%s\n"                  &
    " A: write protected\n"    &
    " B: write protected\n"    &
-   " Drive B: image\n"        &
-   " int. drive\n"            &
    " Drive sound (int. drive)\n" &
    "\n"                       &
    " Chipset: %s\n"           &
@@ -341,9 +343,10 @@ constant OPTM_G_DRVSND     : integer := 11;
 constant OPTM_G_CHIP       : integer := 12;
 constant OPTM_G_CHARSET    : integer := 13;
 constant OPTM_G_HDC        : integer := 14;
-constant OPTM_G_BDRV       : integer := 15;
-constant OPTM_G_PMOD       : integer := 16;
-constant OPTM_G_MOUSE      : integer := 17;
+constant OPTM_G_BINT       : integer := 130;   -- " int. drive": OPTM_G_FDB + 16#80#, the row of " B:%s"
+                                                -- (menu_rows.asm: a row is bits 6..0 of the group id)
+constant OPTM_G_PMOD       : integer := 15;
+constant OPTM_G_MOUSE      : integer := 16;
 
 type OPTM_GTYPE is array (0 to OPTM_SIZE - 1) of integer range 0 to 2**OPTM_GTC- 1;
 
@@ -351,74 +354,74 @@ constant OPTM_GROUPS       : OPTM_GTYPE := ( OPTM_G_TEXT + OPTM_G_HEADLINE,     
                                              OPTM_G_LINE,                              --  1
                                              OPTM_G_FDA + OPTM_G_LOAD_ROM + OPTM_G_START, --  2 A:%s
                                              OPTM_G_FDB + OPTM_G_LOAD_ROM,             --  3 B:%s
-                                             OPTM_G_HDC + OPTM_G_LOAD_ROM,             --  4 C:%s
-                                             OPTM_G_WPA + OPTM_G_SINGLESEL,            --  5 A: write protected
-                                             OPTM_G_WPB + OPTM_G_SINGLESEL,            --  6 B: write protected
-                                             OPTM_G_BDRV + OPTM_G_STDSEL,              --  7 Drive B: image (a row)
-                                             OPTM_G_BDRV,                              --  8 int. drive
-                                             OPTM_G_DRVSND + OPTM_G_SINGLESEL + OPTM_G_STDSEL, --  9 Drive sound
-                                             OPTM_G_LINE,                              -- 10
-                                             OPTM_G_SUBMENU,                           -- 11 Chipset: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 12 Chipset
-                                             OPTM_G_LINE,                              -- 13
-                                             OPTM_G_CHIP + OPTM_G_STDSEL,              -- 14 PC10-III (FE2010A)
-                                             OPTM_G_CHIP,                              -- 15 IBM XT (8255)
-                                             OPTM_G_LINE,                              -- 16
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 17 Back
-                                             OPTM_G_SUBMENU,                           -- 18 Memory: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 19 Memory size
-                                             OPTM_G_LINE,                              -- 20
-                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 21 640 KB
-                                             OPTM_G_MEM,                               -- 22 512 KB
-                                             OPTM_G_MEM,                               -- 23 256 KB
-                                             OPTM_G_MEM,                               -- 24 128 KB
-                                             OPTM_G_LINE,                              -- 25
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 26 Back
-                                             OPTM_G_SUBMENU,                           -- 27 HDMI: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 28 HDMI mode
-                                             OPTM_G_LINE,                              -- 29
-                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 30 720p 60 Hz
-                                             OPTM_G_HDMI,                              -- 31 480p 59.94 Hz
-                                             OPTM_G_HDMI,                              -- 32 720p 50 Hz
-                                             OPTM_G_LINE,                              -- 33
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 34 Back
-                                             OPTM_G_SUBMENU,                           -- 35 Display: %s
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 36 Display
-                                             OPTM_G_LINE,                              -- 37
-                                             OPTM_G_DISP + OPTM_G_STDSEL,              -- 38 Colour
-                                             OPTM_G_DISP,                              -- 39 Monochrome, green
-                                             OPTM_G_DISP,                              -- 40 Monochrome, amber
-                                             OPTM_G_DISP,                              -- 41 Monochrome, white
-                                             OPTM_G_LINE,                              -- 42
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 43 Back
-                                             OPTM_G_CHARSET + OPTM_G_SINGLESEL,        -- 44 Scandinavian charset
-                                             OPTM_G_SUBMENU,                           -- 45 Ports and mouse
-                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 46 Ports and mouse
-                                             OPTM_G_LINE,                              -- 47
-                                             OPTM_G_PMOD + OPTM_G_SINGLESEL,           -- 48 PMOD: serial + printer
-                                             OPTM_G_MOUSE + OPTM_G_STDSEL,             -- 49 Mouse: Amiga
-                                             OPTM_G_MOUSE,                             -- 50 Mouse: Atari ST
-                                             OPTM_G_LINE,                              -- 51
-                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 52 Back
-                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 53 Analog: 15 kHz
-                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 54 Analog: CSYNC
-                                             OPTM_G_LINE,                              -- 55
-                                             OPTM_G_HELP,                              -- 56 Help
-                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 57 Reset the PC
-                                             OPTM_G_LINE,                              -- 58
-                                             OPTM_G_CLOSE                              -- 59 Close Menu
+                                             OPTM_G_BINT + OPTM_G_SINGLESEL,           --  4 int. drive (a row with B:)
+                                             OPTM_G_HDC + OPTM_G_LOAD_ROM,             --  5 C:%s
+                                             OPTM_G_WPA + OPTM_G_SINGLESEL,            --  6 A: write protected
+                                             OPTM_G_WPB + OPTM_G_SINGLESEL,            --  7 B: write protected
+                                             OPTM_G_DRVSND + OPTM_G_SINGLESEL + OPTM_G_STDSEL, --  8 Drive sound
+                                             OPTM_G_LINE,                              --  9
+                                             OPTM_G_SUBMENU,                           -- 10 Chipset: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 11 Chipset
+                                             OPTM_G_LINE,                              -- 12
+                                             OPTM_G_CHIP + OPTM_G_STDSEL,              -- 13 PC10-III (FE2010A)
+                                             OPTM_G_CHIP,                              -- 14 IBM XT (8255)
+                                             OPTM_G_LINE,                              -- 15
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 16 Back
+                                             OPTM_G_SUBMENU,                           -- 17 Memory: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 18 Memory size
+                                             OPTM_G_LINE,                              -- 19
+                                             OPTM_G_MEM + OPTM_G_STDSEL,               -- 20 640 KB
+                                             OPTM_G_MEM,                               -- 21 512 KB
+                                             OPTM_G_MEM,                               -- 22 256 KB
+                                             OPTM_G_MEM,                               -- 23 128 KB
+                                             OPTM_G_LINE,                              -- 24
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 25 Back
+                                             OPTM_G_SUBMENU,                           -- 26 HDMI: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 27 HDMI mode
+                                             OPTM_G_LINE,                              -- 28
+                                             OPTM_G_HDMI + OPTM_G_STDSEL,              -- 29 720p 60 Hz
+                                             OPTM_G_HDMI,                              -- 30 480p 59.94 Hz
+                                             OPTM_G_HDMI,                              -- 31 720p 50 Hz
+                                             OPTM_G_LINE,                              -- 32
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 33 Back
+                                             OPTM_G_SUBMENU,                           -- 34 Display: %s
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 35 Display
+                                             OPTM_G_LINE,                              -- 36
+                                             OPTM_G_DISP + OPTM_G_STDSEL,              -- 37 Colour
+                                             OPTM_G_DISP,                              -- 38 Monochrome, green
+                                             OPTM_G_DISP,                              -- 39 Monochrome, amber
+                                             OPTM_G_DISP,                              -- 40 Monochrome, white
+                                             OPTM_G_LINE,                              -- 41
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 42 Back
+                                             OPTM_G_CHARSET + OPTM_G_SINGLESEL,        -- 43 Scandinavian charset
+                                             OPTM_G_SUBMENU,                           -- 44 Ports and mouse
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 45 Ports and mouse
+                                             OPTM_G_LINE,                              -- 46
+                                             OPTM_G_PMOD + OPTM_G_SINGLESEL,           -- 47 PMOD: serial + printer
+                                             OPTM_G_MOUSE + OPTM_G_STDSEL,             -- 48 Mouse: Amiga
+                                             OPTM_G_MOUSE,                             -- 49 Mouse: Atari ST
+                                             OPTM_G_LINE,                              -- 50
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 51 Back
+                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 52 Analog: 15 kHz
+                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 53 Analog: CSYNC
+                                             OPTM_G_LINE,                              -- 54
+                                             OPTM_G_HELP,                              -- 55 Help
+                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 56 Reset the PC
+                                             OPTM_G_LINE,                              -- 57
+                                             OPTM_G_CLOSE                              -- 58 Close Menu
                                            );
 
--- M2M-UPSTREAM menu-rows (Megamiga, M2M/rom/menu_rows.asm): the radio groups drawn as a row,
--- the label (the first item's text before ": ") on a line of its own, the options side by
--- side on the next one:
---     Drive B
---      *image  int. drive
--- Every option stays its own menu item (line numbers and settings file as for classic
--- lines). Rules: the items of a row are consecutive, a row is a radio group, it fits into
--- OPTM_DX - 2 columns.
+-- M2M-UPSTREAM menu-rows (Megamiga, M2M/rom/menu_rows.asm): the items of a group drawn as a
+-- row. A row whose first item has no label (no ": " in its text) is one screen line: the
+-- first item where a classic line has it, the second one at the right edge of the frame:
+--      B:<No Disk>         int. drive
+-- (the mount line " B:%s", group OPTM_G_FDB, and the single-select " int. drive", group
+-- OPTM_G_BINT = OPTM_G_FDB + 16#80#: a row is the same bits 6..0 of the group id; the Shell
+-- tells a mount line by its whole group word, so the option needs a group of its own).
+-- Every item stays its own menu item (line numbers and settings file as for classic lines).
+-- Rules: the items of a row are consecutive, a row fits into OPTM_DX - 2 columns.
 type OPTM_RTYPE is array (natural range <>) of natural;
-constant OPTM_ROWS : OPTM_RTYPE := (0 => OPTM_G_BDRV);
+constant OPTM_ROWS : OPTM_RTYPE := (0 => OPTM_G_FDB);
 
 -- the layout word of every item (SEL_OPTM_ROWS): bit 0 = an option of a row (Megamiga's
 -- word also carries greyed-out rules and headline separators: not used here)
@@ -428,7 +431,7 @@ function optmLayout return OPTM_LTYPE is
 begin
    for i in 0 to OPTM_SIZE - 1 loop
       for k in OPTM_ROWS'range loop
-         if OPTM_GROUPS(i) mod 256 = OPTM_ROWS(k) then
+         if OPTM_GROUPS(i) mod 128 = OPTM_ROWS(k) then
             r(i) := 1;
          end if;
       end loop;
