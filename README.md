@@ -89,9 +89,14 @@ yet: the framework's R3 board top lacks what the core needs for the SD cards
 | File on the SD card | What | Where from |
 |---|---|---|
 | `/pc10/ucode.bin` | the 8088's microcode, **required** | the release package, or made yourself ([The microcode](#the-microcode)) |
-| `/pc10/bios.rom` | the Commodore BIOS 4.41, **required** | zimmers.net ([The Commodore ROMs](#the-commodore-roms)) |
-| `/pc10/char.rom` | the Commodore character ROM, recommended | zimmers.net |
-| disk images | MS-DOS and your programs | [MS-DOS](#ms-dos), [The hard disk C:](#the-hard-disk-c) |
+| `/pc10/bios.rom` | the Commodore BIOS 4.41, **required** | the release package, or zimmers.net ([The Commodore ROMs](#the-commodore-roms)) |
+| `/pc10/char.rom` | the Commodore character ROM, recommended | the release package, or zimmers.net |
+| disk images | MS-DOS and your programs | the release package (`dos321-1.img`, `dos321-2.img`), [MS-DOS](#ms-dos), [The hard disk C:](#the-hard-disk-c) |
+
+The release 0.1 package's `pc10` folder already holds `bios.rom`,
+`char.rom`, the two MS-DOS 3.21 disks and `ports.img` (a mouse and Covox test
+disk); `pc10/EXTRAS-NOTICE.txt` says whose they are. Copy the folder to the
+card and the core runs.
 | `/pc10/pc10cfg` | the settings | the core creates it |
 
 The core stops at start-up with a message if `ucode.bin` or `bios.rom` is
@@ -473,7 +478,10 @@ makes the `.cor` file with the MEGA65's `coretool` (or `bit2core`), builds
 bitstream, `pc10/ucode.bin` with `pc10/UCODE-NOTICE.txt`
 (from `tools/release/`), `blank-hd20.img`, this README, the licence, the
 release notes (`doc/release-<version>.md`) and the two tools. It refuses any
-other file: no Commodore ROM or DOS goes into a package.
+other file: the repository holds no Commodore ROM or DOS. For release 0.1
+the BIOS, the character ROM and the DOS disks were added to the package's
+`pc10` folder by hand afterwards, with `pc10/EXTRAS-NOTICE.txt` (the user's
+decision, 2026-10-27).
 
 ### Repository
 

@@ -34,14 +34,18 @@ on a MEGA65 except the serial and printer ports (see Known limitations).
 ## Installing
 
 1. Copy the package's `pc10` folder to the root of a FAT32 SD card. It holds
-   `ucode.bin`, the 8088 microcode (see below).
-2. Download the Commodore BIOS 4.41 and character ROM from zimmers.net and
-   rename them to `/pc10/bios.rom` and `/pc10/char.rom`:
+   `ucode.bin`, the 8088 microcode (see below), the Commodore BIOS 4.41 and
+   character ROM (`bios.rom`, `char.rom`), MS-DOS 3.21 (`dos321-1.img`,
+   `dos321-2.img`) and `ports.img`, a test disk for the mouse and the Covox
+   (`pc10/EXTRAS-NOTICE.txt`: whose they are). That is all the core needs.
+2. The same files come from zimmers.net, if you prefer (rename them to
+   `/pc10/bios.rom` and `/pc10/char.rom`):
    - https://www.zimmers.net/anonftp/pub/cbm-pc/firmware/pc10/cbm-pc10c-bios-v4.41-318085-08.bin
      (md5 `598a1adee2a9ddaa5b0d4b73190ff990`)
    - https://www.zimmers.net/anonftp/pub/cbm-pc/firmware/pc10/cbm-pc10c-char-318086-03-e53c.bin
      (md5 `3dff8618da06c084bb2302a338501f8c`)
-3. MS-DOS 3.21 (Commodore Colt), two 360K images:
+3. MS-DOS 3.21 (Commodore Colt), two 360K images (`/pc10/dos321-1.img`,
+   `/pc10/dos321-2.img`):
    https://www.zimmers.net/anonftp/pub/cbm-pc/software/Commodore_COLT_MS-DOS_v3.21.zip
 4. For a hard disk: `blank-hd20.img` from the package, then FDISK and
    `FORMAT C: /S` from DOS disk 1.
@@ -83,8 +87,15 @@ it. You can make the same file yourself:
 | `PC10-III-0.1-R6.cor` | the core, for the flash menu |
 | `PC10-III-0.1-R6.bit` | the bitstream, for JTAG |
 | `pc10/ucode.bin`, `pc10/UCODE-NOTICE.txt` | the 8088 microcode and its notice |
+| `pc10/bios.rom`, `pc10/char.rom` | the Commodore BIOS 4.41 and character ROM |
+| `pc10/dos321-1.img`, `pc10/dos321-2.img` | Commodore MS-DOS 3.21, disks 1 and 2 |
+| `pc10/ports.img` | a test disk for the mouse and the Covox (MOUSE.COM, MTEST, COVOX) |
+| `pc10/EXTRAS-NOTICE.txt` | whose the ROMs and disks are |
+| `doc/img/pc10-logo-horizontal.svg` | the logo the README shows |
 | `blank-hd20.img` | an empty hard disk for C: (21,411,840 bytes) |
 | `README.md`, `LICENSE`, `RELEASE-NOTES.md` | the README, GPL-3.0, these notes |
 | `tools/mkucode.py`, `tools/mkblankhd.py` | the microcode bundle and empty hard disks, made yourself |
 
-No Commodore ROM or DOS is included.
+The Commodore ROMs and MS-DOS are Commodore's and Microsoft's, not covered
+by the core's GPL-3.0; they are included so that the core runs out of the
+box, and will be removed if their owners ask.

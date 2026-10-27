@@ -37,8 +37,11 @@ why, test numbers).
    with a notice that it is Intel's property, not covered by the core's GPLv3,
    and withdrawn if Intel asks. It stays a separate file (never in the
    bitstream, never in this repository), so withdrawing it leaves the core
-   untouched. The same pattern applies to Commodore's BIOS/character ROMs only
-   if Commodore grants permission (asked 2026-10-25).
+   untouched. Commodore's BIOS/character ROMs and the MS-DOS 3.21 disks
+   (the user's decision, 2026-10-27, release 0.1): the release package ships
+   them in its `pc10` folder with `pc10/EXTRAS-NOTICE.txt`, added by hand
+   after `tools/make_release.py` (never in this repository); the user deals
+   with Commodore if it objects (asked 2026-10-25, no answer yet).
 5. **Test data stays outside the repo** (`~/pcxt-work/`): the suite has no
    licence file, and the converted form is several GB.
 6. Hardware rules from Megamiga apply once there is a bitstream: board XDC,
