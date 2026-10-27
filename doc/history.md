@@ -2527,3 +2527,18 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   `dfolder`, uncommitted, no firmware) is cut from both; both say the serial
   and printer ports are untested on hardware. doc/ports.md section 8 has the
   results; doc/m2m-shell.md's open issues are brought up to date.
+
+## 2026-10-27 - Release 0.1 (build pc10-rel-0.1, tag v0.1)
+
+- **Build `pc10-rel-0.1`**: main at a9cf598 (the HDL and firmware of
+  pc10-bline-b), a full build (no REF): RESULT OK, WNS +0.349, WHS +0.018,
+  LUTs 31,300, BRAM 276.5/365, 0 routing errors.
+- **Package** (`tools/make_release.py --jenner ... --version 0.1`, commit
+  83637a1): the .cor (coretool), the .bit, `pc10/ucode.bin` (md5 38d6a32e...,
+  the genuine 8088 bundle) with its notice, `blank-hd20.img`, README, LICENSE,
+  RELEASE-NOTES.md, the two tools; then by hand (the user's decision, AGENTS.md
+  rule 4): `pc10/bios.rom`, `char.rom`, `dos321-1.img`, `dos321-2.img`,
+  `ports.img`, `EXTRAS-NOTICE.txt`, and `doc/img/` for the README's logo.
+  `PC10-III-0.1-R6.zip` 2,376 KB zipped, sha256 f4461a44...; kept in
+  `~/pcxt-work/release-0.1/` (the extras in `~/pcxt-work/release-0.1-extras/`).
+  The bitstream loaded on the board.
