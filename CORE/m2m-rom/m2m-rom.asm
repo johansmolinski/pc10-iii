@@ -734,10 +734,12 @@ CFG_SIGSET      SYSCALL(enter, 1)
 ; "Drive sound" at line 6. "3": 39 lines, the "Chipset" submenu at lines 8-14.
 ; "4": 48 lines, the "Display" submenu. "5": 49 lines, the character set.
 ; "6": 50 lines, " C:%s" (the hard disk image) at line 4. "7": 52 lines,
-; the row "Drive B" (image / int. drive) at lines 7-8.
+; the row "Drive B" (image / int. drive) at lines 7-8 (branch intfd), or 58
+; lines, the "Ports and mouse" submenu at lines 43-50 (branch ports). "8": 60
+; lines, both: the row "Drive B" at 7-8, "Ports and mouse" at 45-52.
 ; At most 3 characters (CFG_SIGCHECK's buffer).
 CFG_SIG_KEY     .ASCII_W "menu"
-CFG_SIG_VAL     .ASCII_W "7"
+CFG_SIG_VAL     .ASCII_W "8"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings
@@ -776,21 +778,23 @@ HDC_FDH         .BLOCK FAT32$FDH_STRUCT_SIZE    ; the directories of its path
 HDC_DE          .BLOCK FAT32$DE_STRUCT_SIZE     ; (HDC_SAVE)
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
-; for this 52-line menu the demand is 1096 words: 20 + 626 item characters
-; + 1 + 4 x 52 + 1 + (4 submenus + 3 manual ROMs + 1) x 30; the Shell checks
+; for this 60-line menu the demand is 1276 words: 20 + 744 item characters
+; + 1 + 4 x 60 + 1 + (5 submenus + 3 manual ROMs + 1) x 30; the Shell checks
 ; it at boot (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
-; (1088 for the 50-line menu, demand 1058.)
-MENU_HEAP_SIZE  .EQU 1120
+; (1088 for the 50-line menu: 1058; 1120 for 52 lines: 1096; 1248 for 58
+; lines: 1238.)
+MENU_HEAP_SIZE  .EQU 1280
 
 #ifndef RELEASE
 HEAP_SIZE       .EQU 0
 HEAP            .BLOCK 1
 #else
 ; HEAP + MENU_HEAP_SIZE + HEAP_SIZE must stay below VAR$STACK_START -
-; STACK_SIZE (check HEAP and VAR$STACK_START in m2m-rom.lis). 19456 since
-; the row "Drive B" (MENU_HEAP_SIZE + 32), 19488 since the hard disk's path
-; (pc_hdc.asm: 412 words of variables; 19904 before)
-HEAP_SIZE       .EQU 19456
+; STACK_SIZE (check HEAP and VAR$STACK_START in m2m-rom.lis). 19488 since
+; the hard disk's path (pc_hdc.asm: 412 words of variables; 19904 before);
+; 19296 since the row "Drive B" and the "Ports and mouse" submenu
+; (MENU_HEAP_SIZE + 192)
+HEAP_SIZE       .EQU 19296
 HEAP            .BLOCK 1
 
                 .ORG    0xFED0                  ; as Megamiga: the FAT32 write layer's

@@ -32,3 +32,11 @@ set_max_delay -datapath_only 20.000 -from [get_clocks main_clk] -to [get_clocks 
 set_property -dict {PULLUP TRUE} [get_ports {sd_mosi_o sd_miso_i sd_d1_i sd_d2_i sd_reset_o}]
 set_property -dict {PULLUP TRUE} [get_ports {sd2_mosi_o sd2_miso_i sd2_d1_i sd2_d2_i sd2_reset_o}]
 
+
+## The serial and parallel ports on the PMOD headers (pc_ports.vhd, doc/ports.md): RXD and
+## /ACK pulled up (idle), /CTS and BUSY pulled down, so an unconnected input reads "clear to
+## send" and "printer not busy" (Megamiga pulls /CTS up: its Amiga serial.device ignores it,
+## the PC's BIOS INT 14h waits for it). The inputs are asynchronous and go through a 2-FF
+## ASYNC_REG synchronizer; the outputs are slow, no I/O delay constraints.
+set_property -dict {PULLUP TRUE}   [get_ports {p1lo_io[2] p1hi_io[2]}]
+set_property -dict {PULLDOWN TRUE} [get_ports {p1lo_io[0] p1hi_io[1]}]

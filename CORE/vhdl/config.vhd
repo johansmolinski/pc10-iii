@@ -130,7 +130,7 @@ constant OPTM_PAUSE        : boolean := false;     -- hard rule 7
 constant WELCOME_ACTIVE    : boolean := false;
 constant WELCOME_AT_RESET  : boolean := false;
 constant KEYBOARD_AT_RESET : boolean := false;
-constant JOY_1_AT_RESET    : boolean := false;
+constant JOY_1_AT_RESET    : boolean := true;    -- the bus mouse in joystick port 1 (pc_ports.vhd)
 constant JOY_2_AT_RESET    : boolean := false;
 constant KEYBOARD_AT_OSD   : boolean := false;
 constant JOY_1_AT_OSD      : boolean := false;
@@ -237,22 +237,31 @@ constant OPTM_S_SAVING     : string := "<Saving>";
 --    43    Back to main menu
 --    44  Scandinavian charset    C_MENU_CHARSET_SCAN (CONFIG switch 1 on: the Commodore character
 --                                ROM's A14 = 0, live as on the board; default off = USA/Europe)
---    45  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
---    46  Analog: CSYNC           C_MENU_ANALOG_CSYNC
---    47  ----
---    48  Help
---    49  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
---    50  ----
---    51  Close Menu
+--    45  Ports and mouse         submenu (doc/ports.md)
+--    46    Ports and mouse       headline
+--    47    ----
+--    48    PMOD: serial + printer  C_MENU_PMOD (default off: the PMOD headers unpowered, all
+--                                pins high-Z; on: COM on PMOD1 lo, LPT on PMOD2 + PMOD1 hi)
+--    49    Mouse: Amiga          (default) the quadrature mouse in joystick port 1
+--    50    Mouse: Atari ST       C_MENU_MOUSE_ATARI (DB9 pins 1 and 4 swapped)
+--    51    ----
+--    52    Back to main menu
+--    53  Analog: 15 kHz RGB      C_MENU_ANALOG_15KHZ (default off: 31 kHz VGA, scandoubler)
+--    54  Analog: CSYNC           C_MENU_ANALOG_CSYNC
+--    55  ----
+--    56  Help
+--    57  Reset the PC            C_MENU_RESET (momentary: the firmware resets and clears it)
+--    58  ----
+--    59  Close Menu
 --
 -- The settings file keeps one byte per line, so the layout is part of its format: the
 -- firmware's CFG_SIGCHECK accepts only a file whose text carries this menu's signature
 -- (m2m-rom.asm, CFG_SIG_VAL; change it with every layout change), any other file is reset to
 -- the defaults.
-constant OPTM_SIZE         : natural := 52;
+constant OPTM_SIZE         : natural := 60;
 constant OPTM_DX           : natural := 28;
-constant OPTM_DY           : natural := 23;   -- the visible main menu (lines 0-11, 18, 27, 35, 44-51; the
-                                              -- row "Drive B" takes two screen lines for its two items)
+constant OPTM_DY           : natural := 24;   -- the visible main menu (lines 0-11, 18, 27, 35, 44, 45, 53-59;
+                                              -- the row "Drive B" takes two screen lines for its two items)
 
 constant OPTM_ITEMS        : string :=
    " PC10-III\n"              &
@@ -300,6 +309,14 @@ constant OPTM_ITEMS        : string :=
    "\n"                       &
    " Back to main menu\n"     &
    " Scandinavian charset\n"  &
+   " Ports and mouse\n"       &
+   " Ports and mouse\n"       &
+   "\n"                       &
+   " PMOD: serial + printer\n" &
+   " Mouse: Amiga\n"          &
+   " Mouse: Atari ST\n"       &
+   "\n"                       &
+   " Back to main menu\n"     &
    " Analog: 15 kHz RGB\n"    &
    " Analog: CSYNC\n"         &
    "\n"                       &
@@ -324,6 +341,8 @@ constant OPTM_G_CHIP       : integer := 12;
 constant OPTM_G_CHARSET    : integer := 13;
 constant OPTM_G_HDC        : integer := 14;
 constant OPTM_G_BDRV       : integer := 15;
+constant OPTM_G_PMOD       : integer := 16;
+constant OPTM_G_MOUSE      : integer := 17;
 
 type OPTM_GTYPE is array (0 to OPTM_SIZE - 1) of integer range 0 to 2**OPTM_GTC- 1;
 
@@ -372,13 +391,21 @@ constant OPTM_GROUPS       : OPTM_GTYPE := ( OPTM_G_TEXT + OPTM_G_HEADLINE,     
                                              OPTM_G_LINE,                              -- 42
                                              OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 43 Back
                                              OPTM_G_CHARSET + OPTM_G_SINGLESEL,        -- 44 Scandinavian charset
-                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 45 Analog: 15 kHz
-                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 46 Analog: CSYNC
+                                             OPTM_G_SUBMENU,                           -- 45 Ports and mouse
+                                             OPTM_G_TEXT + OPTM_G_HEADLINE,            -- 46 Ports and mouse
                                              OPTM_G_LINE,                              -- 47
-                                             OPTM_G_HELP,                              -- 48 Help
-                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 49 Reset the PC
-                                             OPTM_G_LINE,                              -- 50
-                                             OPTM_G_CLOSE                              -- 51 Close Menu
+                                             OPTM_G_PMOD + OPTM_G_SINGLESEL,           -- 48 PMOD: serial + printer
+                                             OPTM_G_MOUSE + OPTM_G_STDSEL,             -- 49 Mouse: Amiga
+                                             OPTM_G_MOUSE,                             -- 50 Mouse: Atari ST
+                                             OPTM_G_LINE,                              -- 51
+                                             OPTM_G_CLOSE + OPTM_G_SUBMENU,            -- 52 Back
+                                             OPTM_G_15KHZ + OPTM_G_SINGLESEL,          -- 53 Analog: 15 kHz
+                                             OPTM_G_CSYNC + OPTM_G_SINGLESEL,          -- 54 Analog: CSYNC
+                                             OPTM_G_LINE,                              -- 55
+                                             OPTM_G_HELP,                              -- 56 Help
+                                             OPTM_G_RESET + OPTM_G_SINGLESEL,          -- 57 Reset the PC
+                                             OPTM_G_LINE,                              -- 58
+                                             OPTM_G_CLOSE                              -- 59 Close Menu
                                            );
 
 -- M2M-UPSTREAM menu-rows (Megamiga, M2M/rom/menu_rows.asm): the radio groups drawn as a row,

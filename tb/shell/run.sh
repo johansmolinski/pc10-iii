@@ -7,7 +7,8 @@
 # settings file signature: run_cfgsig.sh; PREP_LOAD_IMAGE: run_prepload.sh; the RTC write-back PC_RTC_WB: run_rtcwb.sh;
 # the hard disk C: across power-off, pc_hdc.asm on an SD card image: run_hdc.sh) and a
 # Verilator run of the stand-in pc_system (tb_stub.sv). Run from anywhere: tb/shell/run.sh.
-# Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py, tb/shell/mut_hdc.py
+# tb_ports.vhd: the PMOD headers, the mouse lines and the POT buttons (pc_ports.vhd).
+# Mutants: tb/shell/mut.py, tb/shell/mut_rtc.py, tb/shell/mut_hdc.py, tb/shell/mut_ports.py
 set -e
 H=$(cd "$(dirname "$0")" && pwd)
 R=$(cd "$H/../.." && pwd)
@@ -19,7 +20,8 @@ for f in $R/M2M/QNICE/vhdl/tools.vhd $M/tdp_ram.vhd $M/2port2clk_ram.vhd $M/cdc_
          $M/QNICE/sdhost.vhd $R/CORE/vhdl/keyboard.vhd $R/CORE/vhdl/pc_bios.vhd $R/CORE/vhdl/pc_ram.vhd \
          $R/CORE/vhdl/pc_font.vhd $R/CORE/vhdl/pc_ucode.vhd $R/CORE/vhdl/pc_fdd_sd.vhd $R/CORE/vhdl/pc_drvsnd.vhd \
          $R/CORE/vhdl/pc_chipset.vhd $M/i2c/rtc_master.vhd $M/i2c/rtc_controller.vhd $R/CORE/vhdl/pc_rtc.vhd \
-         $H/tb_glue.vhd $H/tb_fdd.vhd $H/tb_drvsnd.vhd $H/tb_chipset.vhd $H/tb_rtc.vhd; do
+         $R/CORE/vhdl/pc_ports.vhd \
+         $H/tb_glue.vhd $H/tb_fdd.vhd $H/tb_drvsnd.vhd $H/tb_chipset.vhd $H/tb_rtc.vhd $H/tb_ports.vhd; do
     ghdl -a --std=08 -frelaxed "$f"
 done
 ghdl -e --std=08 -frelaxed tb_glue
@@ -32,6 +34,8 @@ ghdl -e --std=08 -frelaxed tb_chipset
 ghdl -r --std=08 -frelaxed tb_chipset --ieee-asserts=disable 2>&1 | grep -E "PASS|FAIL|error|failure" || true
 ghdl -e --std=08 -frelaxed tb_rtc
 ghdl -r --std=08 -frelaxed tb_rtc --ieee-asserts=disable 2>&1 | grep -E "PASS|FAIL|error|failure" || true
+ghdl -e --std=08 -frelaxed tb_ports
+ghdl -r --std=08 -frelaxed tb_ports --ieee-asserts=disable 2>&1 | grep -E "PASS|FAIL|error|failure" || true
 "$H/run_cfgsig.sh"
 "$H/run_prepload.sh"
 "$H/run_rtcwb.sh"

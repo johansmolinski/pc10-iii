@@ -131,6 +131,30 @@ entity main is
       rtc_set_o               : out std_logic;
       rtc_time_o              : out std_logic_vector(63 downto 0);
 
+      -- The serial port, the parallel port and the bus mouse (doc/ports.md; pc_ports.vhd: the
+      -- PMOD headers and joystick port 1)
+      ser_txd_o               : out std_logic;
+      ser_rts_n_o             : out std_logic;
+      ser_dtr_n_o             : out std_logic;
+      ser_rxd_i               : in  std_logic;
+      ser_cts_n_i             : in  std_logic;
+      ser_dsr_n_i             : in  std_logic;
+      ser_dcd_n_i             : in  std_logic;
+      ser_ri_n_i              : in  std_logic;
+      lpt_data_o              : out std_logic_vector(7 downto 0);
+      lpt_strobe_n_o          : out std_logic;
+      lpt_init_n_o            : out std_logic;
+      lpt_busy_i              : in  std_logic;
+      lpt_ack_n_i             : in  std_logic;
+      lpt_pe_i                : in  std_logic;
+      lpt_slct_i              : in  std_logic;
+      lpt_err_n_i             : in  std_logic;
+      mouse_xp_i              : in  std_logic;
+      mouse_xq_i              : in  std_logic;
+      mouse_yp_i              : in  std_logic;
+      mouse_yq_i              : in  std_logic;
+      mouse_btn_n_i           : in  std_logic_vector(2 downto 0);
+
       -- Configuration
       dip_sw1_i               : in  std_logic_vector(7 downto 0)
    );
@@ -214,6 +238,29 @@ architecture synthesis of main is
          rtc_seed    : in  std_logic_vector(64 downto 0);
          rtc_set     : out std_logic;
          rtc_time    : out std_logic_vector(63 downto 0);
+         ser_txd     : out std_logic;
+         ser_rts_n   : out std_logic;
+         ser_dtr_n   : out std_logic;
+         ser_rxd     : in  std_logic;
+         ser_cts_n   : in  std_logic;
+         ser_dsr_n   : in  std_logic;
+         ser_dcd_n   : in  std_logic;
+         ser_ri_n    : in  std_logic;
+         lpt_data    : out std_logic_vector(7 downto 0);
+         lpt_strobe_n : out std_logic;
+         lpt_autofd_n : out std_logic;
+         lpt_init_n  : out std_logic;
+         lpt_selin_n : out std_logic;
+         lpt_busy    : in  std_logic;
+         lpt_ack_n   : in  std_logic;
+         lpt_pe      : in  std_logic;
+         lpt_slct    : in  std_logic;
+         lpt_err_n   : in  std_logic;
+         mouse_xp    : in  std_logic;
+         mouse_xq    : in  std_logic;
+         mouse_yp    : in  std_logic;
+         mouse_yq    : in  std_logic;
+         mouse_btn_n : in  std_logic_vector(2 downto 0);
          kbd_code    : in  std_logic_vector(7 downto 0);
          kbd_valid   : in  std_logic;
          kbd_busy    : out std_logic;
@@ -221,6 +268,19 @@ architecture synthesis of main is
          dip_sw1     : in  std_logic_vector(7 downto 0)
       );
    end component pc_system_flat;
+
+   -- the speaker plus the Covox on the parallel port's data latch (rtl/system/pc_audio_mix.sv)
+   component pc_audio_mix is
+      port (
+         clk         : in  std_logic;
+         speaker     : in  std_logic;
+         dac         : in  std_logic_vector(7 downto 0);
+         audio       : out std_logic_vector(15 downto 0)
+      );
+   end component pc_audio_mix;
+
+   signal lpt_data     : std_logic_vector(7 downto 0);
+   signal audio        : std_logic_vector(15 downto 0);
 
    signal kbd_code     : std_logic_vector(7 downto 0);
    signal kbd_valid    : std_logic;
@@ -368,6 +428,29 @@ begin
          rtc_seed    => rtc_i,
          rtc_set     => rtc_set_o,
          rtc_time    => rtc_time_o,
+         ser_txd     => ser_txd_o,
+         ser_rts_n   => ser_rts_n_o,
+         ser_dtr_n   => ser_dtr_n_o,
+         ser_rxd     => ser_rxd_i,
+         ser_cts_n   => ser_cts_n_i,
+         ser_dsr_n   => ser_dsr_n_i,
+         ser_dcd_n   => ser_dcd_n_i,
+         ser_ri_n    => ser_ri_n_i,
+         lpt_data    => lpt_data,
+         lpt_strobe_n => lpt_strobe_n_o,
+         lpt_autofd_n => open,
+         lpt_init_n  => lpt_init_n_o,
+         lpt_selin_n => open,
+         lpt_busy    => lpt_busy_i,
+         lpt_ack_n   => lpt_ack_n_i,
+         lpt_pe      => lpt_pe_i,
+         lpt_slct    => lpt_slct_i,
+         lpt_err_n   => lpt_err_n_i,
+         mouse_xp    => mouse_xp_i,
+         mouse_xq    => mouse_xq_i,
+         mouse_yp    => mouse_yp_i,
+         mouse_yq    => mouse_yq_i,
+         mouse_btn_n => mouse_btn_n_i,
          dip_sw1     => dip_sw1_i
       ); -- i_pc_system
 
@@ -415,10 +498,22 @@ begin
    video_vblank_o <= v_vb;
 
    ---------------------------------------------------------------------------------------------
-   -- Audio: the speaker line, 0 or +1/4 full scale, the same on both channels
+   -- Audio, the same on both channels: the speaker line, 0 or +1/4 full scale as before, plus
+   -- a Covox Speech Thing on the parallel port's data latch through a DC blocker, so a latch at
+   -- rest is silence (pc_audio_mix.sv, doc/ports.md section 5)
    ---------------------------------------------------------------------------------------------
 
-   audio_left_o   <= to_signed(16#2000#, 16) when speaker = '1' else (others => '0');
-   audio_right_o  <= to_signed(16#2000#, 16) when speaker = '1' else (others => '0');
+   lpt_data_o     <= lpt_data;
+
+   i_audio : pc_audio_mix
+      port map (
+         clk         => clk_main_i,
+         speaker     => speaker,
+         dac         => lpt_data,
+         audio       => audio
+      ); -- i_audio
+
+   audio_left_o   <= signed(audio);
+   audio_right_o  <= signed(audio);
 
 end architecture synthesis;

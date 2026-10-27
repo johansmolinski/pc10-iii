@@ -73,6 +73,13 @@ module pc_ooc_top (
     input  logic [64:0] rtc_seed,
     output logic        rtc_set,
     output logic [63:0] rtc_time,
+    output logic        ser_txd, ser_rts_n, ser_dtr_n,
+    input  logic        ser_rxd, ser_cts_n, ser_dsr_n, ser_dcd_n, ser_ri_n,
+    output logic [7:0]  lpt_data,
+    output logic        lpt_strobe_n, lpt_autofd_n, lpt_init_n, lpt_selin_n,
+    input  logic        lpt_busy, lpt_ack_n, lpt_pe, lpt_slct, lpt_err_n,
+    input  logic        mouse_xp, mouse_xq, mouse_yp, mouse_yq,
+    input  logic [2:0]  mouse_btn_n,
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -125,6 +132,10 @@ pc_system #(.RAM_KB(640), .CGA_FIT(1'b1), .MDA_FIT(2), .PVC4_FIT(1'b1), .XTA_FIT
     .xta_sp_rd_valid, .xta_sp_rd_data, .xta_sp_wr_valid, .xta_sp_wr_data,
     .xta_sp_wr_ready, .xta_sp_done, .xta_sp_err,
     .rtc_seed, .rtc_set, .rtc_time,
+    .ser_txd, .ser_rts_n, .ser_dtr_n, .ser_rxd, .ser_cts_n, .ser_dsr_n, .ser_dcd_n, .ser_ri_n,
+    .lpt_data, .lpt_strobe_n, .lpt_autofd_n, .lpt_init_n, .lpt_selin_n,
+    .lpt_busy, .lpt_ack_n, .lpt_pe, .lpt_slct, .lpt_err_n,
+    .mouse_xp, .mouse_xq, .mouse_yp, .mouse_yq, .mouse_btn_n,
     .kbd_code, .kbd_valid, .kbd_busy, .speaker, .dip_sw1
 );
 

@@ -131,6 +131,30 @@ module pc_system #(
     output logic        rtc_set,
     output logic [63:0] rtc_time,
 
+    output logic        ser_txd,
+    output logic        ser_rts_n,
+    output logic        ser_dtr_n,
+    input  logic        ser_rxd,
+    input  logic        ser_cts_n,
+    input  logic        ser_dsr_n,
+    input  logic        ser_dcd_n,
+    input  logic        ser_ri_n,
+    output logic [7:0]  lpt_data,
+    output logic        lpt_strobe_n,
+    output logic        lpt_autofd_n,
+    output logic        lpt_init_n,
+    output logic        lpt_selin_n,
+    input  logic        lpt_busy,
+    input  logic        lpt_ack_n,
+    input  logic        lpt_pe,
+    input  logic        lpt_slct,
+    input  logic        lpt_err_n,
+    input  logic        mouse_xp,
+    input  logic        mouse_xq,
+    input  logic        mouse_yp,
+    input  logic        mouse_yq,
+    input  logic [2:0]  mouse_btn_n,
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -234,6 +258,10 @@ module pc_system #(
     assign {xta_sp_lba, xta_sp_wr_data} = '0;
     // no real-time clock
     assign {rtc_set, rtc_time} = '0;
+    // no serial or parallel port: outputs idle
+    assign {ser_txd, ser_rts_n, ser_dtr_n} = '1;
+    assign lpt_data = '0;
+    assign {lpt_strobe_n, lpt_autofd_n, lpt_init_n, lpt_selin_n} = '1;
 
     function automatic logic [7:0] hexc(input logic [3:0] n);
         hexc = (n < 4'd10) ? (8'h30 + {4'h0, n}) : (8'h37 + {4'h0, n});

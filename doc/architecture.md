@@ -82,7 +82,12 @@ pc_system          (rtl/system/pc_system.sv)  the PC: everything below
      +- xtide_card  rtl/hdc/xtide_card.sv: XTIDE hard disk card + option ROM socket, doc/hdc.md
      +- xta_card    rtl/hdc/xta_card.sv           (XTA_FIT: the PC20-III's hard disk, a
      |               WD93024-X on CN202, doc/xta.md)
-     +- later: COM/LPT
+     +- uart8250    rtl/system/uart8250.sv        (PVC4_FIT: the PC10-III's INS8250 at
+     |               3F8h/2F8h, IRQ4/IRQ3, 230h bits 3-2; doc/ports.md)
+     +- lpt_ppc1    rtl/system/lpt_ppc1.sv        (PVC4_FIT: the parallel port at
+     |               3BCh/378h/278h, IRQ7, 230h bits 1-0)
+     +- cbm_mouse   rtl/system/cbm_mouse.sv       (PVC4_FIT: the 5720's bus mouse at
+                     23Ch-23Eh, IRQ2, 230h bit 4)
 ```
 
 ## 3. The card bus (ISA, as seen inside `pc_system`)
@@ -316,6 +321,18 @@ module pc_system #(
     output logic [63:0] rtc_time,
 
     // Keyboard: XT (set 1) scan codes from the glue
+    // The PC10-III's serial port, parallel port and bus mouse (PVC4_FIT,
+    // doc/ports.md): the 8250's pins (TTL polarity; inputs asynchronous), the
+    // parallel port's pins (inputs synchronized by the glue; lpt_data is also the
+    // Covox's DAC), the 9-pin mouse port's lines (Amiga H/HQ/V/VQ, asynchronous)
+    output logic        ser_txd, ser_rts_n, ser_dtr_n,
+    input  logic        ser_rxd, ser_cts_n, ser_dsr_n, ser_dcd_n, ser_ri_n,
+    output logic [7:0]  lpt_data,
+    output logic        lpt_strobe_n, lpt_autofd_n, lpt_init_n, lpt_selin_n,
+    input  logic        lpt_busy, lpt_ack_n, lpt_pe, lpt_slct, lpt_err_n,
+    input  logic        mouse_xp, mouse_xq, mouse_yp, mouse_yq,
+    input  logic [2:0]  mouse_btn_n,  // {right, middle, left}, 0 = pressed
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,    // one-clk strobe; dropped if kbd_busy
     output logic        kbd_busy,     // the board has not taken the last code
@@ -395,8 +412,16 @@ Notes (2026-10-26, real-time clock):
 - The shell: `pc_system_flat` passes `main_rtc_i` in and the write-back out to
   `CORE/vhdl/pc_rtc.vhd` (doc/m2m-shell.md section 8). tb/sys: `-R` seeds it.
 
-Not yet in the contract: serial/parallel, composite video, turbo. They get
-added here when their module exists.
+Notes (2026-10-26, serial, parallel, mouse; doc/ports.md):
+- With `PVC4_FIT` (the PC10-III board) the 5720's ports exist: the INS8250,
+  the parallel port, the bus mouse, each answering only where 230h enables it;
+  their interrupts are ORed into `isa_irq` (IRQ2 mouse, IRQ3/IRQ4 serial,
+  IRQ7 parallel). Without `PVC4_FIT` there are none (outputs idle).
+- The shell: `pc_system_flat` passes the pins to `CORE/vhdl/pc_ports.vhd` (the
+  PMOD headers, joystick port 1); `main.vhd` mixes `lpt_data` (a Covox) with
+  the speaker (`rtl/system/pc_audio_mix.sv`). tb/sys: `-M` mouse moves, `-SL`.
+
+Not yet in the contract: composite video.
 
 ## 5. Verification
 
@@ -405,4 +430,4 @@ added here when their module exists.
   runs a BIOS, dumps CGA frames as PNG and a bus trace. The bus trace is the
   thing to compare cycle by cycle against MartyPC.
 - Cards: each card has its own TB under `tb/` (`tb/cga`, `tb/mda`,
-  `tb/fdc`, `tb/hdc`, `tb/xta`).
+  `tb/fdc`, `tb/hdc`, `tb/xta`, `tb/rtc`, `tb/ports`).

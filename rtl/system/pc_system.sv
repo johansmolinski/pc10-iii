@@ -161,6 +161,34 @@ module pc_system #(
     output logic        rtc_set,
     output logic [63:0] rtc_time,
 
+    // the PC10-III's serial port, parallel port and bus mouse (PVC4_FIT: the 5720's
+    // board logic, doc/ports.md): the 8250's pins (TTL levels, as at the chip; the
+    // inputs asynchronous), the parallel port's pins (the inputs synchronized by the
+    // glue), the 9-pin mouse port (Amiga 1352 lines: H/HQ, V/VQ; asynchronous)
+    output logic        ser_txd,
+    output logic        ser_rts_n,
+    output logic        ser_dtr_n,
+    input  logic        ser_rxd,
+    input  logic        ser_cts_n,
+    input  logic        ser_dsr_n,
+    input  logic        ser_dcd_n,
+    input  logic        ser_ri_n,
+    output logic [7:0]  lpt_data,       // also the Covox's DAC (pc_audio_mix.sv)
+    output logic        lpt_strobe_n,
+    output logic        lpt_autofd_n,
+    output logic        lpt_init_n,
+    output logic        lpt_selin_n,
+    input  logic        lpt_busy,
+    input  logic        lpt_ack_n,
+    input  logic        lpt_pe,
+    input  logic        lpt_slct,
+    input  logic        lpt_err_n,
+    input  logic        mouse_xp,       // H (DB9 pin 2)
+    input  logic        mouse_xq,       // HQ (pin 4)
+    input  logic        mouse_yp,       // V (pin 1)
+    input  logic        mouse_yq,       // VQ (pin 3)
+    input  logic [2:0]  mouse_btn_n,    // {right, middle, left}, 0 = pressed
+
     input  logic [7:0]  kbd_code,
     input  logic        kbd_valid,
     output logic        kbd_busy,
@@ -406,6 +434,8 @@ logic       venb_n;
 logic [6:0] cfg_bits;                   // 230h bits 6-0 (bit 6: the RTC)
 logic [7:0] rtc_din;
 logic       rtc_dsel;
+logic [7:0] com_din, lpt_din, mse_din;
+logic       com_dsel, lpt_dsel, mse_dsel, com_irq3, com_irq4, lpt_irq7, mse_irq2;
 wire        pvc_on = PVC4_FIT;
 
 generate if (PVC4_FIT) begin : g_pvc4
@@ -447,6 +477,90 @@ generate if (PVC4_FIT) begin : g_pvc4
         .seed          (rtc_seed),
         .clk_set       (rtc_set),
         .now           (rtc_time)
+    );
+
+    // the serial port (doc/ports.md): an INS8250 at 3F8h (IRQ4) or 2F8h (IRQ3), 230h bits 3-2
+    uart8250 u_com (
+        .clk           (clk),
+        .reset         (reset),
+        .isa_addr      (isa_addr),
+        .isa_addr_next (isa_addr_next),
+        .isa_aen_next  (isa_aen_next),
+        .isa_ior_n_next(isa_ior_n_next),
+        .isa_iow_n_next(isa_iow_n_next),
+        .isa_dout      (isa_dout),
+        .isa_din       (com_din),
+        .isa_dsel      (com_dsel),
+        .isa_ior_n     (isa_ior_n),
+        .isa_iow_n     (isa_iow_n),
+        .isa_aen       (isa_aen),
+        .com           (cfg_bits[3:2]),
+        .irq3          (com_irq3),
+        .irq4          (com_irq4),
+        .intr          (),
+        .sout          (ser_txd),
+        .sin           (ser_rxd),
+        .rts_n         (ser_rts_n),
+        .dtr_n         (ser_dtr_n),
+        .out1_n        (),
+        .out2_n        (),
+        .cts_n         (ser_cts_n),
+        .dsr_n         (ser_dsr_n),
+        .dcd_n         (ser_dcd_n),
+        .ri_n          (ser_ri_n)
+    );
+
+    // the parallel port (doc/ports.md): the PPC1 at 3BCh/378h/278h (230h bits 1-0), IRQ7
+    lpt_ppc1 u_lpt (
+        .clk           (clk),
+        .reset         (reset),
+        .isa_addr      (isa_addr),
+        .isa_addr_next (isa_addr_next),
+        .isa_aen_next  (isa_aen_next),
+        .isa_iow_n_next(isa_iow_n_next),
+        .isa_dout      (isa_dout),
+        .isa_din       (lpt_din),
+        .isa_dsel      (lpt_dsel),
+        .isa_ior_n     (isa_ior_n),
+        .isa_iow_n     (isa_iow_n),
+        .isa_aen       (isa_aen),
+        .lpt           (cfg_bits[1:0]),
+        .irq7          (lpt_irq7),
+        .data          (lpt_data),
+        .strobe_n      (lpt_strobe_n),
+        .autofd_n      (lpt_autofd_n),
+        .init_n        (lpt_init_n),
+        .selin_n       (lpt_selin_n),
+        .busy          (lpt_busy),
+        .ack_n         (lpt_ack_n),
+        .pe            (lpt_pe),
+        .slct          (lpt_slct),
+        .err_n         (lpt_err_n)
+    );
+
+    // the 5720's bus mouse at 23Ch-23Eh, IRQ2 (230h bit 4; doc/ports.md)
+    cbm_mouse u_mouse (
+        .clk           (clk),
+        .reset         (reset),
+        .isa_addr      (isa_addr),
+        .isa_addr_next (isa_addr_next),
+        .isa_aen_next  (isa_aen_next),
+        .isa_iow_n_next(isa_iow_n_next),
+        .isa_dout      (isa_dout),
+        .isa_din       (mse_din),
+        .isa_dsel      (mse_dsel),
+        .isa_ior_n     (isa_ior_n),
+        .isa_iow_n     (isa_iow_n),
+        .isa_aen       (isa_aen),
+        .enable        (cfg_bits[4]),
+        .irq2          (mse_irq2),
+        .x_p           (mouse_xp),
+        .x_q           (mouse_xq),
+        .y_p           (mouse_yp),
+        .y_q           (mouse_yq),
+        .btn_l_n       (mouse_btn_n[0]),
+        .btn_m_n       (mouse_btn_n[1]),
+        .btn_r_n       (mouse_btn_n[2])
     );
 
     pvc4 u_pvc4 (
@@ -492,6 +606,12 @@ generate if (PVC4_FIT) begin : g_pvc4
 end else begin : g_no_pvc4
     assign cfg_din_c = 8'h00;  assign cfg_dsel_c = 1'b0;  assign venb_n = 1'b1;  assign cfg_bits = 7'd0;
     assign rtc_din = 8'h00;  assign rtc_dsel = 1'b0;  assign rtc_set = 1'b0;  assign rtc_time = 64'd0;
+    assign com_din = 8'h00;  assign com_dsel = 1'b0;  assign com_irq3 = 1'b0;  assign com_irq4 = 1'b0;
+    assign lpt_din = 8'h00;  assign lpt_dsel = 1'b0;  assign lpt_irq7 = 1'b0;
+    assign mse_din = 8'h00;  assign mse_dsel = 1'b0;  assign mse_irq2 = 1'b0;
+    assign ser_txd = 1'b1;  assign ser_rts_n = 1'b1;  assign ser_dtr_n = 1'b1;
+    assign lpt_data = 8'h00;  assign lpt_strobe_n = 1'b1;  assign lpt_autofd_n = 1'b1;
+    assign lpt_init_n = 1'b1;  assign lpt_selin_n = 1'b1;
     assign pvc_din_c = 8'h00;  assign pvc_dsel_c = 1'b0;  assign pvc_ready_c = 1'b1;
     assign pvc_ce = 1'b0;  assign pvc_rgbi = 4'h0;  assign pvc_mono = 1'b0;  assign pvc_mm = 1'b0;
     assign pvc_hs = 1'b0;  assign pvc_vs = 1'b0;  assign pvc_hb = 1'b1;  assign pvc_vb = 1'b1;
@@ -640,10 +760,13 @@ end endgenerate
 assign isa_din   = (cga_dsel ? cga_din : 8'h00) | (mda_dsel ? mda_din : 8'h00) |
                    (fdc_dsel ? fdc_din : 8'h00) | (hdc_dsel ? hdc_din : 8'h00) |
                    (pvc_dsel ? pvc_din : 8'h00) | (cfg_dsel ? cfg_din : 8'h00) |
-                   (xta_dsel ? xta_din : 8'h00) | (rtc_dsel ? rtc_din : 8'h00);
-assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel | pvc_dsel | cfg_dsel | xta_dsel | rtc_dsel;
+                   (xta_dsel ? xta_din : 8'h00) | (rtc_dsel ? rtc_din : 8'h00) |
+                   (com_dsel ? com_din : 8'h00) | (lpt_dsel ? lpt_din : 8'h00) | (mse_dsel ? mse_din : 8'h00);
+assign isa_dsel  = cga_dsel | mda_dsel | fdc_dsel | hdc_dsel | pvc_dsel | cfg_dsel | xta_dsel | rtc_dsel |
+                   com_dsel | lpt_dsel | mse_dsel;
 assign isa_ready = cga_ready & mda_ready & fdc_ready & hdc_ready & pvc_ready;
-assign isa_irq   = fdc_irq | hdc_irq | xta_irq;
+// the 5720's interrupts: the mouse IRQ2, the serial port IRQ3/IRQ4, the parallel port IRQ7
+assign isa_irq   = fdc_irq | hdc_irq | xta_irq | {lpt_irq7, 2'b00, com_irq4, com_irq3, mse_irq2};
 assign isa_drq   = fdc_drq | xta_drq;
 
 endmodule

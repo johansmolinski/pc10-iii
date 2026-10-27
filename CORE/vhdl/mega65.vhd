@@ -21,6 +21,8 @@
 -- * pc_rtc.vhd: the PC10-III's real-time clock (rtl/system/msm6242.sv, seeded from main_rtc_i)
 --   writes the time back into the MEGA65's battery RTC when the PC sets it (QNICE device
 --   C_DEV_PC_RTC, the firmware's HANDLE_CORE_IO; doc/rtc.md)
+-- * pc_ports.vhd: the PC10-III's serial (8250) and parallel ports on the PMOD headers (one menu
+--   item powers and drives them) and its bus mouse in joystick port 1 (doc/ports.md)
 -- * pc_drvsnd.vhd: the drive LED (yellow while A: or B: is selected) and the drive sound (the
 --   MEGA65's internal drive follows the motors and head steps of A: and B:; off while B: is
 --   the internal drive)
@@ -367,12 +369,14 @@ constant C_MENU_DISP_GREEN    : natural := 39;
 constant C_MENU_DISP_AMBER    : natural := 40;
 constant C_MENU_DISP_WHITE    : natural := 41;
 constant C_MENU_CHARSET_SCAN  : natural := 44;
+constant C_MENU_PMOD          : natural := 48;  -- "PMOD: serial + printer" (pc_ports.vhd)
+constant C_MENU_MOUSE_ATARI   : natural := 50;  -- "Mouse: Atari ST" (else Amiga)
 constant C_MENU_HDMI_720P     : natural := 30;
 constant C_MENU_HDMI_480P     : natural := 31;
 constant C_MENU_HDMI_720P50   : natural := 32;
-constant C_MENU_ANALOG_15KHZ  : natural := 45;
-constant C_MENU_ANALOG_CSYNC  : natural := 46;
-constant C_MENU_RESET         : natural := 49;
+constant C_MENU_ANALOG_15KHZ  : natural := 53;
+constant C_MENU_ANALOG_CSYNC  : natural := 54;
+constant C_MENU_RESET         : natural := 57;
 
 -- The PC's switches in the 5160 layout (bit = 1: switch off), per chipset (the menu's
 -- "Chipset", xt_board.sv's fe2010a). PC10-III, as the FE2010A gives them: bit 0 = 1 normal
@@ -410,6 +414,28 @@ signal main_mono              : std_logic;             -- the menu's display: mo
 signal main_mono_tint         : std_logic_vector(1 downto 0);
 signal main_charset           : std_logic;             -- CONFIG switch 1: 1 = off = USA/Europe
 signal main_rtc_set           : std_logic;             -- the PC has set its clock (pc_rtc.vhd)
+-- the serial port, the parallel port, the bus mouse (pc_ports.vhd, doc/ports.md)
+signal main_ser_txd           : std_logic;
+signal main_ser_rts_n         : std_logic;
+signal main_ser_dtr_n         : std_logic;
+signal main_ser_rxd           : std_logic;
+signal main_ser_cts_n         : std_logic;
+signal main_ser_dsr_n         : std_logic;
+signal main_ser_dcd_n         : std_logic;
+signal main_ser_ri_n          : std_logic;
+signal main_lpt_data          : std_logic_vector(7 downto 0);
+signal main_lpt_strobe_n      : std_logic;
+signal main_lpt_init_n        : std_logic;
+signal main_lpt_busy          : std_logic;
+signal main_lpt_ack_n         : std_logic;
+signal main_lpt_pe            : std_logic;
+signal main_lpt_slct          : std_logic;
+signal main_lpt_err_n         : std_logic;
+signal main_mouse_xp          : std_logic;
+signal main_mouse_xq          : std_logic;
+signal main_mouse_yp          : std_logic;
+signal main_mouse_yq          : std_logic;
+signal main_mouse_btn_n       : std_logic_vector(2 downto 0);
 signal main_rtc_time          : std_logic_vector(63 downto 0);
 signal qnice_rtc_data         : std_logic_vector(15 downto 0);
 signal qnice_rtc_ce           : std_logic;
@@ -653,13 +679,7 @@ begin
    sdram_dqmh_o         <= '0';
    sdram_dq_io          <= (others => 'Z');
 
-   -- M2M-UPSTREAM pmod-pins: high-Z, headers unpowered
-   p1lo_io              <= (others => 'Z');
-   p1hi_io              <= (others => 'Z');
-   p2lo_io              <= (others => 'Z');
-   p2hi_io              <= (others => 'Z');
-   pmod1_en_o           <= '0';
-   pmod2_en_o           <= '0';
+   -- M2M-UPSTREAM pmod-pins: the serial and parallel ports (pc_ports.vhd below)
 
    -- M2M-UPSTREAM eth-pins: PHY held idle
    eth_clock_o          <= '0';
@@ -901,8 +921,74 @@ begin
          rtc_set_o            => main_rtc_set,
          rtc_time_o           => main_rtc_time,
 
+         ser_txd_o            => main_ser_txd,
+         ser_rts_n_o          => main_ser_rts_n,
+         ser_dtr_n_o          => main_ser_dtr_n,
+         ser_rxd_i            => main_ser_rxd,
+         ser_cts_n_i          => main_ser_cts_n,
+         ser_dsr_n_i          => main_ser_dsr_n,
+         ser_dcd_n_i          => main_ser_dcd_n,
+         ser_ri_n_i           => main_ser_ri_n,
+         lpt_data_o           => main_lpt_data,
+         lpt_strobe_n_o       => main_lpt_strobe_n,
+         lpt_init_n_o         => main_lpt_init_n,
+         lpt_busy_i           => main_lpt_busy,
+         lpt_ack_n_i          => main_lpt_ack_n,
+         lpt_pe_i             => main_lpt_pe,
+         lpt_slct_i           => main_lpt_slct,
+         lpt_err_n_i          => main_lpt_err_n,
+         mouse_xp_i           => main_mouse_xp,
+         mouse_xq_i           => main_mouse_xq,
+         mouse_yp_i           => main_mouse_yp,
+         mouse_yq_i           => main_mouse_yq,
+         mouse_btn_n_i        => main_mouse_btn_n,
+
          dip_sw1_i            => main_dip_sw1
       ); -- i_main
+
+   -- the serial and parallel ports on the PMOD headers (one menu item powers and drives them),
+   -- the bus mouse in joystick port 1 (doc/ports.md section 6)
+   i_pc_ports : entity work.pc_ports
+      port map (
+         clk_i                => main_clk,
+         rst_i                => main_pc_reset,
+         pmod_on_i            => main_osm_control_i(C_MENU_PMOD),
+         atari_i              => main_osm_control_i(C_MENU_MOUSE_ATARI),
+         ser_txd_i            => main_ser_txd,
+         ser_rts_n_i          => main_ser_rts_n,
+         ser_dtr_n_i          => main_ser_dtr_n,
+         ser_rxd_o            => main_ser_rxd,
+         ser_cts_n_o          => main_ser_cts_n,
+         ser_dsr_n_o          => main_ser_dsr_n,
+         ser_dcd_n_o          => main_ser_dcd_n,
+         ser_ri_n_o           => main_ser_ri_n,
+         lpt_data_i           => main_lpt_data,
+         lpt_strobe_n_i       => main_lpt_strobe_n,
+         lpt_init_n_i         => main_lpt_init_n,
+         lpt_busy_o           => main_lpt_busy,
+         lpt_ack_n_o          => main_lpt_ack_n,
+         lpt_pe_o             => main_lpt_pe,
+         lpt_slct_o           => main_lpt_slct,
+         lpt_err_n_o          => main_lpt_err_n,
+         joy_up_n_i           => main_joy_1_up_n_i,
+         joy_down_n_i         => main_joy_1_down_n_i,
+         joy_left_n_i         => main_joy_1_left_n_i,
+         joy_right_n_i        => main_joy_1_right_n_i,
+         joy_fire_n_i         => main_joy_1_fire_n_i,
+         pot_x_i              => main_pot1_x_i,
+         pot_y_i              => main_pot1_y_i,
+         mouse_xp_o           => main_mouse_xp,
+         mouse_xq_o           => main_mouse_xq,
+         mouse_yp_o           => main_mouse_yp,
+         mouse_yq_o           => main_mouse_yq,
+         mouse_btn_n_o        => main_mouse_btn_n,
+         p1lo_io              => p1lo_io,
+         p1hi_io              => p1hi_io,
+         p2lo_io              => p2lo_io,
+         p2hi_io              => p2hi_io,
+         pmod1_en_o           => pmod1_en_o,
+         pmod2_en_o           => pmod2_en_o
+      ); -- i_pc_ports
 
    i_pc_ram : entity work.pc_ram
       port map (
