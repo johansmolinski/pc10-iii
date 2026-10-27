@@ -2490,3 +2490,24 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   31,322, BRAM 276.5/365 (+16: the bank ROM), 0 routing errors. Kit
   `~/pcxt-work/kits/pc10-bline-a/` (SD files as pc10-real-v). Loaded on the
   board; not tested yet.
+- Hardware (pc10-bline-a): C: was not remembered across power-off. Cause:
+  the menu shrank (60 -> 59 lines). The Shell reads only this menu's bytes,
+  so the old file's 60th byte (0) started the text; `CFGS_FIND` stops at a 0,
+  so neither `menu=9` nor `hdc=` was ever found: every start reset the
+  settings and C: stayed empty, and each save appended the keys behind the 0
+  again. A menu that grows is handled (`_HLP_CA_OLD`); one that shrinks was
+  not (Megamiga's cfg-strings has the same gap).
+- **Fix** (core firmware only, `M2M/` unchanged): `CFG_SIGCHECK`, which runs
+  right after `CFGS_LOAD`, first drops the leading 0/1 bytes of the text (a
+  key is printable) and moves the rest to the front (`CFGS_LEN` follows).
+  The settings reset once more on the next start (the file's first
+  signature line is `menu=8`), then the file is clean; `hdc=` survives the
+  reset. ROM 32557 (+26). `cfgsig_test.asm` cases 8-10 (0 and 1 in front of
+  the signature, a 0 in front of `hdc=` with another layout, menu bytes
+  only); case 8 failed before the fix. `mut.py` signature mutants 10 of 10
+  killed (5 new). `run.sh` PASS as above.
+- **Build `pc10-bline-b`**: firmware only, `patch_firmware.sh patch` of the
+  new fixed ROM into pc10-bline-a's checkpoint (fedora `~/pcxt-fw/pc10-bline-a`;
+  16 block RAMs verified; the bank image is byte-identical): pc10-bline-a's
+  netlist and timing. Kit `~/pcxt-work/kits/pc10-bline-b/`. Loaded on the
+  board.

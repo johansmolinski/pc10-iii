@@ -452,7 +452,11 @@ Any other file (the 31-line
 files before the drive sound line had none; the Shell would even load a
 shorter file as one from a menu that grew at its end, shifting every option
 behind the new lines) gets the defaults, and `CFG_SIGSET` writes the
-signature with the next save (when the menu closes).
+signature with the next save (when the menu closes). A file from a longer
+menu (the menu shrank) has its last menu bytes in front of the text, as the
+Shell reads only this menu's bytes; `CFG_SIGCHECK` drops those 0/1 bytes
+first (2026-10-27, after pc10-bline-a forgot C: and the settings at every
+start), so its keys (`hdc=`) are found again.
 
 **Chipset** (2026-10-25, `pc_chipset.vhd`): the PC10-III's Faraday FE2010A
 (default; the Commodore BIOS 4.41 needs it) or the IBM 5160's 8255 (GLaBIOS,
@@ -527,7 +531,8 @@ nothing selected puts the cursor on ` B:`.
 Budget (`make_rom.sh` prints it; check `HEAP` and `VAR$STACK_START` in
 `m2m-rom.lis`):
 
-- ROM: **32531 of 32768 words** and bank 0 364 of 4096 (since 2026-10-27:
+- ROM: **32557 of 32768 words** and bank 0 364 of 4096 (since 2026-10-27:
+  32531 before `CFG_SIGCHECK` dropped a longer menu's bytes (26 words);
   `pc_hdc.asm` moved into bank 0, 32400; the B: line 131 words: the rows
   without a label and the hidden option in `menu_rows.asm`/`menu.asm`,
   `OPTM_CORE_HIDE`, `OSM_SEL_POST`; 32740 before, 28 free; the row "Drive B"

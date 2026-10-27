@@ -4,7 +4,11 @@
 ;
 ; Cases: no text (an old file): C=0; CFG_SIGSET on it: the text "menu=<sig>\n", CFGS_DIRTY;
 ; then C=1; the signature among other lines: C=1; another value (shorter, longer, a prefix):
-; C=0; registers R8..R12 preserved by both. Prints "CFGSIG TEST: PASS" or "FAIL <case>".
+; C=0; registers R8..R12 preserved by both. A file from a longer menu (the menu shrank): the
+; Shell reads only this menu's bytes, so the text starts with the old menu's last bytes (0 or
+; 1): they are dropped (CFGS_BUF, CFGS_LEN), the signature behind them counts (8), a key
+; behind them stays (9, another layout: C=0), only menu bytes: no text (10). Prints
+; "CFGSIG TEST: PASS" or "FAIL <case>".
 
 #include "sysdef.asm"
 #include "monitor.def"
@@ -51,6 +55,27 @@ CFGS_MAXC       .EQU    511
                 RSUB    SETBUF, 1
                 RSUB    CHECK, 1
                 RBRA    FAIL7, C
+                MOVE    T_SHRUNK, R8            ; 8: a longer menu's 0 and 1 in front
+                RSUB    SETRAW, 1
+                RSUB    CHECK, 1
+                RBRA    FAIL8, !C
+                MOVE    T_SIGNED, R8
+                RSUB    TXT_IS, 1
+                RBRA    FAIL8, !C
+                MOVE    T_SHRUNK2, R8           ; 9: a 0 in front, another layout: the
+                RSUB    SETRAW, 1               ; key behind it stays
+                RSUB    CHECK, 1
+                RBRA    FAIL9, C
+                MOVE    T_HDC, R8
+                RSUB    TXT_IS, 1
+                RBRA    FAIL9, !C
+                MOVE    T_SHRUNK3, R8           ; 10: menu bytes only: no text
+                RSUB    SETRAW, 1
+                RSUB    CHECK, 1
+                RBRA    FAIL10, C
+                MOVE    T_EMPTY, R8
+                RSUB    TXT_IS, 1
+                RBRA    FAIL10, !C
 
                 MOVE    S_PASS, R8
                 SYSCALL(puts, 1)
@@ -69,6 +94,12 @@ FAIL5           MOVE    5, R0
 FAIL6           MOVE    6, R0
                 RBRA    FAIL, 1
 FAIL7           MOVE    7, R0
+                RBRA    FAIL, 1
+FAIL8           MOVE    8, R0
+                RBRA    FAIL, 1
+FAIL9           MOVE    9, R0
+                RBRA    FAIL, 1
+FAIL10          MOVE    10, R0
 FAIL            MOVE    S_FAIL, R8
                 SYSCALL(puts, 1)
                 MOVE    R0, R8
@@ -144,6 +175,44 @@ _SETB_2         MOVE    CFGS_LEN, R0
                 MOVE    R2, @R0
                 RET
 
+; SETRAW: CFGS_BUF := R8's first word n, then n raw words, then a string; CFGS_LEN := all
+SETRAW          MOVE    R8, R0
+                MOVE    CFGS_BUF, R1
+                MOVE    @R0++, R2
+                MOVE    R2, R4
+_SETR_1         CMP     0, R2
+                RBRA    _SETR_2, Z
+                MOVE    @R0++, @R1++
+                SUB     1, R2
+                RBRA    _SETR_1, 1
+_SETR_2         MOVE    @R0++, R3
+                MOVE    R3, @R1++
+                CMP     0, R3
+                RBRA    _SETR_3, Z
+                ADD     1, R4
+                RBRA    _SETR_2, 1
+_SETR_3         MOVE    CFGS_LEN, R0
+                MOVE    R4, @R0
+                RET
+
+; TXT_IS: C=1 when CFGS_BUF is the string R8 and CFGS_LEN its length
+TXT_IS          MOVE    R8, R0
+                MOVE    CFGS_BUF, R1
+                XOR     R2, R2
+_TXT_1          CMP     @R0, @R1++
+                RBRA    _TXT_N, !Z
+                CMP     0, @R0++
+                RBRA    _TXT_2, Z
+                ADD     1, R2
+                RBRA    _TXT_1, 1
+_TXT_2          MOVE    CFGS_LEN, R0
+                CMP     @R0, R2
+                RBRA    _TXT_N, !Z
+                OR      0x0004, SR
+                RET
+_TXT_N          AND     0xFFFB, SR
+                RET
+
 T_EMPTY         .DW      0
 T_SIGNED        .ASCII_P "menu="
                 .ASCII_P CFG_SIG_TEXT
@@ -164,6 +233,16 @@ T_LONGER        .ASCII_P "menu="
 T_KEY           .ASCII_P "xmenu="
                 .ASCII_P CFG_SIG_TEXT
                 .DW      0x000A, 0
+T_SHRUNK        .DW      3, 0, 1, 0
+                .ASCII_P "menu="
+                .ASCII_P CFG_SIG_TEXT
+                .DW      0x000A, 0
+T_SHRUNK2       .DW      1, 0
+T_HDC           .ASCII_P "hdc=SD1:/pc10/hd20.img"
+                .DW      0x000A
+                .ASCII_P "menu=1"
+                .DW      0x000A, 0
+T_SHRUNK3       .DW      2, 1, 0, 0
 S_PASS          .ASCII_W "CFGSIG TEST: PASS\n"
 S_FAIL          .ASCII_W "CFGSIG TEST: FAIL "
 

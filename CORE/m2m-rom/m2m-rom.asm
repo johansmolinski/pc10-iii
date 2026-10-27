@@ -775,8 +775,27 @@ FAR_CALL        INCRB
 ; another layout would set the wrong options (the Shell even loads a shorter
 ; file, as one from a menu that grew at its end); for C=0 the Shell uses the
 ; defaults and calls CFG_SIGSET, and the next save writes the file in this
-; layout. Registers preserved.
+; layout. A file from a longer menu (the menu shrank): the Shell reads only
+; this menu's bytes, so the text starts with the old menu's last bytes (0 or
+; 1; a key is printable); they are dropped first, else the 0 would end the
+; text before its first line and no key (signature, hdc=) would ever be found
+; again. Registers preserved.
 CFG_SIGCHECK    SYSCALL(enter, 1)
+                MOVE    CFGS_LEN, R3            ; R2: characters left
+                MOVE    @R3, R2
+                MOVE    CFGS_BUF, R0
+                MOVE    R0, R1                  ; R1: the first character
+_CFGSC_SK       CMP     0, R2                   ; that is not a menu byte
+                RBRA    _CFGSC_MV, Z
+                CMP     @R1, 1
+                RBRA    _CFGSC_MV, N            ; (above 1)
+                ADD     1, R1
+                SUB     1, R2
+                RBRA    _CFGSC_SK, 1
+_CFGSC_MV       MOVE    R2, @R3                 ; the text to the front,
+_CFGSC_M1       MOVE    @R1++, @R0++            ; with its zero
+                SUB     1, R2
+                RBRA    _CFGSC_M1, !N
                 SUB     4, SP                   ; SP: the file's value
                 MOVE    CFG_SIG_KEY, R8
                 MOVE    SP, R9
