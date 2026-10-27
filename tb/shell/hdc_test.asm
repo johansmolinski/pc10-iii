@@ -882,6 +882,11 @@ S_SP            .ASCII_W " "
 #include "hdc_pl.asm"
 #include "hdc_io.asm"
 #include "pc_hdc.asm"
+; the firmware calls pc_hdc.asm (code bank 0) through stubs (m2m-rom.asm,
+; FAR_CALL); here it is flat
+HDC_SAVE        RBRA    B0_HDC_SAVE, 1
+HDC_RESTORE     RBRA    B0_HDC_RESTORE, 1
+HDC_PEND_APPLY  RBRA    B0_HDC_PEND_APPLY, 1
 #include "cfgstr.asm"
 
 ; ---------------------------------------------------------------------------- variables

@@ -692,7 +692,48 @@ _HCIO_RET_NS    DECRB
                 RET
 
 #include "pc_rtc.asm"
-#include "pc_hdc.asm"
+
+; ----------------------------------------------------------------------------
+; The hard disk C: across power-off (pc_hdc.asm) is code bank BANK_HDC (see
+; "Code banks" after END_OF_ROM); these are its entry points in the fixed ROM.
+; ----------------------------------------------------------------------------
+
+HDC_SAVE        RSUB    FAR_CALL, 1
+                .DW     BANK_HDC, B0_HDC_SAVE
+HDC_RESTORE     RSUB    FAR_CALL, 1
+                .DW     BANK_HDC, B0_HDC_RESTORE
+HDC_PEND_APPLY  RSUB    FAR_CALL, 1
+                .DW     BANK_HDC, B0_HDC_PEND_APPLY
+
+; ----------------------------------------------------------------------------
+; FAR_CALL: call a routine in a code bank (Megamiga, M2M-UPSTREAM code-banks).
+;
+; The QNICE address space is 64K words, so code that does not fit into the
+; 32K-word ROM lives in code banks: 4K-word banks that M2M$CODE_BANK shows in
+; the window M2M$CODE_WIN (0x9000-0x9FFF). An entry point of a bank is a stub
+; in the fixed ROM:
+;
+;   NAME            RSUB    FAR_CALL, 1
+;                   .DW     <bank>, <address in the window>
+;
+; FAR_CALL selects the bank, calls the routine and selects the bank of the
+; caller again, then returns to the caller of the stub. R8..R12 and the Carry
+; pass through both ways (the other flags do not); the stack holds one word
+; more during the call. Code in a bank may call the fixed ROM directly but
+; never another bank (only through a stub); the fixed ROM never calls into a
+; bank except through a stub.
+; ----------------------------------------------------------------------------
+
+FAR_CALL        INCRB
+                MOVE    @SP++, R0               ; R0: the two words of the stub
+                MOVE    M2M$CODE_BANK, R3
+                MOVE    @R3, R4                 ; R4: the bank of the caller
+                MOVE    @R0++, @R3              ; select the bank
+                MOVE    @R0, R0
+                ASUB    R0, 1
+                MOVE    R4, @R3                 ; the caller's bank again
+                DECRB
+                RET
 
 ; CFG_SIGCHECK (M2M-UPSTREAM cfg-strings): C=1 = the settings file R8 (open,
 ; its text loaded by CFGS_LOAD) belongs to this menu: its text has the line
@@ -757,6 +798,22 @@ CFG_SIG_VAL     .ASCII_W "8"
 END_OF_ROM      .DW 0
 
 ; ----------------------------------------------------------------------------
+; Code banks (Megamiga, M2M-UPSTREAM code-banks, see FAR_CALL): each bank is
+; a section that starts with ".ORG 0x9000" (M2M$CODE_WIN) and its marker word
+; 0x4B00 + n, bank n in source order. make_rom.sh (make_banks.py) writes them
+; into m2m-banks.rom and checks the markers.
+; ----------------------------------------------------------------------------
+
+BANK_HDC        .EQU    0                       ; the hard disk C: across power-off
+
+#ifdef RELEASE
+                .ORG    0x9000                  ; M2M$CODE_WIN (.ORG takes no symbol)
+                .DW     0x4B00                  ; bank 0: BANK_HDC
+
+#include "pc_hdc.asm"
+#endif
+
+; ----------------------------------------------------------------------------
 ; Variables: Need to be located in RAM
 ; ----------------------------------------------------------------------------
 
@@ -764,7 +821,7 @@ END_OF_ROM      .DW 0
                 .ORG    0xA000                  ; RAM starts at 0xA000: the 4k device
                                                 ; window takes 0x8000-0x8FFF (M2M-UPSTREAM
                                                 ; rom-32k), the code window 0x9000-0x9FFF
-                                                ; (code-banks; unused here)
+                                                ; (code-banks)
 #endif
 
 #include "../../M2M/rom/shell_vars.asm"
