@@ -186,70 +186,16 @@ and the analog RGB output, as emulators do (doc/plan.md section 4).
 - **Cost:** a few DSPs for the filter and the YIQ matrix, a little logic; no
   extra memory.
 
-## Before release 0.1: serial port, parallel port, bus mouse (asked 2026-10-26)
+## Before release 0.1: serial port, parallel port, bus mouse (asked 2026-10-26) - DONE
 
-The PC10-III's on-board I/O that the core does not have yet. The user wants
-them in release 0.1. Facts: the 8088-line research
-(`~/pcxt-work/research/models/commodore-8088-models.md`, PC10-III service
-manual parts list, PC-1 Technical Manual for the 5720). The 5720 decodes all
-three; 230h (`cbm_cfg230.sv`) enables them: bits 1-0 LPT (off / 3BCh / 378h /
-278h), bits 3-2 COM (off / 2F8h / 3F8h / off), bit 4 mouse + its IRQ.
-
-### Serial port (8250, U402)
-
-- An 8250 UART (INS8250 behaviour: divisor latch, LCR/LSR/MSR/IER/IIR, THRE
-  and receive interrupts, the 8250's quirks rather than a 16450's) at 2F8h or
-  3F8h as 230h selects, IRQ4 at 3F8h / IRQ3 at 2F8h. Clock 1.8432 MHz
-  (a fractional enable from the core clock).
-- Outside: the MEGA65's PMOD header only (decided 2026-10-26), as Megamiga's
-  PMOD serial port (its pin layout, pull-ups in CORE.xdc, pins high-Z and the
-  header unpowered unless the PMOD menu toggle is on; Megamiga's M2M exception 13
-  `pmod-pins` for the board-top routing). TTL levels: an RS-232 level shifter
-  module on the PMOD, as for Megamiga.
-- The BIOS's POST and DOS's MODE / COM1 should find it; tests: a TB with an
-  8250 reference behaviour (loopback via MCR bit 4, baud divisors, interrupt
-  identification), then a terminal program and a null-modem link on hardware.
-
-### Parallel port (Paradise PPC1, U403)
-
-- Data 8 bits (read back), status (BUSY, ACK, PE, SELECT, ERROR), control
-  (STROBE, AUTOFD, INIT, SELECTIN, IRQ enable) at 3BCh / 378h / 278h as 230h
-  selects, IRQ7 when enabled. The PPC1's own details (bidirectional mode?)
-  from its data sheet if found, else the IBM printer adapter.
-- Outside (decided 2026-10-26): **on the PMOD headers only, else no parallel
-  port for now; no print to file.** The pin budget fits: the two PMOD headers
-  have 16 I/O pins (Megamiga's `p1lo/p1hi/p2lo/p2hi`, 4 each); serial takes
-  PMOD1 lo (TXD, RXD, RTS, CTS), the parallel port PMOD2 (D0-D7) and PMOD1 hi
-  (STROBE out, BUSY and ACK in, one more: INIT out or SELECT in). The other
-  status lines read "printer ready". Levels: the FPGA pins are 3.3 V; a
-  printer's 5 V outputs need series resistors or a buffer on the adapter
-  (document it, as Megamiga documents its serial level shifter). One menu
-  toggle powers the headers and drives the pins (high-Z and unpowered when off).
-- **Covox Speech Thing (for 0.1, decided 2026-10-26):** the parallel port's
-  data latch as an 8-bit DAC into the audio output, mixed with the PC speaker
-  (the mixer of the Sound Blaster item, in small). It works with or without
-  the PMOD toggle (it is inside the core). A few lines plus the mixer.
-
-### Bus mouse (the 5720's, 9-pin port)
-
-- Registers (PC-1 Technical Manual, BIOS 4.41 F000:CD30-CD71): 23Ch read:
-  counter nibble (bits 3-0) and buttons (bits 7-5, 0 = pressed); 23Dh
-  read/write latch (the Microsoft driver and the BIOS detect the mouse by
-  writing it and reading it back); 23Eh write: bit 4 interrupt disable,
-  bit 5 nibble select, bit 6 counter select (X/Y), bit 7 hold (its falling
-  edge clears the counters); 23Eh read: bits 2-0 = 1, bit 3 the periodic
-  interrupt (a 32.8 ms square wave on IRQ2). The BIOS enables it with 230h
-  bit 4; SETUP offers the IRQ (2/3/4: "On Board Mouse Interrupt") - check
-  how the IRQ choice reaches the hardware (231h is the open question of the
-  research; without it IRQ2).
-- Outside: the PC10-III's mouse was an Amiga-style quadrature mouse (the 1352)
-  on a 9-pin port, so an Amiga or Atari mouse in the MEGA65's joystick port 1
-  is authentic: raw quadrature into X/Y counters (Megamiga's M2M exception 6
-  `raw-joyports` removes the 1 ms debouncer that swallows quadrature pulses;
-  port it). Maybe also the MEGA65's 1351 in proportional mode later.
-- Tests: the BIOS finds it (its POST/SETUP), Microsoft MOUSE.COM loads and a
-  mouse program (e.g. GW-BASIC with a mouse demo, or a game) moves the pointer;
-  a TB with a quadrature model.
+Done 2026-10-26 (branch `ports`, build `pc10-ports-c`; doc/ports.md,
+doc/history.md): the INS8250 at 3F8h/2F8h, the parallel port (IBM's printer
+adapter for the PPC1) at 3BCh/378h/278h, both on the PMOD headers behind one
+menu item ("Ports and mouse > PMOD: serial + printer"), the Covox Speech Thing
+on the parallel port's latch mixed with the speaker, the 5720's bus mouse with
+an Amiga or Atari ST mouse in joystick port 1. Left open (doc/ports.md section
+9): the PPC1's own details, the right/middle buttons of a passive mouse (a
+MEGA65 limitation: active adapters only), the 1351 in proportional mode.
 
 ## Other open items
 

@@ -402,7 +402,9 @@ and, through Q602, the PVC4's READY onto IOREADY (jumper JMPS12 can force
 it on). Bits 6-0 read back what was written; they enable the onboard RTC
 (02C0h), bus mouse (023Ch), serial port (com1/com0: off, 2F8h, 3F8h,
 reserved) and parallel port (lpt1/lpt0: off, 3BCh, 378h, 278h). The model
-builds the register, not the peripherals. Its reset value is 00h: the PC-1
+builds the register; the peripherals are their own modules (the RTC:
+doc/rtc.md; the serial and parallel ports and the bus mouse since 2026-10-26:
+doc/ports.md). Its reset value is 00h: the PC-1
 Technical Manual (the same 5720) says "all bits are cleared to 0 by applying
 /RESET = L" (the BIOS writes it before anything depends on it anyway).
 

@@ -2122,3 +2122,88 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   hardware yet.
 - Hardware (pc10-hdc-a): the user confirmed C: is remembered across power-off
   (mounted again at start-up, DOS boots from it).
+
+## 2026-10-26 - Serial port, parallel port, bus mouse, Covox (branch `ports`, build pc10-ports-c)
+
+- **What** (the backlog's "before release 0.1", the user's decisions of
+  2026-10-26; doc/ports.md): the 5720's three on-board ports in `pc_system`
+  (with `PVC4_FIT`, enabled by 230h): an **INS8250** at 3F8h/2F8h (IRQ4/IRQ3,
+  1.8432 MHz from the core clock, no scratch register, the THRE interrupt on
+  every IER write, the 8250's INTR pulse when a higher source is cleared,
+  loopback, OUT2 gating), the **parallel port** as IBM's printer adapter (no
+  PPC1 data sheet) at 3BCh/378h/278h with IRQ7 from /ACK, the **bus mouse**
+  at 23Ch-23Eh (TM pp. 1-29..1-31: counters, nibble/counter select, hold with
+  the clear on its falling edge, buttons, the 23Dh register, the 32.768 ms
+  square wave on IRQ2, status bit 3), and a **Covox** on the parallel port's
+  latch, mixed with the speaker through a DC blocker (`pc_audio_mix.sv`:
+  (d - 128) x 32, y = x - x' + y' - y'/1024 at 47.7 kHz; a resting latch is
+  exactly silent whatever its value, the speaker's levels are unchanged, no
+  clipping: -8192..+16384 by the filter's L1 norm 2).
+- **MEGA65 side** (`CORE/vhdl/pc_ports.vhd`): serial and printer on the PMOD
+  headers only (PMOD1 lo /CTS TXD RXD /RTS, Megamiga's layout; PMOD1 hi
+  /STROBE BUSY /ACK /INIT; PMOD2 D0-D7), one menu item powers both headers and
+  drives the pins (off: unpowered, high-Z); pull-ups on RXD and /ACK,
+  pull-downs on /CTS and BUSY (CORE.xdc). With the PMOD off the 8250 sees an
+  unplugged port (RXD mark, modem inputs inactive); on, DSR and DCD follow the
+  PC's DTR (the null-modem loop, for INT 14h). The printer's other status
+  lines read "ready". The mouse: an Amiga (or, by a menu choice, Atari ST:
+  pins 1 and 4 swapped) quadrature mouse in joystick port 1; left button =
+  fire, right/middle only through an active adapter (Megamiga's POT presence
+  latch: a passive mouse's POT buttons are invisible to the MEGA65).
+- **From Megamiga:** M2M exception 13 `pmod-pins` and exception 6
+  `raw-joyports` were already in the vendored framework (doc/m2m-provenance.md:
+  `M2M/` copied from Megamiga 4dac552), so `M2M/` is unchanged; this core had
+  tied the PMOD pins off and never used the joysticks. Ported: the PMOD1 lo
+  serial layout and its pin driver/synchronizer (mega65.vhd), the pull-ups
+  (CORE.xdc), the POT button latch with its 30 s watchdog (main.vhd).
+  `JOY_1_AT_RESET` = true in config.vhd (the framework passes port 1 to the
+  core; not while the menu is open).
+- **Menu:** "Ports and mouse" submenu (main menu line 43): "PMOD: serial +
+  printer" (default off), "Mouse: Amiga" (default) / "Mouse: Atari ST". 58
+  lines, signature `menu=7`, `MENU_HEAP_SIZE` 1248 (demand 1238), `HEAP_SIZE`
+  19328 (-160); ROM 32740/32768 unchanged (no firmware code).
+- **Commits:** HDL blocks + tb/ports, then the integration (pc_system, shell,
+  tb/sys, tb/shell), then the menu (for the rebase onto intfd).
+- **tb/ports** (new; Verilator, `make run`, `mut.py`): a reference model per
+  block compared in every clk. uart 7 tests 1,919 checks (bit times on SOUT
+  for divisors 1-1047 within 1 clk, all 40 frame formats decoded by a
+  separate line decoder, SIN frames at -3/0/+3 % with parity/framing errors,
+  break, overrun, false start; the interrupt sequence with the 8250 pulses;
+  MSR deltas and loopback; 400,000 random operations, 34 M clk), lpt 5 tests
+  71 checks, mouse 6 tests 64 checks (the BIOS's detection, the Microsoft
+  driver's read sequence, IRQ2's period 938,356 clk +-1), mix 5 tests (silence,
+  range -8160..+16352, within 4 LSB of a double model, gain 1.001 at 1 kHz and
+  0.565 at 5 Hz, decay to exactly 0 in 0.19 s). `mut.py`: 86 of 86 killed (the
+  first run left two, both fixed by stronger tests: a DLL-only write that
+  keeps the divisor counter, a one-stage mouse synchronizer).
+- **tb/shell** (`run.sh` all PASS): `tb_ports.vhd` (PMOD off/on pin directions
+  and drive, the synchronizer, DSR/DCD, both mouse mappings, the POT latch);
+  `mut_ports.py` 25 of 25 killed (the first run left one: /STROBE and /INIT
+  swapped, the bench toggled them together).
+- **Gates** (fedora `gates.sh ports-a`): g_tr a72753ca..., g_tre bd612823...,
+  g_trL2 a72753ca...: identical (the 5160 configuration has no ports); g_fd
+  identical but for the wall time and the new BDA line; tb/fdc 232, tb/hdc
+  3,182 checks, tb/cga, tb/mda, tb/shell PASS.
+- **tb/sys** (fedora, `make FE=1 PVC4=1 RAM_KB=256`, BIOS 4.41): the POST
+  (20 s, no disk) lists `Onboard   LPT    at 03BCh`, `Onboard   COM    at
+  03F8h`, `Onboard   MOUSE  at 023Ch`, `Onboard   RTC    at 02C0h`; the BIOS
+  data area: COM 03F8 0000 0000 0000, LPT 03BC 0000 0000, equipment 426D (1
+  serial, 1 parallel port); the printer probe's strobe with 0Ch seen on the
+  port log (`-SL`). The mouse: tb/sys showed the
+  TM's button bits swapped (fixed for pc10-ports-c); that run's numbers were
+  not recorded.
+- **Build:** `pc10-ports-a` (REF=pc10-keys-b, incremental) routed with timing
+  met but **write_bitstream failed** ("Site type pointers for element PAD and
+  routed site do not match", 8 IOB sites: the PMOD pins, which the reference
+  had as tied-off buffers and are now bidirectional; incremental placement
+  reused their sites). `pc10-ports-b`: full build, **WNS +0.216, WHS +0.029**
+  (the worst path QNICE's own; main_clk WNS +12.499, WHS +0.036), LUTs 30,445
+  (pc10-keys-b 30,348; uart8250 199, lpt 20, mouse 55, pc_ports 29, mixer 95),
+  FFs 21,366, BRAM 260.5 of 365 (unchanged), DSPs 64. It has the TM's
+  button order, which tb/sys then showed wrong (above); **`pc10-ports-c`**
+  (REF=pc10-ports-b, the button bits swapped): WNS +0.216, WHS +0.029 (main_clk
+  +12.499 / +0.036), LUTs 30,417, BRAM 260.5. Checkpoint saved for
+  `patch_firmware.sh` (fedora `~/pcxt-fw/pc10-ports-c`). Kit
+  `~/pcxt-work/kits/pc10-ports-c/` (`pc10-ports-c.bit`, `sd/pc10/ports.img`:
+  Colt DOS 3.21 disk 1 + MOUSE.COM from PC1020-3.ZIP + MTEST.COM + COVOX.COM;
+  the other SD files as pc10-keys-b). Not on hardware yet.
