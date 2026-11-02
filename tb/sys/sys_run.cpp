@@ -85,6 +85,9 @@
 #ifndef PVC4_BUILD
 #define PVC4_BUILD 0
 #endif
+#ifndef CGACARD_BUILD
+#define CGACARD_BUILD 0     // with PVC4_BUILD: an IBM CGA card in a slot (its screen is dumped)
+#endif
 
 static const double CLK_HZ = 28636363.64;      // 315/11 MHz
 
@@ -120,7 +123,12 @@ struct HdImage {
 // one line of the text screen (the PVC4 build: its RAM; else the CGA's)
 static std::string screen_line(Vtb_sys *tb, int y) {
     std::string l;
-#if PVC4_BUILD
+#if PVC4_BUILD && CGACARD_BUILD
+    for (int x = 0; x < 80; x++) {
+        unsigned char c = tb->rootp->tb_sys__DOT__u_pc__DOT__u_cga__DOT__vram[(y * 80 + x) * 2];
+        l += (c >= 32 && c < 127) ? (char)c : ' ';
+    }
+#elif PVC4_BUILD
     auto *r = tb->rootp;
     for (int x = 0; x < 80; x++) {
         unsigned o = (tb->vid_monomode ? 0x0000 : 0x8000) + (y * 80 + x) * 2;
@@ -172,7 +180,7 @@ static void dump_screen(Vtb_sys *tb, const char *title, bool mono = false) {
     for (int y = 0; y < 25; y++) {
         char line[81];
         for (int x = 0; x < 80; x++) {
-#if PVC4_BUILD
+#if PVC4_BUILD && !CGACARD_BUILD
             // the PVC4's RAM: B0000 + offset, banks by A14 (doc/pvc4.md 6.1)
             unsigned o = (tb->vid_monomode ? 0x0000 : 0x8000) + (y * 80 + x) * 2;
             unsigned char c = r->tb_sys__DOT__u_pc__DOT__g_pvc4__DOT__u_pvc4__DOT__vram0[((o >> 1) & 0x4000) | (o & 0x3FFF)];

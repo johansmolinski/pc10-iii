@@ -36,6 +36,7 @@ module pc_system_flat #(
     input  logic [1:0]  cbm_dip,            // PVC4: CONFIG switches 1 and 2 (1 = off)
     output logic        vid_mono,           // PVC4: MONO
     output logic        vid_monomode,       // PVC4: the mono personality (16.257 MHz dots)
+    input  logic        cga_card,           // 1 = an IBM CGA card in a slot (taken in reset)
 
     input  logic        ucl_we,
     input  logic [12:0] ucl_addr,
@@ -129,17 +130,18 @@ assign tracks = img_tracks;
 assign heads  = img_heads;
 assign spt    = img_spt;
 
-// the PC10-III: its onboard video, the Paradise PVC4 (doc/pvc4.md), instead of
-// the IBM CGA; no expansion video card. The chipset is the menu's (fe2010a). The
+// the PC10-III: its onboard video, the Paradise PVC4 (doc/pvc4.md), and an IBM
+// CGA card that the menu can plug into a slot (cga_card, doc/cga.md section 11).
+// The chipset is the menu's (fe2010a). The
 // PC20-III's hard disk on CN202 (XTA_FIT): JMP208 = xta_enable (the shell: an image
 // is mounted).
-pc_system #(.RAM_KB(RAM_KB), .PVC4_FIT(1'b1), .CGA_FIT(1'b0), .XTA_FIT(1'b1)) u_pc (
+pc_system #(.RAM_KB(RAM_KB), .PVC4_FIT(1'b1), .CGA_FIT(1'b1), .XTA_FIT(1'b1)) u_pc (
     .clk, .reset, .fe2010a,
     .ram_addr, .ram_en, .ram_we, .ram_wdata, .ram_rdata, .ram_ack,
     .rom_addr, .rom_rdata,
     .vid_ce, .vid_rgbi, .vid_hsync, .vid_vsync, .vid_hblank, .vid_vblank,
     .font_we, .font_addr, .font_data, .font_thin, .font_addr_hi, .font_cbm, .cbm_dip,
-    .vid_mono, .vid_monomode,
+    .vid_mono, .vid_monomode, .cga_card,
     .ucl_we, .ucl_addr, .ucl_data,
     .drv_80trk, .img_present, .img_wp,
     .img_tracks(tracks), .img_heads(heads), .img_spt(spt),

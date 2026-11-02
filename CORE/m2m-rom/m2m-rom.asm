@@ -831,10 +831,11 @@ CFG_SIGSET      SYSCALL(enter, 1)
 ; the row "Drive B" (image / int. drive) at lines 7-8 (branch intfd), or 58
 ; lines, the "Ports and mouse" submenu at lines 43-50 (branch ports). "8": 60
 ; lines, both: the row "Drive B" at 7-8, "Ports and mouse" at 45-52. "9": 59
-; lines, " int. drive" at line 4 beside " B:%s" (no row "Drive B").
+; lines, " int. drive" at line 4 beside " B:%s" (no row "Drive B"). "10": 60
+; lines, " IBM CGA card" at line 41 in the "Display" submenu.
 ; At most 3 characters (CFG_SIGCHECK's buffer).
 CFG_SIG_KEY     .ASCII_W "menu"
-CFG_SIG_VAL     .ASCII_W "9"
+CFG_SIG_VAL     .ASCII_W "10"
 
 ; ----------------------------------------------------------------------------
 ; The FAT32 write layer, flat (the Shell creates and resizes the settings
@@ -889,11 +890,11 @@ HDC_FDH         .BLOCK FAT32$FDH_STRUCT_SIZE    ; the directories of its path
 HDC_DE          .BLOCK FAT32$DE_STRUCT_SIZE     ; (HDC_SAVE)
 
 ; The menu heap (Megamiga hard rule 11): the menu structure plus OPTM_HEAP;
-; for this 59-line menu the demand is 1255 words: 20 + 727 item characters
-; + 1 + 4 x 59 + 1 + (5 submenus + 3 manual ROMs + 1) x 30; the Shell checks
+; for this 60-line menu the demand is 1274 words: 20 + 742 item characters
+; + 1 + 4 x 60 + 1 + (5 submenus + 3 manual ROMs + 1) x 30; the Shell checks
 ; it at boot (ERR_FATAL_HEAP1/2). The rest of the heap is the file browser's.
 ; (1088 for the 50-line menu: 1058; 1120 for 52 lines: 1096; 1248 for 58
-; lines: 1238; 1280 for 60 lines: 1276.)
+; lines: 1238; 1280 for 60 lines: 1276; for the 59-line one: 1255.)
 MENU_HEAP_SIZE  .EQU 1280
 
 #ifndef RELEASE

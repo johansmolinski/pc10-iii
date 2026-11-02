@@ -13,7 +13,8 @@ module pc_system #(
     // the PC10-III's onboard video, the Paradise PVC4 (doc/pvc4.md), and its
     // Commodore configuration register 230h; the CGA/MDA parameters above are
     // then expansion cards (0 for the PC10-III as built). The vid_* outputs
-    // come from the PVC4.
+    // come from the PVC4, or from the CGA while cga_card puts it into a slot
+    // (CGA_FIT = 1, doc/cga.md section 11).
     parameter bit PVC4_FIT = 1'b0,
     // the PC20-III's hard disk on CN202 (rtl/hdc/xta_card.sv, doc/xta.md):
     // 0 = not built (the PC10-III), 1 = the drive's connector and logic exist;
@@ -77,6 +78,11 @@ module pc_system #(
     // vid_ce is the 16.257 MHz dot (1-2 clk) and vid_rgbi = {IT, MONO x 3}
     output logic        vid_mono,
     output logic        vid_monomode,
+    // PVC4_FIT with CGA_FIT: 1 = an IBM CGA card in an expansion slot (on the
+    // bus, its picture on vid_*; the Commodore BIOS then leaves the onboard
+    // video off), 0 = no card. Taken while reset is high. Without PVC4_FIT
+    // the CGA (CGA_FIT) is always the machine's video and this is ignored.
+    input  logic        cga_card,
 
     // floppy drives A: and B: (rtl/fdc, doc/fdc.md): image geometry from the
     // glue, the sector port to the image backend
@@ -321,29 +327,58 @@ logic       cga_hs, cga_vs, cga_hb, cga_vb;
 
 wire        ibm_font_we = font_we && font_addr_hi == 2'b00;
 
+// The CGA in the machine: always without the PVC4; with it, an expansion card
+// that the menu plugs in (cga_card, taken while reset is high: a card is
+// plugged in with the power off).
+logic       cga_slot;
+always_ff @(posedge clk)
+    if (reset) cga_slot <= cga_card;
+wire        cga_on = CGA_FIT && (!PVC4_FIT || cga_slot);
+
+// The CGA's character ROM: an IBM 5788005 image as it is, or from the
+// PC10-III's 32 KB Commodore ROM (font_cbm) the USA/Europe set's 8x8 colour
+// glyphs (A14 = 1, A13 = 0, A11 = 1, rows 0-7: the IBM CGA's font, doc/pvc4.md
+// section 5.2) into the 8x8 font at 0x1800, its dots reversed (the ROM keeps
+// the leftmost dot in D0, the IBM ROM in D7). The Scandinavian set stays the
+// PVC4's: the IBM card has the one ROM.
+logic        cga_font_we;
+logic [12:0] cga_font_addr;
+logic [7:0]  cga_font_data;
+always_comb begin
+    if (font_cbm) begin
+        cga_font_we   = font_we && font_addr_hi == 2'b10 && font_addr[11] && !font_addr[3];
+        cga_font_addr = {2'b11, font_addr[12], font_addr[10:4], font_addr[2:0]};
+        for (int b = 0; b < 8; b++) cga_font_data[b] = font_data[7 - b];
+    end else begin
+        cga_font_we   = ibm_font_we;
+        cga_font_addr = font_addr;
+        cga_font_data = font_data;
+    end
+end
+
 cga_card #(.REG_READY(1'b1), .SNOW(CGA_SNOW)) u_cga (
     .clk        (clk),
     .reset      (reset),
     .ce_14m     (ce_14m),
     .isa_addr   (isa_addr),
     .isa_addr_next  (isa_addr_next),
-    .isa_memr_n_next(isa_memr_n_next | !CGA_FIT),   // an unfitted card sees no strobes
-    .isa_memw_n_next(isa_memw_n_next | !CGA_FIT),
+    .isa_memr_n_next(isa_memr_n_next | !cga_on),    // a card not in the machine sees no strobes
+    .isa_memw_n_next(isa_memw_n_next | !cga_on),
     .isa_aen_next   (isa_aen_next),
-    .isa_ior_n_next (isa_ior_n_next  | !CGA_FIT),
-    .isa_iow_n_next (isa_iow_n_next  | !CGA_FIT),
+    .isa_ior_n_next (isa_ior_n_next  | !cga_on),
+    .isa_iow_n_next (isa_iow_n_next  | !cga_on),
     .isa_dout   (isa_dout),
     .isa_din    (cga_din_c),
     .isa_dsel   (cga_dsel_c),
-    .isa_memr_n (isa_memr_n | !CGA_FIT),
-    .isa_memw_n (isa_memw_n | !CGA_FIT),
-    .isa_ior_n  (isa_ior_n  | !CGA_FIT),
-    .isa_iow_n  (isa_iow_n  | !CGA_FIT),
+    .isa_memr_n (isa_memr_n | !cga_on),
+    .isa_memw_n (isa_memw_n | !cga_on),
+    .isa_ior_n  (isa_ior_n  | !cga_on),
+    .isa_iow_n  (isa_iow_n  | !cga_on),
     .isa_aen    (isa_aen),
     .isa_ready  (cga_ready_c),
-    .font_we    (ibm_font_we),
-    .font_addr  (font_addr),
-    .font_data  (font_data),
+    .font_we    (cga_font_we),
+    .font_addr  (cga_font_addr),
+    .font_data  (cga_font_data),
     .font_thin  (font_thin),
     .lpen_trig  (1'b0),
     .lpen_sw    (1'b0),
@@ -361,20 +396,22 @@ cga_card #(.REG_READY(1'b1), .SNOW(CGA_SNOW)) u_cga (
 );
 
 // a card that is not fitted is not on the bus (synthesis removes it)
-assign cga_din    = CGA_FIT ? cga_din_c : 8'h00;
-assign cga_dsel   = CGA_FIT && cga_dsel_c;
-assign cga_ready  = !CGA_FIT || cga_ready_c;
-// video out: the PVC4 when it is on the board, else the CGA
+assign cga_din    = cga_on ? cga_din_c : 8'h00;
+assign cga_dsel   = cga_on && cga_dsel_c;
+assign cga_ready  = !cga_on || cga_ready_c;
+// video out: the PVC4 when it is on the board and no CGA card is plugged in
+// (the monitor is on the card's connector then), else the CGA
 logic       pvc_ce, pvc_mono, pvc_mm, pvc_hs, pvc_vs, pvc_hb, pvc_vb;
 logic [3:0] pvc_rgbi;
-assign vid_ce       = PVC4_FIT ? pvc_ce : ce_14m;
-assign vid_rgbi     = PVC4_FIT ? pvc_rgbi : CGA_FIT ? cga_rgbi : 4'h0;
-assign vid_hsync    = PVC4_FIT ? pvc_hs : CGA_FIT && cga_hs;
-assign vid_vsync    = PVC4_FIT ? pvc_vs : CGA_FIT && cga_vs;
-assign vid_hblank   = PVC4_FIT ? pvc_hb : !CGA_FIT || cga_hb;
-assign vid_vblank   = PVC4_FIT ? pvc_vb : !CGA_FIT || cga_vb;
-assign vid_mono     = PVC4_FIT && pvc_mono;
-assign vid_monomode = PVC4_FIT && pvc_mm;
+wire        vid_pvc = PVC4_FIT && !cga_on;
+assign vid_ce       = vid_pvc ? pvc_ce : ce_14m;
+assign vid_rgbi     = vid_pvc ? pvc_rgbi : cga_on ? cga_rgbi : 4'h0;
+assign vid_hsync    = vid_pvc ? pvc_hs : cga_on && cga_hs;
+assign vid_vsync    = vid_pvc ? pvc_vs : cga_on && cga_vs;
+assign vid_hblank   = vid_pvc ? pvc_hb : !cga_on || cga_hb;
+assign vid_vblank   = vid_pvc ? pvc_vb : !cga_on || cga_vb;
+assign vid_mono     = vid_pvc && pvc_mono;
+assign vid_monomode = vid_pvc && pvc_mm;
 
 // MDA or Hercules. With a CGA in the machine the Hercules card does not
 // answer at B8000-BFFFF (its page 2 stays invisible to the CPU).

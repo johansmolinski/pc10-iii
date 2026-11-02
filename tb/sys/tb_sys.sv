@@ -12,6 +12,7 @@ module tb_sys #(
     parameter int MDA_FIT = 0,
     parameter bit FE2010A = 1'b0,
     parameter bit PVC4 = 1'b0,          // the PC10-III's onboard video (doc/pvc4.md)
+    parameter bit CGACARD = 1'b0,       // with PVC4: an IBM CGA card in a slot (doc/cga.md 11)
     parameter bit XTA = 1'b0            // the PC20-III's hard disk (doc/xta.md)
 ) (
     input  logic        clk,
@@ -179,7 +180,7 @@ end
 assign ram_ack   = ack_sh[ram_lat - 1];
 assign ram_rdata = rd_sh[ram_lat - 1];
 
-pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4), .MDA_FIT(MDA_FIT),
+pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4 || CGACARD), .MDA_FIT(MDA_FIT),
             .PVC4_FIT(PVC4), .XTA_FIT(XTA)) u_pc (
     .clk        (clk),
     .reset      (reset),
@@ -203,6 +204,7 @@ pc_system #(.RAM_KB(RAM_KB), .DRQ0_SKEW(DRQ0_SKEW), .CGA_FIT(!PVC4), .MDA_FIT(MD
     .vid_vblank (vid_vblank),
     .vid_mono   (vid_mono),
     .vid_monomode(vid_monomode),
+    .cga_card   (CGACARD),
     .font_addr_hi(font_addr_hi),
     .font_cbm   (font_cbm),
     .cbm_dip    (cbm_dip),

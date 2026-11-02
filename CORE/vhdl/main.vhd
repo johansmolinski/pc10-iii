@@ -38,6 +38,7 @@ entity main is
       -- switch 1 (1 = USA/Europe character set), bit 1 = switch 2 (1 = onboard video mono);
       -- they agree with dip_sw1_i bits 5-4 (pc_chipset.vhd)
       cbm_dip_i               : in  std_logic_vector(1 downto 0);
+      cga_card_i              : in  std_logic;     -- an IBM CGA card in a slot (pc_chipset.vhd)
       mono_tint_i             : in  std_logic_vector(1 downto 0);   -- the mono phosphor: 0 green, 1 amber, 2 white
 
       -- Video output (on clk_main_i with video_ce_o)
@@ -193,6 +194,7 @@ architecture synthesis of main is
          cbm_dip     : in  std_logic_vector(1 downto 0);
          vid_mono    : out std_logic;
          vid_monomode : out std_logic;
+         cga_card    : in  std_logic;
          ucl_we      : in  std_logic;
          ucl_addr    : in  std_logic_vector(12 downto 0);
          ucl_data    : in  std_logic_vector(7 downto 0);
@@ -383,6 +385,7 @@ begin
          cbm_dip     => cbm_dip_i,
          vid_mono    => vid_mono,
          vid_monomode => vid_mm,
+         cga_card    => cga_card_i,
          ucl_we      => ucl_we_i,
          ucl_addr    => ucl_addr_i,
          ucl_data    => ucl_data_i,

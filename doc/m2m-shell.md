@@ -418,8 +418,9 @@ Menu (`config.vhd`, bits = line numbers, `C_MENU_*` in `mega65.vhd`):
  Chipset: %s         PC10-III (FE2010A) (default) / IBM XT (8255); a change restarts the PC
  Memory: %s          640 KB / 512 KB / 256 KB / 128 KB
  HDMI: %s            720p 60 Hz 16:9 / 480p 59.94 Hz 4:3 / 720p 50 Hz 16:9
- Display: %s         Colour (default) / Monochrome, green / amber / white;
-                     colour <-> mono restarts the PC
+ Display: %s         Colour (default) / Monochrome, green / amber / white /
+                     IBM CGA card; a change between colour, mono and the
+                     card restarts the PC
  Scandinavian charset  CONFIG switch 1 on (default off = USA/Europe): the
                      Commodore character ROM's A14, live
  Ports and mouse     submenu (doc/ports.md section 6): PMOD: serial + printer
@@ -433,13 +434,13 @@ Menu (`config.vhd`, bits = line numbers, `C_MENU_*` in `mega65.vhd`):
 ```
 
 Settings file `/pc10/pc10cfg` (the Shell creates it), start folder `/pc10`.
-Behind the menu bytes its text holds `key=value` lines: `menu=9` (the
-signature below, `menu=9` since 2026-10-27) and `hdc=<card>:<path>` (C:'s
+Behind the menu bytes its text holds `key=value` lines: `menu=10` (the
+signature below, `menu=10` since 2026-10-28) and `hdc=<card>:<path>` (C:'s
 image, section 4).
 It holds one byte per menu line, so its layout is the menu's: since
 2026-10-25 the firmware's `CFG_SIGCHECK` accepts a file only when its text
 (M2M-UPSTREAM cfg-strings, behind the menu bytes) has the line `menu=5`
-(`CFG_SIG_VAL` in `m2m-rom.asm`, the layout version, `9` since 2026-10-27:
+(`CFG_SIG_VAL` in `m2m-rom.asm`, the layout version, `10` since 2026-10-28:
 change it with every change of the menu's lines; `2` was the 32-line menu with the drive sound,
 `3` the 39-line one with the chipset submenu, `4` the 48-line one with the
 Display submenu and 720p 50 Hz, `5` the 49-line one with the character set,
@@ -447,7 +448,9 @@ Display submenu and 720p 50 Hz, `5` the 49-line one with the character set,
 the row "Drive B" at lines 7-8 (branch intfd) or the 58-line one with the "Ports
 and mouse" submenu at lines 43-50 (branch ports), 2026-10-26; `8` the 60-line one
 with both, the row at lines 7-8 and the submenu at lines 45-52, 2026-10-27; `9` the
-59-line one with ` int. drive` at line 4 beside ` B:%s`, since 2026-10-27).
+59-line one with ` int. drive` at line 4 beside ` B:%s`, 2026-10-27; `10` the
+60-line one with ` IBM CGA card` at line 41 in the Display submenu, since
+2026-10-28).
 Any other file (the 31-line
 files before the drive sound line had none; the Shell would even load a
 shorter file as one from a menu that grew at its end, shifting every option
@@ -478,7 +481,11 @@ chipset change does: the PVC4 takes its straps in reset, and the real machine
 is switched off to move a DIP switch. Switch 1 (the character set) is the
 line "Scandinavian charset": on the board it is wired straight to the
 character ROM's A14, so it acts at once, without a restart; it matters only
-with a Commodore ROM in `/pc10/char.rom`.
+with a Commodore ROM in `/pc10/char.rom`. **IBM CGA card** (2026-10-28,
+doc/cga.md section 11): the fifth choice of the same group puts an IBM CGA
+into a slot (`pc_system`'s `cga_card`); `pc_chipset.vhd` straps the onboard
+video colour with it (5D/6D), the Commodore BIOS finds the card and leaves
+the PVC4 off, and the picture comes from the card.
 
 The firmware (`m2m-rom.asm`) is the Shell plus the callbacks (`PREP_START`:
 BIOS check, alignment and gate, CGA font; `PREP_LOAD_IMAGE`: the floppy

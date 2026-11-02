@@ -62,6 +62,7 @@ module pc_system #(
     input  logic [1:0]  cbm_dip,
     output logic        vid_mono,
     output logic        vid_monomode,
+    input  logic        cga_card,     // (ignored)
 
     input  logic        ucl_we,       // the 8088's microcode load port (ignored)
     input  logic [12:0] ucl_addr,

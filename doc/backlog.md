@@ -77,7 +77,14 @@ sound: nearly every sound option of the 1987-1991 games that run on an 8088.
   on the hardware: a game's setup that probes the card (Sierra SCI0: AdLib,
   Game Blaster and Sound Blaster drivers), digital sound by DMA.
 
-## An IBM CGA card instead of the onboard video (asked 2026-10-26)
+## An IBM CGA card instead of the onboard video (asked 2026-10-26) - BUILT
+
+Built 2026-10-28 (branch `cgacard`, doc/cga.md section 11): the menu's
+"Display > IBM CGA card"; the character ROM from the Commodore ROM's USA set
+(decided: no separate `cga.rom`). Hardware (pc10-cgac-a): the card works and
+snows; 8088 MPH on it: no result yet. The design
+notes as they were asked:
+
 
 A menu choice **Video: onboard (PVC4) / IBM CGA card**: the PC10-III with an
 IBM CGA (or a faithful clone) in an expansion slot, the onboard video off.

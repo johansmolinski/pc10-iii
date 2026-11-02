@@ -260,7 +260,7 @@ Help opens it:
 | `Chipset` | `PC10-III (FE2010A)` (default) or `IBM XT (8255)`; a change restarts the PC |
 | `Memory` | 640 / 512 / 256 / 128 KB |
 | `HDMI` | 720p 60 Hz (default), 480p 59.94 Hz 4:3, 720p 50 Hz |
-| `Display` | colour (default), or monochrome in green, amber or white; colour <-> monochrome restarts the PC |
+| `Display` | colour (default), monochrome in green, amber or white, or `IBM CGA card`; a change between them restarts the PC |
 | `Scandinavian charset` | the character ROM's national set (CONFIG switch 1), at once |
 | `Analog: 15 kHz RGB`, `Analog: CSYNC` | the analog output: 15 kHz instead of VGA; composite sync |
 | `Help` | the help page |
@@ -334,6 +334,12 @@ at boot.
   (default) or 480p 59.94 Hz 4:3.
 - **Monochrome** (MDA, Hercules): 49.8 Hz; on HDMI, 720p 50 Hz is the mode for
   it. The analog output cannot show it.
+- **IBM CGA card:** an IBM Color/Graphics Adapter in an expansion slot
+  instead of the onboard video, as the PC10-III allowed: the Commodore BIOS
+  finds the card and leaves the onboard video off. For programs written for
+  IBM's card and its exact timing (wait states, snow), such as 8088 MPH. Its
+  characters come from `char.rom` (the USA/Europe set: the IBM card has one
+  character ROM). Its picture is the colour picture's (59.92 Hz).
 - **Analog:** VGA (31 kHz, the picture line-doubled) next to HDMI, or with
   `Analog: 15 kHz RGB` the PC's own 15.7 kHz for an RGB monitor or a CRT, and
   `Analog: CSYNC` for composite sync.
@@ -381,8 +387,8 @@ the back card first, then in the tray, and `/pc10/bios.rom`, `ucode.bin` and
 - **8088 MPH** does not run through: it hangs in its sprite part. This is
   being investigated. The demo is written for IBM's CGA card, whose timing the
   PC10-III's onboard video does not have.
-- No IBM CGA card in place of the onboard video, no composite colour, no sound
-  card: they are on the list for later versions (doc/backlog.md).
+- No composite colour, no sound card: they are on the list for later
+  versions (doc/backlog.md).
 - Floppy images are not remembered across power-off (C: is); a changed SD card
   is not noticed; no 1.2M or 1.44M disks (they need an AT's controller).
 - C: takes only the PC20-III's 20 MB size. With slow SD cards, writing and
