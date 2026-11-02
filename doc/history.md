@@ -2573,5 +2573,6 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   3,182 checks, tb/mda, tb/shell PASS.
 - **Build `pc10-cgac-a`** (REF=pc10-rel-0.1): RESULT OK, WNS +0.349, WHS
   +0.018, LUTs 31,893 (+593), BRAM 282.5/365 (+6), 0 routing errors. Kit
-  `~/pcxt-work/kits/pc10-cgac-a/` (SD files as release 0.1). Loaded on the
-  board; not tested yet.
+  `~/pcxt-work/kits/pc10-cgac-a/` (SD files as release 0.1).
+- **Hardware** (the user, on pc10-cgac-a): the IBM CGA card works, and it
+  snows like the IBM card. 8088 MPH on it: no result yet.

@@ -81,7 +81,8 @@ sound: nearly every sound option of the 1987-1991 games that run on an 8088.
 
 Built 2026-10-28 (branch `cgacard`, doc/cga.md section 11): the menu's
 "Display > IBM CGA card"; the character ROM from the Commodore ROM's USA set
-(decided: no separate `cga.rom`). Hardware: 8088 MPH to be tried. The design
+(decided: no separate `cga.rom`). Hardware (pc10-cgac-a): the card works and
+snows; 8088 MPH on it: no result yet. The design
 notes as they were asked:
 
 

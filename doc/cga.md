@@ -2,7 +2,8 @@
 
 Status 2026-10-22: complete for RGBI output, verified in simulation (section
 9) against a C++ model of MartyPC's CGA. GLaBIOS boots with it in `tb/sys`
-(instead of `cga_stub.sv`), without a font. Not yet on hardware; composite
+(instead of `cga_stub.sv`), without a font. On hardware since 2026-10-28 as
+the PC10-III's slot card (section 11): it works and snows. Composite
 decoding not done (the raw signals are there, section 7).
 
 ## 1. Files and ports
@@ -506,3 +507,5 @@ PVC4 does not have (doc/backlog.md).
   frame equals the PVC4's of the same boot without the card dot for dot (the
   same glyphs, not mirrored). `tb_chipset.vhd`: the restart, the colour
   straps with mono chosen, the card's output.
+- **Hardware** (build pc10-cgac-a): the card works and snows. 8088 MPH on
+  it: no result yet.
