@@ -18,11 +18,12 @@ hardware-generated [SingleStepTests 8088](https://github.com/SingleStepTests/808
 suite on every cycle of 3,006,693 of its 3,007,000 tests (and in registers
 and memory on all of them).
 
-**Version 0.1** is the first release. It runs the Commodore BIOS 4.41 and
-Commodore MS-DOS 3.21 from floppy images and from the hard disk; every feature
-below was tested on a MEGA65 except the serial and printer ports (see
-[Ports, mouse and Covox](#ports-mouse-and-covox)). It is built for the **MEGA65 R6** only (see
-[Boards](#boards)).
+**Version 0.1.1** runs the Commodore BIOS 4.41 and Commodore MS-DOS 3.21
+from floppy images and from the hard disk; every feature below was tested on
+a MEGA65 except the serial and printer ports (see
+[Ports, mouse and Covox](#ports-mouse-and-covox)). It is built for the
+**MEGA65 R6** and the **R3/R3A** (see [Boards](#boards)); what is new is in
+[doc/release-0.1.1.md](doc/release-0.1.1.md).
 
 - [Features](#features)
 - [Boards](#boards)
@@ -76,11 +77,14 @@ below was tested on a MEGA65 except the serial and printer ports (see
 
 ## Boards
 
-Release 0.1 is built for the **MEGA65 R6** only. The project's goal is every
-board from R3 on: the core keeps the PC's memory in the FPGA's block RAM and
-needs no SDRAM, so it fits the R3. Since release 0.1 there is an R3 bitstream
-(`build_all.sh R3`, doc/m2m-shell.md section 12): it boots on an R3A;
-R4/R5 builds have not been made or tested.
+Release 0.1.1 is built for the **MEGA65 R6** (`PC10-III-0.1.1-R6.cor`) and
+the **R3 and R3A** (`PC10-III-0.1.1-R3.cor`): the core keeps the PC's memory
+in the FPGA's block RAM and needs no SDRAM. The R3 core is tested on an R3A
+(it boots from the back SD slot, HDMI and VGA); its 3.5 mm audio jack, the battery
+clock (another chip on the R3), the internal drive as B: and the PMOD ports
+are not tested yet, and the original R3 not at all (its PCB cannot detect a
+card in the internal SD slot: use the back slot). R4/R5 builds have not been
+made or tested. Release 0.1 was R6 only.
 
 ## Installing
 
@@ -93,7 +97,7 @@ R4/R5 builds have not been made or tested.
 | `/pc10/char.rom` | the Commodore character ROM, recommended | the release package, or zimmers.net |
 | disk images | MS-DOS and your programs | the release package (`dos321-1.img`, `dos321-2.img`), [MS-DOS](#ms-dos), [The hard disk C:](#the-hard-disk-c) |
 
-The release 0.1 package's `pc10` folder already holds `bios.rom`,
+The release package's `pc10` folder already holds `bios.rom`,
 `char.rom`, the two MS-DOS 3.21 disks and `ports.img` (a mouse and Covox test
 disk); `pc10/EXTRAS-NOTICE.txt` says whose they are. Copy the folder to the
 card and the core runs.
@@ -196,12 +200,16 @@ file copied to a FAT32 card in one go never is.
 
 ### Flashing the core
 
-The package has the core as `PC10-III-0.1-R6.cor` and as a bitstream,
-`PC10-III-0.1-R6.bit`. Flash the `.cor` file into a core slot with the
-MEGA65's flash menu (hold NO SCROLL while switching on; the MEGA65 User's
-Guide explains it), or, with a JTAG adapter, load the `.bit` file directly
-with the [m65 tool](https://github.com/MEGA65/mega65-tools):
-`m65 -q PC10-III-0.1-R6.bit`.
+The package has the core for each board as a `.cor` file and as a
+bitstream: `PC10-III-0.1.1-R6.cor` / `.bit` for the R6,
+`PC10-III-0.1.1-R3.cor` / `.bit` for the R3 and R3A. Flash the `.cor` file of
+your board into a core slot with the MEGA65's flash menu (hold NO SCROLL
+while switching on; the MEGA65 User's Guide explains it), or, with a JTAG
+adapter, load the `.bit` file directly with the
+[m65 tool](https://github.com/MEGA65/mega65-tools):
+`m65 -q PC10-III-0.1.1-R6.bit`. If the core then says it cannot mount the SD
+card (after another core ran), switch the MEGA65 off and on: a card can be
+left in a state that only losing power clears.
 
 ## First start
 
@@ -361,7 +369,7 @@ The PC10-III's ports, as its Commodore BIOS finds them at start-up (COM at
   tolerant: use a 3.3 V USB-UART module or an RS-232 level shifter (MAX3232)
   for the serial port, 5 V buffers for a printer, and never RS-232 levels on
   the header. The serial layout is Megamiga's, so its adapters fit.
-  doc/ports.md section 6.1 has the wiring. Release 0.1: the serial and
+  doc/ports.md section 6.1 has the wiring. Release 0.1.1: the serial and
   printer ports are not tested on hardware yet (simulated only, with the
   Commodore BIOS and DOS); the mouse and the Covox are.
 - **Mouse:** an Amiga mouse (the PC10-III came with Commodore's 1352, an Amiga
@@ -383,7 +391,7 @@ the back card first, then in the tray, and `/pc10/bios.rom`, `ucode.bin` and
 
 ## Known limitations
 
-- MEGA65 R6 only ([Boards](#boards)).
+- MEGA65 R6 and R3/R3A only; parts of the R3 are not tested yet ([Boards](#boards)).
 - **8088 MPH** does not run through: it hangs in its sprite part. This is
   being investigated. The demo is written for IBM's CGA card, whose timing the
   PC10-III's onboard video does not have.
@@ -473,21 +481,22 @@ engineering log: [doc/history.md](doc/history.md); what is asked for next:
 ### A release package
 
 ```sh
-python3 tools/make_release.py --bit <build>/mega65_r6.bit --out <dir> \
-    --jenner 8086_microcode_v2.zip --version 0.1
+python3 tools/make_release.py --bit <r6 build>/mega65_r6.bit --board R6 \
+    --bit <r3 build>/mega65_r3.bit --board R3 --out <dir> \
+    --jenner 8086_microcode_v2.zip --version 0.1.1
 ```
 
 It checks `CORE_VERSION` in `CORE/vhdl/config.vhd` and the bitstream's board,
 makes the `.cor` file with the MEGA65's `coretool` (or `bit2core`), builds
 `pc10/ucode.bin` and checks it against the genuine 8088 bundle, and writes
-`<dir>/PC10-III-<version>/` and `PC10-III-<version>-R6.zip`: the core, the
-bitstream, `pc10/ucode.bin` with `pc10/UCODE-NOTICE.txt`
+`<dir>/PC10-III-<version>/` and `PC10-III-<version>-R3-R6.zip` (the boards
+given): each board's core and bitstream, `pc10/ucode.bin` with `pc10/UCODE-NOTICE.txt`
 (from `tools/release/`), `blank-hd20.img`, this README, the licence, the
 release notes (`doc/release-<version>.md`) and the two tools. It refuses any
-other file: the repository holds no Commodore ROM or DOS. For release 0.1
-the BIOS, the character ROM and the DOS disks were added to the package's
-`pc10` folder by hand afterwards, with `pc10/EXTRAS-NOTICE.txt` (the user's
-decision, 2026-10-27).
+other file: the repository holds no Commodore ROM or DOS. For releases 0.1
+and 0.1.1 the BIOS, the character ROM and the DOS disks were added to the
+package's `pc10` folder by hand afterwards, with `pc10/EXTRAS-NOTICE.txt`
+(the user's decision, 2026-10-27).
 
 ### Repository
 

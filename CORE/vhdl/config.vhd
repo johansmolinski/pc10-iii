@@ -38,7 +38,7 @@ end entity config;
 architecture beh of config is
 
 -- The version of the core: welcome/help screens and the core name derive from it
-constant CORE_VERSION : string := "0.1";
+constant CORE_VERSION : string := "0.1.1";
 
 ----------------------------------------------------------------------------------------------------------
 -- String and character constants (specific for the Anikki-16x16 font)
