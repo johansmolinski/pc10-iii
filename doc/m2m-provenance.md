@@ -13,7 +13,7 @@ the code; the list with the reasons is in Megamiga's `AGENTS.md`.
 
 Taken over from Megamiga's `main` since (single files, the rest stays at `4dac552`):
 
-- `M2M/vhdl/controllers/HDMI/video_out_clock.vhd` from `b2a2f06` (2026-11-06):
+- `M2M/vhdl/controllers/HDMI/video_out_clock.vhd` from `b2a2f06` (2026-11-03; taken over 2026-11-06):
   Megamiga's exception 22 `hdmi-clock-reset` (upstream AExp `b6f2d98`, AExp
   issue #39). A reset takes the video-mode-change route (the backup clock
   first, then the MMCM reset and reprogramming after the release;
