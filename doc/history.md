@@ -2635,3 +2635,32 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   original R3 (doc/m2m-shell.md section 12).
 - No CPU or PC change: SST and the gates are not affected (no RTL under
   `rtl/` changed).
+
+## 2026-11-06 - HDMI after the reset button (branch `hdmirst`, builds pc10-hdmirst-r3, -r6)
+
+- **What** (the user, R3A, pc10-r3-b): after the reset button, VGA was fine
+  and HDMI showed static vertical bars until a power cycle.
+- **Why:** the framework's `video_out_clock.vhd` reset the HDMI MMCM directly
+  with `rsti` (`mmcm_rst <= cfg_rst or rsti`), so the HDMI pixel clock stopped
+  and ran unlocked under the scaler's output stage, whose reset is released
+  long before the MMCM locks again. Megamiga took the fix over from upstream
+  AExp on 2026-11-03 (`b2a2f06`, its exception 22 `hdmi-clock-reset`, AExp
+  `b6f2d98`, AExp issue #39), after the framework copy this repository vendors
+  (`4dac552`).
+- **Change:** `video_out_clock.vhd` from Megamiga `b2a2f06` (the only change
+  to that file since `4dac552`): a reset takes the video-mode-change route
+  (backup clock first, RESET_WAIT, MMCM reset and reprogramming after the
+  release), `mmcm_rst <= cfg_rst`. doc/m2m-provenance.md lists the file.
+- **Bench** `tb/voc/run_voc_reset.sh` (Megamiga's `CORE/sim/video`, ROOT
+  adjusted): **PASS** (long press: 0 unlocked edges at the scaler, longest
+  pixel-clock pause 34 ns, the encoder held in reset during the press, MMCM
+  locked 52.8 us after the release; a sweep of 42 resets over every state);
+  the red control (the old file) **FAILS** as it must (5,556 unlocked edges,
+  a 203 us pause).
+- **Builds** (`cfd497f`, full, in parallel): `pc10-hdmirst-r3` OK first pass,
+  WNS +0.315, WHS +0.024, LUTs 31,956; `pc10-hdmirst-r6` OK, WNS +0.343,
+  WHS +0.036, LUTs 31,868; 0 routing errors. Kits
+  `~/pcxt-work/kits/pc10-hdmirst-r3/`, `-r6/`.
+- **Hardware** (the user's R3A, pc10-hdmirst-r3): the reset button brings
+  HDMI back. R6: not tried (the same change).
+- No CPU or PC change: no RTL under `rtl/` changed.
