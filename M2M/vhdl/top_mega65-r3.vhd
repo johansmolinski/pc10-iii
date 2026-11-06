@@ -63,23 +63,26 @@ port (
    kb_jtagen_o        : out   std_logic;
 
    -- Micro SD Connector (external slot at back of the cover)
-   sd_reset_o         : out   std_logic;
+   -- M2M-UPSTREAM sd-host (pc10-iii 2026-11-06, R3 as Megamiga's R4-R6 of 2026-10-14): CMD and
+   -- DAT3..0 are bidirectional (native 4-bit SD bus); the names stay the SPI ones of the XDC:
+   -- reset = DAT3/CS, mosi = CMD, miso = DAT0
+   sd_reset_o         : inout std_logic;
    sd_clk_o           : out   std_logic;
-   sd_mosi_o          : out   std_logic;
-   sd_miso_i          : in    std_logic;
+   sd_mosi_o          : inout std_logic;
+   sd_miso_i          : inout std_logic;
    sd_cd_i            : in    std_logic;
-   sd_d1_i            : in    std_logic;
-   sd_d2_i            : in    std_logic;
+   sd_d1_i            : inout std_logic;
+   sd_d2_i            : inout std_logic;
 
    -- SD Connector (this is the slot at the bottom side of the case under the cover)
-   sd2_reset_o        : out   std_logic;
+   sd2_reset_o        : inout std_logic;
    sd2_clk_o          : out   std_logic;
-   sd2_mosi_o         : out   std_logic;
-   sd2_miso_i         : in    std_logic;
+   sd2_mosi_o         : inout std_logic;
+   sd2_miso_i         : inout std_logic;
    sd2_cd_i           : in    std_logic;
    sd2_wp_i           : in    std_logic;
-   sd2_d1_i           : in    std_logic;
-   sd2_d2_i           : in    std_logic;
+   sd2_d1_i           : inout std_logic;
+   sd2_d2_i           : inout std_logic;
 
    -- 3.5mm analog audio jack
    pwm_l_o            : out   std_logic;
@@ -267,6 +270,16 @@ architecture synthesis of mega65_r3 is
    signal osm_key_b              : integer range 0 to 79;  -- M2M-UPSTREAM osm-hotkey (AExp 2026-07-10)
    signal osm_combo              : std_logic;              -- M2M-UPSTREAM osm-hotkey (AExp 2026-07-10)
    signal osm_block              : std_logic;              -- M2M-UPSTREAM osm-hotkey (Megamiga 2026-10-13)
+   -- M2M-UPSTREAM rtg-framebuffer (pc10-iii 2026-11-06, R3 as Megamiga's R4-R6 of 2026-10-09):
+   -- core -> ascal framebuffer mode
+   signal fb_ena                 : std_logic;
+   signal fb_hsize, fb_vsize     : std_logic_vector(11 downto 0);
+   signal fb_format              : std_logic_vector( 5 downto 0);
+   signal fb_base                : std_logic_vector(31 downto 0);
+   signal fb_stride              : std_logic_vector(13 downto 0);
+   signal fb_pal_clk, fb_pal_wr  : std_logic;
+   signal fb_pal_a               : std_logic_vector( 7 downto 0);
+   signal fb_pal_dw, fb_pal_dr   : std_logic_vector(23 downto 0);
 
    -- Joysticks and Paddles
    signal main_joy1_up_n         : std_logic;
@@ -374,7 +387,32 @@ architecture synthesis of mega65_r3 is
    signal i2c_sda                : std_logic := 'H';
    signal i2c_scl                : std_logic := 'H';
 
+   -- M2M-UPSTREAM sd-host (pc10-iii 2026-11-06): the SD lines of the framework and the engine
+   -- port to the core
+   signal sd_cmd_o, sd_cmd_oe, sd_cmd_in       : std_logic;
+   signal sd_dat_o, sd_dat_oe, sd_dat_in       : std_logic_vector(3 downto 0);
+   signal sd2_cmd_o, sd2_cmd_oe, sd2_cmd_in    : std_logic;
+   signal sd2_dat_o, sd2_dat_oe, sd2_dat_in    : std_logic_vector(3 downto 0);
+   signal sd_eng_c2q                           : std_logic_vector(75 downto 0);
+   signal sd_eng_q2c                           : std_logic_vector(63 downto 0);
+
 begin
+
+   -- M2M-UPSTREAM sd-host (pc10-iii 2026-11-06, as R4-R6): tri-state drivers of the SD lines
+   sd_mosi_o   <= sd_cmd_o    when sd_cmd_oe     = '1' else 'Z';
+   sd_miso_i   <= sd_dat_o(0) when sd_dat_oe(0)  = '1' else 'Z';
+   sd_d1_i     <= sd_dat_o(1) when sd_dat_oe(1)  = '1' else 'Z';
+   sd_d2_i     <= sd_dat_o(2) when sd_dat_oe(2)  = '1' else 'Z';
+   sd_reset_o  <= sd_dat_o(3) when sd_dat_oe(3)  = '1' else 'Z';
+   sd_cmd_in   <= sd_mosi_o;
+   sd_dat_in   <= sd_reset_o & sd_d2_i & sd_d1_i & sd_miso_i;
+   sd2_mosi_o  <= sd2_cmd_o    when sd2_cmd_oe    = '1' else 'Z';
+   sd2_miso_i  <= sd2_dat_o(0) when sd2_dat_oe(0) = '1' else 'Z';
+   sd2_d1_i    <= sd2_dat_o(1) when sd2_dat_oe(1) = '1' else 'Z';
+   sd2_d2_i    <= sd2_dat_o(2) when sd2_dat_oe(2) = '1' else 'Z';
+   sd2_reset_o <= sd2_dat_o(3) when sd2_dat_oe(3) = '1' else 'Z';
+   sd2_cmd_in  <= sd2_mosi_o;
+   sd2_dat_in  <= sd2_reset_o & sd2_d2_i & sd2_d1_i & sd2_miso_i;
 
    -----------------------------------------------------------------------------------------
    -- MAX10 FPGA handling: extract reset signal
@@ -477,10 +515,14 @@ begin
    f_motorb_o    <= '1';
    f_selectb_o   <= '1';
    led_o         <= '0'; -- Off
-   p1lo_io       <= (others => 'Z');
-   p1hi_io       <= (others => 'Z');
-   p2lo_io       <= (others => 'Z');
-   p2hi_io       <= (others => 'Z');
+   -- M2M-UPSTREAM pmod-pins (pc10-iii 2026-11-06, R3 as Megamiga's R4-R6 of 2026-10-09): the
+   -- PMOD headers are routed into MEGA65_Core, board top -> core direct, framework.vhd
+   -- untouched. The R3 has no pmod1_en/pmod2_en (its headers are always powered); the core
+   -- keeps every pin high-Z while its ports are off. Original tie-offs kept for reference:
+   -- p1lo_io       <= (others => 'Z');
+   -- p1hi_io       <= (others => 'Z');
+   -- p2lo_io       <= (others => 'Z');
+   -- p2hi_io       <= (others => 'Z');
    qspidb_io     <= (others => 'Z');
    qspicsn_o     <= '1';
 
@@ -514,16 +556,25 @@ begin
       kb_io0_o                => kb_io0_o,
       kb_io1_o                => kb_io1_o,
       kb_io2_i                => kb_io2_i,
-      sd_reset_o              => sd_reset_o,
+      -- M2M-UPSTREAM sd-host (pc10-iii 2026-11-06, as R4-R6)
       sd_clk_o                => sd_clk_o,
-      sd_mosi_o               => sd_mosi_o,
-      sd_miso_i               => sd_miso_i,
+      sd_cmd_o                => sd_cmd_o,
+      sd_cmd_oe_o             => sd_cmd_oe,
+      sd_cmd_i                => sd_cmd_in,
+      sd_dat_o                => sd_dat_o,
+      sd_dat_oe_o             => sd_dat_oe,
+      sd_dat_i                => sd_dat_in,
       sd_cd_i                 => sd_cd_i,
-      sd2_reset_o             => sd2_reset_o,
       sd2_clk_o               => sd2_clk_o,
-      sd2_mosi_o              => sd2_mosi_o,
-      sd2_miso_i              => sd2_miso_i,
+      sd2_cmd_o               => sd2_cmd_o,
+      sd2_cmd_oe_o            => sd2_cmd_oe,
+      sd2_cmd_i               => sd2_cmd_in,
+      sd2_dat_o               => sd2_dat_o,
+      sd2_dat_oe_o            => sd2_dat_oe,
+      sd2_dat_i               => sd2_dat_in,
       sd2_cd_i                => sd2_cd_i,
+      sd_eng_i                => sd_eng_c2q,
+      sd_eng_o                => sd_eng_q2c,
       joy_1_up_n_i            => fa_up_n_i,
       joy_1_down_n_i          => fa_down_n_i,
       joy_1_left_n_i          => fa_left_n_i,
@@ -588,6 +639,18 @@ begin
       osm_key_b_i             => osm_key_b,    -- M2M-UPSTREAM osm-hotkey (AExp 2026-07-10)
       osm_combo_i             => osm_combo,    -- M2M-UPSTREAM osm-hotkey (AExp 2026-07-10)
       osm_block_i             => osm_block,    -- M2M-UPSTREAM osm-hotkey (Megamiga 2026-10-13)
+      -- M2M-UPSTREAM rtg-framebuffer (pc10-iii 2026-11-06, as R4-R6)
+      fb_ena_i                => fb_ena,
+      fb_hsize_i              => fb_hsize,
+      fb_vsize_i              => fb_vsize,
+      fb_format_i             => fb_format,
+      fb_base_i               => fb_base,
+      fb_stride_i             => fb_stride,
+      fb_pal_clk_i            => fb_pal_clk,
+      fb_pal_a_i              => fb_pal_a,
+      fb_pal_dw_i             => fb_pal_dw,
+      fb_pal_wr_i             => fb_pal_wr,
+      fb_pal_dr_o             => fb_pal_dr,
       main_joy1_up_n_o        => main_joy1_up_n,
       main_joy1_down_n_o      => main_joy1_down_n,
       main_joy1_left_n_o      => main_joy1_left_n,
@@ -763,6 +826,18 @@ begin
          osm_key_b_o             => osm_key_b,  -- M2M-UPSTREAM osm-hotkey (AExp 2026-07-10)
          osm_combo_o             => osm_combo,  -- M2M-UPSTREAM osm-hotkey (AExp 2026-07-10)
          osm_block_o             => osm_block,  -- M2M-UPSTREAM osm-hotkey (Megamiga 2026-10-13)
+         -- M2M-UPSTREAM rtg-framebuffer (pc10-iii 2026-11-06, as R4-R6)
+         fb_ena_o                => fb_ena,
+         fb_hsize_o              => fb_hsize,
+         fb_vsize_o              => fb_vsize,
+         fb_format_o             => fb_format,
+         fb_base_o               => fb_base,
+         fb_stride_o             => fb_stride,
+         fb_pal_clk_o            => fb_pal_clk,
+         fb_pal_a_o              => fb_pal_a,
+         fb_pal_dw_o             => fb_pal_dw,
+         fb_pal_wr_o             => fb_pal_wr,
+         fb_pal_dr_i             => fb_pal_dr,
 
          -- Audio output (Signed PCM)
          main_audio_left_o       => main_audio_l,
@@ -856,6 +931,42 @@ begin
          f_writeprotect_i  => f_writeprotect_i,
          f_rdata_i         => f_rdata_i,
          f_diskchanged_i   => f_diskchanged_i,
+
+         -- M2M-UPSTREAM sdram-pins (pc10-iii 2026-11-06): the R3 has no SDRAM; the core's
+         -- SDRAM ports stay unconnected (a core that needs SDRAM does not run on the R3)
+         sdram_clk_o       => open,
+         sdram_cke_o       => open,
+         sdram_ras_n_o     => open,
+         sdram_cas_n_o     => open,
+         sdram_we_n_o      => open,
+         sdram_cs_n_o      => open,
+         sdram_ba_o        => open,
+         sdram_a_o         => open,
+         sdram_dqml_o      => open,
+         sdram_dqmh_o      => open,
+         sdram_dq_io       => open,
+
+         -- M2M-UPSTREAM pmod-pins (pc10-iii 2026-11-06, as R4-R6; no header power switch)
+         p1lo_io           => p1lo_io,
+         p1hi_io           => p1hi_io,
+         p2lo_io           => p2lo_io,
+         p2hi_io           => p2hi_io,
+         pmod1_en_o        => open,
+         pmod2_en_o        => open,
+
+         -- M2M-UPSTREAM eth-pins (pc10-iii 2026-11-06): not routed on the R3 (the tie-offs
+         -- above stay); the core's Ethernet ports are unconnected
+         eth_clock_o       => open,
+         eth_led2_o        => open,
+         eth_mdc_o         => open,
+         eth_mdio_io       => open,
+         eth_reset_o       => open,
+         eth_txd_o         => open,
+         eth_txen_o        => open,
+
+         -- M2M-UPSTREAM sd-host (pc10-iii 2026-11-06, as R4-R6): the engine port
+         sd_eng_i          => sd_eng_q2c,
+         sd_eng_o          => sd_eng_c2q,
 
          -- C64 Expansion Port (aka Cartridge Port)
          cart_en_o         => cart_en,      -- Enable port, active high

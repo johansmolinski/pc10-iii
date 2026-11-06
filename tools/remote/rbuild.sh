@@ -59,6 +59,8 @@ fetch)
     d="$B/$name/CORE/CORE-$board.runs/impl_1"
     scp "$H:$d/mega65_$b.bit" "$H:$d/*timing_summary_routed.rpt" "$H:$d/*utilization_placed.rpt" \
         "$H:$d/utilization_hierarchical.rpt" "$H:$d/worst_paths.rpt" "$H:$d/*route_status.rpt" "$dest/" 2>/dev/null || true
+    # a re-rolled build (build_all.sh): which attempt won, and its timing report
+    scp "$H:$d/mega65_${b}_reroll.txt" "$H:$d/mega65_${b}_reroll_timing.rpt" "$dest/" 2>/dev/null || true
     scp "$H:$B/$name.log" "$dest/build.log"
     scp "$H:$B/$name/CORE/CORE-$board.runs/synth_1/runme.log" "$dest/synth_runme.log" 2>/dev/null || true
     ls -l "$dest"

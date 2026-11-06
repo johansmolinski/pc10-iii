@@ -534,6 +534,21 @@ nothing selected puts the cursor on ` B:`.
   two lines of the row "Drive B" so that the merged menu fits the 25 lines.
   For Megamiga: it has no rows on `main` yet; its cores must define
   `OPTM_CORE_HIDE` (C=0) when they take this.
+- `sd-host`, `rtg-framebuffer`, `pmod-pins`, `sdram-pins`, `eth-pins` on the
+  **R3 board top** (2026-11-06; `M2M/vhdl/top_mega65-r3.vhd`): Megamiga made
+  these for R4-R6 only (its R3 top was not adapted and no longer compiled
+  against its `framework.vhd`). The R3 top now does what the R6 top does:
+  bidirectional SD lines with the same XDC names and the engine port
+  (`sd_eng_*`), the framebuffer ports between core and framework, the PMOD
+  headers into `MEGA65_Core` (the R3 has no `pmod1_en`/`pmod2_en`: its
+  headers are always powered, the core keeps the pins high-Z while its ports
+  are off). The R3 has no SDRAM, and its Ethernet keeps the original tie-offs:
+  the core's SDRAM and Ethernet ports are unconnected there (this core uses
+  neither). Joystick outputs stay open as before (the R3 cannot drive the
+  joystick lines). `CORE/CORE-R3.xpr` comes from `CORE-R6.xpr` through
+  `tools/xpr_board.py` (top, XDC, `max10.vhdl` + `pcm_to_pdm.vhdl` instead
+  of `audio.vhd`): Megamiga's own R3 project is out of date. For Megamiga:
+  the same top works for its cores that do not need SDRAM.
 
 Budget (`make_rom.sh` prints it; check `HEAP` and `VAR$STACK_START` in
 `m2m-rom.lis`):
@@ -624,6 +639,11 @@ $R wait <name>
 $R fetch <name> R6                                   # -> ~/pcxt-work/builds/<name>/
 ```
 
+R3 (since 2026-11-06): `... start <checkout> <name> R3`, `fetch <name> R3`.
+`CORE/CORE-R3.xpr` is made from `CORE-R6.xpr`: run `tools/xpr_board.py`
+after every `tools/gen_xpr.py` run (Megamiga hard rule 1, the projects in
+sync).
+
 `build_bitstream.tcl` writes the bitstream in any case and prints one
 `RESULT` line: `SIGNOFF-FAILED` (a gate), `TIMING-FAILED` (WNS or WHS < 0)
 or `OK`. Gates: `main_clk` 34.921 ns (the one PC clock since clk28; the old
@@ -631,6 +651,22 @@ or `OK`. Gates: `main_clk` 34.921 ns (the one PC clock since clk28; the old
 160 block RAMs. It also writes
 `utilization_hierarchical.rpt` and `worst_paths.rpt` (50 paths, one per
 group) next to the bitstream; `rbuild.sh fetch` copies them.
+
+**Re-roll** (since 2026-11-06, Megamiga's `reroll_bitstream.tcl`): a board
+whose first pass only missed timing (`TIMING-FAILED`, the miss at most
+`REROLL_MAX_MISS`, 0.3 ns) is implemented again from that build's own
+checkpoints with other placer, then router directives, until one attempt
+meets setup, hold and the gates (`signoff_gates.tcl`, shared with
+`build_bitstream.tcl`). The winner replaces `mega65_<b>.bit`;
+`mega65_<b>_reroll.txt` names the attempt, `mega65_<b>_reroll_timing.rpt`
+has its timing, `mega65_<b>_reroll.dcp` is the checkpoint (`patch_firmware.sh
+save` takes it). The other reports describe the failed first pass.
+`build_all.sh --no-reroll` skips it. The usual case is the framework's
+HyperRAM read: the RWDS strobe reaches the data IDDRs over fabric routing,
+and the placement alone decides whether one data bit misses hold by a few
+tens of picoseconds (pc10-r3-a: `hr_d_io[4]`, -0.054 ns). The IDELAY tap is
+field-calibrated, so the design is not changed; Megamiga's
+`doc/developers/timing_closure.md` explains it.
 
 **Reference builds:** `REF=<earlier build> rbuild.sh start ...` (build_all.sh
 `REF_DIR`) runs incremental synthesis and implementation from that build's
@@ -940,13 +976,15 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
   exception).
 - **Firmware ROM:** 32557 of 32768 words; code banks since 2026-10-27 (bank 0:
   `pc_hdc.asm`); more code can move into banks 1-7.
-- **R3:** this fork's R3 board top was never adapted. It needs:
-  - sd-host (exception 18): bidirectional SD pins (CMD, DAT0..3 with output
-    enables) from `framework.vhd`, the engine port `sd_eng_*` to the core
-    (the floppy backend uses it), the pull-ups (CORE.xdc names), both slots;
-  - the `MEGA65_Core` port list of R4-R6 (floppy pins are routed already;
-    SDRAM, PMOD, Ethernet ports left open or tied - R3 has no SDRAM, so the
-    core must not need it, which this core does not);
-  - PMOD (exception 13) for the serial and parallel ports (doc/ports.md);
-  - a `CORE-R3.xpr` (`gen_xpr.py` on Megamiga's R3 project) with `max10.vhdl`
-    / `pcm_to_pdm.vhdl` instead of `audio.vhd` (Megamiga hard rule 1).
+- **R3:** built since 2026-11-06 (build `pc10-r3-b`; the board top in
+  section 8, framework exceptions); boots on an R3A (2026-11-06, after a
+  power cycle: a card stuck from an earlier session answered nothing, EE31,
+  doc/history.md). The original R3 (not R3A) cannot detect a card in the
+  tray (a PCB bug, upstream `sdmux.vhd`): untested; there the tray card may
+  need `sd2_cd_i` tied to "present" in the R3 top. Still to check on the R3A:
+  the 3.5 mm jack (PDM through `pcm_to_pdm`; HDMI
+  audio as on R6), the RTC (an ISL12020M, `rtc_master` reads and writes it
+  for `MEGA65_R3`), reset through the MAX10, both SD slots in 4-bit mode,
+  the PMOD headers (always powered on the R3), the internal drive as B:.
+  R4 and R5 have no build yet (`tools/xpr_board.py` would make their
+  projects with only the top and the XDC changed).

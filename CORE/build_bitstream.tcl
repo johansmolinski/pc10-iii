@@ -1,6 +1,6 @@
 # Build one board bitstream in Vivado batch mode (called by build_all.sh):
 #
-#   vivado -mode batch -source build_bitstream.tcl -tclargs <R6> [jobs]
+#   vivado -mode batch -source build_bitstream.tcl -tclargs <R6|R3> [jobs]
 #
 # Prints one "RESULT <board> ..." line and exits non-zero on any failure. After the bitstream
 # the routed design is opened and the sign-off gates are checked (constraints that silently
@@ -58,19 +58,9 @@ set whs [get_property STATS.WHS [get_runs impl_1]]
 open_run impl_1
 report_utilization -hierarchical -file CORE-${board}.runs/impl_1/utilization_hierarchical.rpt
 report_timing -max_paths 50 -nworst 1 -sort_by group -file CORE-${board}.runs/impl_1/worst_paths.rpt
-set gate {}
+source [file join [file dirname [info script]] signoff_gates.tcl]
+set gate [signoff_gates]
 if {$uc_gate ne ""} { lappend gate $uc_gate }
-foreach {clk want} {main_clk 34.921} {
-    set c [get_clocks -quiet $clk]
-    if {[llength $c] == 0} {
-        lappend gate "generated clock $clk missing"
-    } elseif {[expr {abs([get_property PERIOD $c] - $want)}] > 0.01} {
-        lappend gate "$clk period [get_property PERIOD $c] ns, expected $want ns"
-    }
-}
-if {[llength [get_cells -quiet -hierarchical -filter {NAME =~ CORE/i_pc_ram/* && REF_NAME =~ RAMB*}]] < 160} {
-    lappend gate "pc_ram has fewer than 160 block RAM primitives (640 KB optimised away?)"
-}
 if {[llength $gate] > 0} {
     foreach g $gate { puts "GATE $board: $g" }
     puts "RESULT $board SIGNOFF-FAILED WNS=$wns WHS=$whs"
