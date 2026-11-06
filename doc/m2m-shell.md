@@ -534,6 +534,21 @@ nothing selected puts the cursor on ` B:`.
   two lines of the row "Drive B" so that the merged menu fits the 25 lines.
   For Megamiga: it has no rows on `main` yet; its cores must define
   `OPTM_CORE_HIDE` (C=0) when they take this.
+- `sd-host`, `rtg-framebuffer`, `pmod-pins`, `sdram-pins`, `eth-pins` on the
+  **R3 board top** (2026-11-06; `M2M/vhdl/top_mega65-r3.vhd`): Megamiga made
+  these for R4-R6 only (its R3 top was not adapted and no longer compiled
+  against its `framework.vhd`). The R3 top now does what the R6 top does:
+  bidirectional SD lines with the same XDC names and the engine port
+  (`sd_eng_*`), the framebuffer ports between core and framework, the PMOD
+  headers into `MEGA65_Core` (the R3 has no `pmod1_en`/`pmod2_en`: its
+  headers are always powered, the core keeps the pins high-Z while its ports
+  are off). The R3 has no SDRAM, and its Ethernet keeps the original tie-offs:
+  the core's SDRAM and Ethernet ports are unconnected there (this core uses
+  neither). Joystick outputs stay open as before (the R3 cannot drive the
+  joystick lines). `CORE/CORE-R3.xpr` comes from `CORE-R6.xpr` through
+  `tools/xpr_board.py` (top, XDC, `max10.vhdl` + `pcm_to_pdm.vhdl` instead
+  of `audio.vhd`): Megamiga's own R3 project is out of date. For Megamiga:
+  the same top works for its cores that do not need SDRAM.
 
 Budget (`make_rom.sh` prints it; check `HEAP` and `VAR$STACK_START` in
 `m2m-rom.lis`):
@@ -623,6 +638,11 @@ $R status <name>
 $R wait <name>
 $R fetch <name> R6                                   # -> ~/pcxt-work/builds/<name>/
 ```
+
+R3 (since 2026-11-06): `... start <checkout> <name> R3`, `fetch <name> R3`.
+`CORE/CORE-R3.xpr` is made from `CORE-R6.xpr`: run `tools/xpr_board.py`
+after every `tools/gen_xpr.py` run (Megamiga hard rule 1, the projects in
+sync).
 
 `build_bitstream.tcl` writes the bitstream in any case and prints one
 `RESULT` line: `SIGNOFF-FAILED` (a gate), `TIMING-FAILED` (WNS or WHS < 0)

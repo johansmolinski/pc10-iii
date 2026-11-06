@@ -39,7 +39,9 @@ case "${cmd}" in
 save)
     board=$(echo "${3:-R6}" | tr a-z A-Z); b=$(echo "${board}" | tr A-Z a-z)
     impl=CORE-${board}.runs/impl_1
-    dcp=${impl}/mega65_${b}_postroute_physopt.dcp
+    # a re-rolled build (build_all.sh): its bitstream comes from mega65_<b>_reroll.dcp
+    dcp=${impl}/mega65_${b}_reroll.dcp
+    [ -f "${dcp}" ] || dcp=${impl}/mega65_${b}_postroute_physopt.dcp
     [ -f "${dcp}" ] || dcp=${impl}/mega65_${b}_routed.dcp
     [ -f "${dcp}" ] || die "no routed checkpoint in ${impl}"
     [ -f "${impl}/mega65_${b}.bit" ] || die "no bitstream in ${impl}"
