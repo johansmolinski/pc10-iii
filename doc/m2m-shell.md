@@ -981,10 +981,11 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
   power cycle: a card stuck from an earlier session answered nothing, EE31,
   doc/history.md). The original R3 (not R3A) cannot detect a card in the
   tray (a PCB bug, upstream `sdmux.vhd`): untested; there the tray card may
-  need `sd2_cd_i` tied to "present" in the R3 top. Still to check on the R3A:
-  the 3.5 mm jack (PDM through `pcm_to_pdm`; HDMI
-  audio as on R6), the RTC (an ISL12020M, `rtc_master` reads and writes it
-  for `MEGA65_R3`), reset through the MAX10, both SD slots in 4-bit mode,
-  the PMOD headers (always powered on the R3), the internal drive as B:.
+  need `sd2_cd_i` tied to "present" in the R3 top. Tested on the R3A
+  (the user, 2026-11-06): the 3.5 mm jack (PDM through `pcm_to_pdm`), the RTC
+  (an ISL12020M, `rtc_master` reads and writes it for `MEGA65_R3`), reset
+  through the MAX10 (HDMI back since hdmirst). Still to check on the R3A:
+  booting from the tray slot (its card initialises: 4-bit, high speed), the
+  PMOD headers (always powered on the R3), the internal drive as B:.
   R4 and R5 have no build yet (`tools/xpr_board.py` would make their
   projects with only the top and the XDC changed).

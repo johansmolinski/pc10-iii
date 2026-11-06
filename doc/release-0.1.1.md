@@ -11,7 +11,8 @@ Everything else is as in 0.1 (its notes and the README describe the core).
   `PC10-III-0.1.1-R6.cor` for the R6. The core keeps the PC's memory in the
   FPGA and needs no SDRAM, so it runs on the first MEGA65s. Tested on an
   R3A: it boots from the SD card in the back slot, with HDMI and VGA, and
-  HDMI comes back after the reset button.
+  HDMI comes back after the reset button; sound from the 3.5 mm jack and
+  the battery clock (a different chip on the R3) work.
 - **An IBM CGA card in a slot:** `Display` > `IBM CGA card` puts IBM's
   Color/Graphics Adapter into an expansion slot of the PC10-III, as the
   service manual allows; the Commodore BIOS then leaves the onboard video
@@ -59,9 +60,8 @@ it. You can make the same file yourself:
 
 ## Known limitations
 
-- **R3/R3A, not tested yet:** the 3.5 mm audio jack (HDMI audio works as on
-  the R6), the battery clock (a different chip on the R3), the MEGA65's
-  internal drive as B:, the PMOD ports. The original R3 (not R3A) has not
+- **R3/R3A, not tested yet:** the MEGA65's internal drive as B:, the PMOD
+  ports. The original R3 (not R3A) has not
   been tried at all; its PCB cannot detect a card in the internal SD slot,
   so use the back slot there.
 - **"Cannot mount SD card"** right after loading the core by JTAG over

@@ -2699,3 +2699,7 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   JTAG (over MegaX): "Core: PC10-III 0.1.1", the config file and the three
   ROMs from the back card. The R6 release bitstream was not loaded (no R6
   connected); it differs from pc10-hdmirst-r6 by the version string only.
+- **Hardware, later** (the user, R3A, 0.1.1): the battery clock (the R3's
+  ISL12020M) and sound from the 3.5 mm jack work. Release notes, README and
+  doc/m2m-shell.md section 12 updated, and the text of the GitHub release;
+  the zip keeps the notes it was released with.

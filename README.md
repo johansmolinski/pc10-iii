@@ -80,9 +80,10 @@ a MEGA65 except the serial and printer ports (see
 Release 0.1.1 is built for the **MEGA65 R6** (`PC10-III-0.1.1-R6.cor`) and
 the **R3 and R3A** (`PC10-III-0.1.1-R3.cor`): the core keeps the PC's memory
 in the FPGA's block RAM and needs no SDRAM. The R3 core is tested on an R3A
-(it boots from the back SD slot, HDMI and VGA); its 3.5 mm audio jack, the battery
-clock (another chip on the R3), the internal drive as B: and the PMOD ports
-are not tested yet, and the original R3 not at all (its PCB cannot detect a
+(it boots from the back SD slot, HDMI and VGA, the reset button, sound from
+the 3.5 mm jack, the battery clock, which is another chip on the R3); the
+internal drive as B: and the PMOD ports are not tested yet, and the original
+R3 not at all (its PCB cannot detect a
 card in the internal SD slot: use the back slot). R4/R5 builds have not been
 made or tested. Release 0.1 was R6 only.
 
