@@ -11,6 +11,18 @@ code-banks, cfg-strings, sd-host with two slots, menu-rows, line-doubler,
 rtg-native-modes, ...). Each change carries an `M2M-UPSTREAM <name>` tag in
 the code; the list with the reasons is in Megamiga's `AGENTS.md`.
 
+Taken over from Megamiga's `main` since (single files, the rest stays at `4dac552`):
+
+- `M2M/vhdl/controllers/HDMI/video_out_clock.vhd` from `b2a2f06` (2026-11-06):
+  Megamiga's exception 22 `hdmi-clock-reset` (upstream AExp `b6f2d98`, AExp
+  issue #39). A reset takes the video-mode-change route (the backup clock
+  first, then the MMCM reset and reprogramming after the release;
+  `mmcm_rst <= cfg_rst`). Before, the reset button stopped the HDMI pixel
+  clock under the scaler's already released output stage: static vertical
+  bars on HDMI until a power cycle, VGA fine (the user's R3A, pc10-r3-b).
+  Bench `tb/voc/run_voc_reset.sh` (Megamiga's `CORE/sim/video`, with its red
+  control: the template's behaviour must fail).
+
 `M2M/QNICE` is a git submodule: johansmolinski/QNICE-FPGA, branch
 `fat32-fastseek`, pinned to **`78aeaac`**, the commit Megamiga `main` pins
 (fast FAT32 seek, extent maps, the FAT32 write layer).
