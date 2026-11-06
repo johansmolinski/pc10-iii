@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """make_release.py - package a release of the PC10-III core from a bitstream.
 
-  make_release.py --bit FILE --out DIR [--jenner ZIP|DIR | --ucode FILE | --no-ucode]
-                  [--version V] [--board R6] [--coretool PATH] [--no-blank-hd]
+  make_release.py --bit FILE [--board R6] [--bit FILE --board R3 ...] --out DIR
+                  [--jenner ZIP|DIR | --ucode FILE | --no-ucode]
+                  [--version V] [--coretool PATH] [--no-blank-hd]
                   [--allow-dirty] [--force]
+
+--bit and --board come in pairs, one per board (a single --bit without --board
+is R6); every board's .cor and .bit go into the same package (since 0.1.1).
 
 It checks the version (CORE_VERSION in CORE/vhdl/config.vhd: a plain release
 number such as "0.1", equal to --version if given) and the bitstream (the
@@ -11,12 +15,13 @@ design of the board, the FPGA part), makes the .cor file with the MEGA65's
 coretool (or bit2core), and writes
 
   DIR/PC10-III-<version>/                     the package, unpacked
-  DIR/PC10-III-<version>-<board>.zip          the same, zipped
+  DIR/PC10-III-<version>-<boards>.zip         the same, zipped (boards joined
+                                              by "-", e.g. R3-R6)
 
 with these files and no others:
 
-  PC10-III-<version>-<board>.cor   the core, for flashing a core slot
-  PC10-III-<version>-<board>.bit   the bitstream, for JTAG
+  PC10-III-<version>-<board>.cor   the core, for flashing a core slot (per board)
+  PC10-III-<version>-<board>.bit   the bitstream, for JTAG (per board)
   pc10/ucode.bin                   the 8088 microcode bundle (AGENTS.md rule 4:
   pc10/UCODE-NOTICE.txt            Intel's property, a separate file, withdrawn
                                    if Intel asks), with its notice
@@ -161,10 +166,12 @@ def build_ucode(args, dst):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--bit", required=True, help="the bitstream of the release build")
+    ap.add_argument("--bit", required=True, action="append",
+                    help="the bitstream of a board's release build (once per board)")
     ap.add_argument("--out", required=True, help="output directory (the package and the zip go here)")
     ap.add_argument("--version", help="the release number; must equal CORE_VERSION in config.vhd")
-    ap.add_argument("--board", default="R6", help="board revision of the bitstream (default R6)")
+    ap.add_argument("--board", action="append",
+                    help="board revision of the --bit in the same position (default R6 for one --bit)")
     u = ap.add_mutually_exclusive_group(required=True)
     u.add_argument("--jenner", help="Jenner's 8086_microcode_v2.zip (or its unpacked directory)")
     u.add_argument("--ucode", help="a ready ucode.bin (checked against the genuine 8088 bundle)")
@@ -176,9 +183,15 @@ def main():
     ap.add_argument("--force", action="store_true", help="replace an existing package in --out")
     args = ap.parse_args()
 
-    board = args.board.upper()
-    if not re.fullmatch(r"R[3-6]", board):
-        die("--board %s: one of R3..R6" % args.board)
+    boards = [b.upper() for b in (args.board or ["R6"])]
+    if len(boards) != len(args.bit):
+        die("%d --bit but %d --board: give one --board per --bit" % (len(args.bit), len(boards)))
+    for b in boards:
+        if not re.fullmatch(r"R[3-6]", b):
+            die("--board %s: one of R3..R6" % b)
+    if len(set(boards)) != len(boards):
+        die("a board twice: %s" % " ".join(boards))
+    bits = sorted(zip(boards, args.bit))                # R3 before R6: the zip name, the listing
 
     # the version: config.vhd is the one source (welcome and help screens, core name)
     version = core_version()
@@ -192,21 +205,24 @@ def main():
     if dirty and not args.allow_dirty:
         die("the work tree has uncommitted changes (--allow-dirty for a test):\n" + dirty)
 
-    # the bitstream
-    if not os.path.isfile(args.bit):
-        die("no bitstream %s" % args.bit)
-    hdr = bit_header(args.bit)
-    design, part = hdr["a"].split(";")[0], hdr["b"]
-    if design != "mega65_" + board.lower():
-        die("%s: design %s, not mega65_%s (--board?)" % (args.bit, design, board.lower()))
-    if part != PART:
-        die("%s: part %s, not %s" % (args.bit, part, PART))
+    # the bitstreams
+    hdrs = {}
+    for board, bit in bits:
+        if not os.path.isfile(bit):
+            die("no bitstream %s" % bit)
+        hdr = bit_header(bit)
+        design, part = hdr["a"].split(";")[0], hdr["b"]
+        if design != "mega65_" + board.lower():
+            die("%s: design %s, not mega65_%s (--board?)" % (bit, design, board.lower()))
+        if part != PART:
+            die("%s: part %s, not %s" % (bit, part, PART))
+        hdrs[board] = (design, hdr)
 
     tool = find_coretool(args.coretool)
 
     base = "%s-%s" % (NAME, version)
     final_pkg = os.path.join(os.path.abspath(args.out), base)
-    final_zip = final_pkg + "-%s.zip" % board
+    final_zip = final_pkg + "-%s.zip" % "-".join(b for b, _ in bits)
     for p in (final_pkg, final_zip):
         if os.path.exists(p) and not args.force:
             die("%s exists (--force replaces it)" % p)
@@ -218,12 +234,12 @@ def main():
     os.makedirs(os.path.join(pkg, "pc10"))
     os.makedirs(os.path.join(pkg, "tools"))
 
-    core = "%s-%s" % (base, board)
-    make_cor(tool, args.bit, board, version, os.path.join(pkg, core + ".cor"))
-    shutil.copyfile(args.bit, os.path.join(pkg, core + ".bit"))
-
-    expect = {core + ".cor", core + ".bit", "README.md", "LICENSE",
-              "tools/mkucode.py", "tools/mkblankhd.py"}
+    expect = {"README.md", "LICENSE", "tools/mkucode.py", "tools/mkblankhd.py"}
+    for board, bit in bits:
+        core = "%s-%s" % (base, board)
+        make_cor(tool, bit, board, version, os.path.join(pkg, core + ".cor"))
+        shutil.copyfile(bit, os.path.join(pkg, core + ".bit"))
+        expect |= {core + ".cor", core + ".bit"}
     if not args.no_ucode:
         build_ucode(args, os.path.join(pkg, "pc10", "ucode.bin"))
         shutil.copyfile(NOTICE, os.path.join(pkg, "pc10", "UCODE-NOTICE.txt"))
@@ -273,9 +289,11 @@ def main():
     os.rename(zpath, final_zip)
     pkg, zpath = final_pkg, final_zip
 
-    print("%s %s for %s: commit %s%s, bitstream %s (%s %s %s)"
-          % (NAME, version, board, head, " (uncommitted changes)" if dirty else "",
-             os.path.basename(args.bit), design, hdr["c"], hdr["d"]))
+    print("%s %s for %s: commit %s%s" % (NAME, version, " ".join(b for b, _ in bits), head,
+                                         " (uncommitted changes)" if dirty else ""))
+    for board, bit in bits:
+        design, hdr = hdrs[board]
+        print("  %s: bitstream %s (%s %s %s)" % (board, bit, design, hdr["c"], hdr["d"]))
     print("core file made with %s (%s)" % (tool[0], tool[1]))
     for rel in sorted(found):
         p = os.path.join(pkg, rel)

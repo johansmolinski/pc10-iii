@@ -2664,3 +2664,38 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
 - **Hardware** (the user's R3A, pc10-hdmirst-r3): the reset button brings
   HDMI back. R6: not tried (the same change).
 - No CPU or PC change: no RTL under `rtl/` changed.
+
+## 2026-11-06 - Release 0.1.1 (builds pc10-rel-0.1.1-r3, -r6; tag v0.1.1)
+
+- **What** (the user: a 0.1.1 release with both R3 and R6 .cor files): what
+  main has since 0.1: the R3/R3A, the IBM CGA card in a slot, HDMI after the
+  reset button. `CORE_VERSION` "0.1.1"; `doc/release-0.1.1.md` (new,
+  updating from 0.1: the settings reset once because the menu grew,
+  `menu=10`, C: stays; the R3 parts not tested; the stuck SD card); README
+  for both boards.
+- **tools/make_release.py:** `--bit`/`--board` pairs, given once per board,
+  go into one package (`PC10-III-<v>-R3-R6.zip`); a single `--bit` without
+  `--board` is R6 as before. Tested with the hdmirst bitstreams (both .cor
+  verified by coretool: 03 mega65r3 and 06 mega65r6, PC10-III, 0.1.1), the
+  single-board form, a board that does not match the bitstream and an
+  unpaired `--bit` (both refused).
+- **Builds** (`384ce67`, full, in parallel): `pc10-rel-0.1.1-r6` OK first
+  pass, WNS +0.376, WHS +0.036, LUTs 31,859, BRAM 282.5/365, md5 112c200d...;
+  `pc10-rel-0.1.1-r3` first pass WHS -0.029 (the HyperRAM strobe again,
+  `hr_d_io[4]`), **OK after re-roll 2/15** (place ExtraTimingOpt, route
+  Explore): WNS +0.380, WHS +0.036, LUTs 31,953, BRAM 282.5/365, md5
+  f184f74e...; 0 routing errors.
+- **Package** (`make_release.py --bit .../mega65_r6.bit --board R6 --bit
+  .../mega65_r3.bit --board R3 --ucode ~/pcxt-work/ucode/8088.bin --version
+  0.1.1`): both .cor and .bit, `pc10/ucode.bin` (md5 38d6a32e..., the genuine
+  8088 bundle) with its notice, `blank-hd20.img`, README, LICENSE,
+  RELEASE-NOTES.md, the two tools; then by hand (AGENTS.md rule 4, as 0.1):
+  `pc10/bios.rom`, `char.rom`, `dos321-1.img`, `dos321-2.img`, `ports.img`,
+  `EXTRAS-NOTICE.txt` (its header says 0.1.1; kept in
+  `~/pcxt-work/release-0.1.1-extras/`) and `doc/img/` for the README's logo.
+  `PC10-III-0.1.1-R3-R6.zip` 5,290,534 bytes, 24 entries, sha256
+  62121c97...; in `~/pcxt-work/release-0.1.1/`.
+- **Hardware:** the package's `PC10-III-0.1.1-R3.bit` on the user's R3A by
+  JTAG (over MegaX): "Core: PC10-III 0.1.1", the config file and the three
+  ROMs from the back card. The R6 release bitstream was not loaded (no R6
+  connected); it differs from pc10-hdmirst-r6 by the version string only.
