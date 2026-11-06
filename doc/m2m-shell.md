@@ -652,6 +652,22 @@ or `OK`. Gates: `main_clk` 34.921 ns (the one PC clock since clk28; the old
 `utilization_hierarchical.rpt` and `worst_paths.rpt` (50 paths, one per
 group) next to the bitstream; `rbuild.sh fetch` copies them.
 
+**Re-roll** (since 2026-11-06, Megamiga's `reroll_bitstream.tcl`): a board
+whose first pass only missed timing (`TIMING-FAILED`, the miss at most
+`REROLL_MAX_MISS`, 0.3 ns) is implemented again from that build's own
+checkpoints with other placer, then router directives, until one attempt
+meets setup, hold and the gates (`signoff_gates.tcl`, shared with
+`build_bitstream.tcl`). The winner replaces `mega65_<b>.bit`;
+`mega65_<b>_reroll.txt` names the attempt, `mega65_<b>_reroll_timing.rpt`
+has its timing, `mega65_<b>_reroll.dcp` is the checkpoint (`patch_firmware.sh
+save` takes it). The other reports describe the failed first pass.
+`build_all.sh --no-reroll` skips it. The usual case is the framework's
+HyperRAM read: the RWDS strobe reaches the data IDDRs over fabric routing,
+and the placement alone decides whether one data bit misses hold by a few
+tens of picoseconds (pc10-r3-a: `hr_d_io[4]`, -0.054 ns). The IDELAY tap is
+field-calibrated, so the design is not changed; Megamiga's
+`doc/developers/timing_closure.md` explains it.
+
 **Reference builds:** `REF=<earlier build> rbuild.sh start ...` (build_all.sh
 `REF_DIR`) runs incremental synthesis and implementation from that build's
 checkpoints (keep its tree on the host). Vivado only does it when the
@@ -960,13 +976,11 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
   exception).
 - **Firmware ROM:** 32557 of 32768 words; code banks since 2026-10-27 (bank 0:
   `pc_hdc.asm`); more code can move into banks 1-7.
-- **R3:** this fork's R3 board top was never adapted. It needs:
-  - sd-host (exception 18): bidirectional SD pins (CMD, DAT0..3 with output
-    enables) from `framework.vhd`, the engine port `sd_eng_*` to the core
-    (the floppy backend uses it), the pull-ups (CORE.xdc names), both slots;
-  - the `MEGA65_Core` port list of R4-R6 (floppy pins are routed already;
-    SDRAM, PMOD, Ethernet ports left open or tied - R3 has no SDRAM, so the
-    core must not need it, which this core does not);
-  - PMOD (exception 13) for the serial and parallel ports (doc/ports.md);
-  - a `CORE-R3.xpr` (`gen_xpr.py` on Megamiga's R3 project) with `max10.vhdl`
-    / `pcm_to_pdm.vhdl` instead of `audio.vhd` (Megamiga hard rule 1).
+- **R3:** built since 2026-11-06 (build `pc10-r3-b`; the board top in
+  section 8, framework exceptions). Not tried on an R3 yet. What differs
+  there and wants a check: the 3.5 mm jack (PDM through `pcm_to_pdm`; HDMI
+  audio as on R6), the RTC (an ISL12020M, `rtc_master` reads and writes it
+  for `MEGA65_R3`), reset through the MAX10, both SD slots in 4-bit mode,
+  the PMOD headers (always powered on the R3), the internal drive as B:.
+  R4 and R5 have no build yet (`tools/xpr_board.py` would make their
+  projects with only the top and the XDC changed).

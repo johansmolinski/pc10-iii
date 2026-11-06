@@ -2576,3 +2576,45 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   `~/pcxt-work/kits/pc10-cgac-a/` (SD files as release 0.1).
 - **Hardware** (the user, on pc10-cgac-a): the IBM CGA card works, and it
   snows like the IBM card. 8088 MPH on it: no result yet.
+
+## 2026-11-06 - The core on the MEGA65 R3 (branch `r3`, builds pc10-r3-a, pc10-r3-b)
+
+- **Why:** the user asked for an R3 build. The R3 has the same XC7A200T; the
+  core needs no SDRAM (plan.md section 3). The framework's R3 top was never
+  adapted by Megamiga and no longer compiled against its `framework.vhd`
+  (the old SPI-style SD ports).
+- **Board top** (`M2M/vhdl/top_mega65-r3.vhd`, `M2M-UPSTREAM` tags, framework
+  exception in doc/m2m-shell.md section 8): sd-host (bidirectional CMD and
+  DAT3..0 with the XDC's names, the engine port `sd_eng_*`), rtg-framebuffer
+  (`fb_*` between core and framework), the PMOD headers into `MEGA65_Core`
+  (no `pmod*_en` on the R3: always powered); the core's SDRAM and Ethernet
+  ports unconnected (the R3's Ethernet keeps its tie-offs), joystick outputs
+  open as before. MAX10 reset, `pcm_to_pdm` on the 3.5 mm jack and the R3 XDC
+  unchanged. Checked before Vivado: ghdl analysis and elaboration of the R3
+  top against the real entity declarations of `framework`, `MEGA65_Core`,
+  `max10` and `pcm_to_pdm` (every port mapped), the R6 top the same way.
+- **Project:** `CORE/CORE-R3.xpr` from `CORE-R6.xpr` with `tools/xpr_board.py`
+  (top, XDC, `max10.vhdl` + `pcm_to_pdm.vhdl` instead of `audio.vhd`, both
+  `VHDL2008`); Megamiga's own R3 project is out of date. Run it after every
+  `gen_xpr.py`.
+- **Build `pc10-r3-a`** (`478832c`, full): `TIMING-FAILED` WNS +0.184,
+  WHS -0.054: one endpoint, the framework's HyperRAM read
+  (`hr_d_io[4]` -> IDDR, clock `hr_rwds`): the strobe's fabric route from
+  its IDELAY was 1.597 ns. Megamiga's known case
+  (doc/developers/timing_closure.md there): a placement draw, the IDELAY tap
+  is field-calibrated, so no design change.
+- **Re-roll** (`b7ecfe5`): Megamiga's `reroll_bitstream.tcl` and the second
+  pass of its `build_all.sh` (`--no-reroll`, `REROLL_MAX_MISS` 0.3 ns), with
+  our gates moved to `CORE/signoff_gates.tcl` (shared with
+  `build_bitstream.tcl`); `patch_firmware.sh save` takes the re-roll's
+  checkpoint, `rbuild.sh fetch` its record and timing report.
+- **Build `pc10-r3-b`** (`b7ecfe5`, full, 8 min + re-roll 4 min): first pass
+  as pc10-r3-a (WNS +0.184, WHS -0.054, deterministic); re-roll attempt 1/15
+  (place ExtraPostPlacementOpt) WHS -0.054, **attempt 2/15 (place
+  ExtraTimingOpt, route Explore) PASS: WNS +0.334, WHS +0.024** (hr_rwds hold
+  +0.229), gates pass, 0 routing errors (first pass), LUTs 31,951, BRAM
+  282.5/365 (as pc10-cgac-a + 58 LUTs). `mega65_r3.bit` md5 1af37566...,
+  kit `~/pcxt-work/kits/pc10-r3-b/` (SD files as release 0.1). Not tried on
+  an R3 (doc/m2m-shell.md section 12 lists what to check).
+- No CPU or PC change: SST and the gates are not affected (no RTL under
+  `rtl/` changed).
