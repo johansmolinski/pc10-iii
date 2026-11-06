@@ -977,8 +977,12 @@ same timing to the picosecond and `RESULT R6 OK`; its bitstream is
 - **Firmware ROM:** 32557 of 32768 words; code banks since 2026-10-27 (bank 0:
   `pc_hdc.asm`); more code can move into banks 1-7.
 - **R3:** built since 2026-11-06 (build `pc10-r3-b`; the board top in
-  section 8, framework exceptions). Not tried on an R3 yet. What differs
-  there and wants a check: the 3.5 mm jack (PDM through `pcm_to_pdm`; HDMI
+  section 8, framework exceptions); boots on an R3A (2026-11-06, after a
+  power cycle: a card stuck from an earlier session answered nothing, EE31,
+  doc/history.md). The original R3 (not R3A) cannot detect a card in the
+  tray (a PCB bug, upstream `sdmux.vhd`): untested; there the tray card may
+  need `sd2_cd_i` tied to "present" in the R3 top. Still to check on the R3A:
+  the 3.5 mm jack (PDM through `pcm_to_pdm`; HDMI
   audio as on R6), the RTC (an ISL12020M, `rtc_master` reads and writes it
   for `MEGA65_R3`), reset through the MAX10, both SD slots in 4-bit mode,
   the PMOD headers (always powered on the R3), the internal drive as B:.

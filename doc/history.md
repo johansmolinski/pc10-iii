@@ -2614,7 +2614,24 @@ printer port; Hercules details without a schematic (doc/mda.md section 10).
   ExtraTimingOpt, route Explore) PASS: WNS +0.334, WHS +0.024** (hr_rwds hold
   +0.229), gates pass, 0 routing errors (first pass), LUTs 31,951, BRAM
   282.5/365 (as pc10-cgac-a + 58 LUTs). `mega65_r3.bit` md5 1af37566...,
-  kit `~/pcxt-work/kits/pc10-r3-b/` (SD files as release 0.1). Not tried on
-  an R3 (doc/m2m-shell.md section 12 lists what to check).
+  kit `~/pcxt-work/kits/pc10-r3-b/` (SD files as release 0.1).
+- **Hardware** (the user's R3A, loaded by JTAG): the first three loads stopped
+  at "FATAL ERROR ... no SD card can be mounted. Error code: EE31" (sdhost's
+  "no card / init failed"). The firmware's UART log (115200 baud on
+  `/dev/ttyUSB1`, captured while `m65 -q` loads) and QMON afterwards
+  (`M D FF20`..`FF27`, `M C FF27` selects the slot, `M C FF25 0000` re-inits,
+  `M C FF26 0001` SPI only; CSR at `FFE0`): both card-detects set (`0F3D`);
+  the tray card ready (SDHC, native, high speed: register 6 `0035`); the
+  back card (the user's, with `/pc10`) EE31 with register 6 `0000`, and
+  still EE31 after a re-init and in SPI-only mode, on the pins and pads of
+  the R6 build (the routed checkpoints compared). After a **power cycle**
+  the same bitstream **boots**: "Using config file: /pc10/pc10cfg", the three
+  ROMs load. A card left in a state that only losing power clears (JTAG loads
+  never cut its supply); MegaX recorded the same on this board (its first
+  load failed, the second booted). If it comes back: switch off and on.
+- A tie-off of the tray card-detect (`sd2_cd_i => '0'`, upstream's note on
+  the original R3's PCB bug) was tried as the fix, then dropped unbuilt: the
+  R3A's tray detect works, and the miss was the back card. Open for an
+  original R3 (doc/m2m-shell.md section 12).
 - No CPU or PC change: SST and the gates are not affected (no RTL under
   `rtl/` changed).

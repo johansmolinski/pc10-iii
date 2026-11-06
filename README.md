@@ -79,7 +79,7 @@ below was tested on a MEGA65 except the serial and printer ports (see
 Release 0.1 is built for the **MEGA65 R6** only. The project's goal is every
 board from R3 on: the core keeps the PC's memory in the FPGA's block RAM and
 needs no SDRAM, so it fits the R3. Since release 0.1 there is an R3 bitstream
-(`build_all.sh R3`, doc/m2m-shell.md section 12), not yet tried on an R3;
+(`build_all.sh R3`, doc/m2m-shell.md section 12): it boots on an R3A;
 R4/R5 builds have not been made or tested.
 
 ## Installing
