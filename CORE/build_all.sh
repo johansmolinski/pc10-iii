@@ -2,7 +2,7 @@
 # Build the PC10-III bitstream(s) in Vivado batch mode (simplified from Megamiga's
 # build_all.sh: no re-roll, no placement margin, no reference builds yet).
 #
-# Usage: ./build_all.sh [board ...]        boards: R6 (default; only CORE-R6.xpr exists)
+# Usage: ./build_all.sh [board ...]        boards: R6 (default), R3 (CORE-R3.xpr from tools/xpr_board.py)
 #
 #   cd CORE && source <Vivado>/settings64.sh && ./build_all.sh R6
 #

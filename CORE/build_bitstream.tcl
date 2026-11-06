@@ -1,6 +1,6 @@
 # Build one board bitstream in Vivado batch mode (called by build_all.sh):
 #
-#   vivado -mode batch -source build_bitstream.tcl -tclargs <R6> [jobs]
+#   vivado -mode batch -source build_bitstream.tcl -tclargs <R6|R3> [jobs]
 #
 # Prints one "RESULT <board> ..." line and exits non-zero on any failure. After the bitstream
 # the routed design is opened and the sign-off gates are checked (constraints that silently
